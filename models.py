@@ -14,26 +14,11 @@ def encoder(opts, inputs, reuse=False, is_training=False):
             return x
         inputs = tf.cond(is_training,
                          lambda: add_noise(inputs), lambda: do_nothing(inputs))
-    num_units = opts['e_num_filters']
-    num_layers = opts['e_num_layers']
 
     with tf.variable_scope("encoder", reuse=reuse):
-        if opts['e_arch'] == 'mlp':
+        if opts['e_arch_g'] == 'mlp':
             # Encoder uses only fully connected layers with ReLus
-            hi = inputs
-            for i in xrange(num_layers):
-                hi = ops.linear(opts, hi, num_units, scope='h%d_lin' % i)
-                if opts['batch_norm']:
-                    hi = ops.batch_norm(opts, hi, is_training,
-                                        reuse, scope='h%d_bn' % i)
-                hi = tf.nn.relu(hi)
-            if opts['e_noise'] != 'gaussian':
-                res = ops.linear(opts, hi, opts['zdim'], 'hfinal_lin')
-            else:
-                mean = ops.linear(opts, hi, opts['zdim'], 'mean_lin')
-                log_sigmas = ops.linear(opts, hi,
-                                        opts['zdim'], 'log_sigmas_lin')
-                res = (mean, log_sigmas)
+            res = mlp_encoder(opts, inputs, is_training, reuse)
         elif opts['e_arch'] == 'dcgan':
             # Fully convolutional architecture similar to DCGAN
             res = dcgan_encoder(opts, inputs, is_training, reuse)
@@ -73,6 +58,387 @@ def encoder(opts, inputs, reuse=False, is_training=False):
 
         return res
 
+def mlp_encoder(opts, inputs, is_training=False, reuse=False):
+    num_units_g = opts['e_num_filters_g']
+    num_layers_g = opts['e_num_layers_g']
+    num_units_m = opts['e_num_filters_m']
+    num_layers_m = opts['e_num_layers_m']
+    means, log_sigmas = [], []
+    if opts['e_noise'] == 'gaussians':
+        # encode the mean parameters of gaussian
+        layer_x = inputs
+        for i in range(num_layers_g):
+            layer_x = ops.linear(opts, layer_x, num_units_g, scope='h{}_lin'.format(i))
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                    reuse, scope='h{}_bn'.format(i))
+            layer_x = tf.nn.relu(layer_x)
+        mean = ops.linear(opts, layer_x, opts['zdim'], 'mean_lin')
+        log_sigma = ops.linear(opts, layer_x,
+                                opts['zdim'], 'log_sigmas_lin')
+        means.append(mean)
+        log_sigmas.append(log_sigma)
+        log_mixprobs = None
+    elif opts['e_noise'] == 'mixture_gaussians':
+        # encode the mean parameters of the nmixtures gaussians
+        for k in range(opts['nmixtures']):
+            layer_x = inputs
+            for i in range(num_layers_m):
+                layer_x = ops.linear(opts, layer_x, num_units_m, scope='m{}_h{}_lin'.format(k,i))
+                if opts['batch_norm']:
+                    layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                        reuse, scope='m{}_h{}_bn'.format(k,i))
+                layer_x = tf.nn.relu(layer_x)
+            mean = ops.linear(opts, layer_x, opts['zdim'], 'm{}_mean_lin'.format(k))
+            log_sigma = ops.linear(opts, layer_x,
+                                    opts['zdim'], 'm{}_log_sigmas_lin'.format(k))
+            means.append(mean)
+            log_sigmas.append(log_sigma)
+        # encode the mean parameters of the weights mixture
+        layer_x = inputs
+        for i in range(num_layers_g):
+            layer_x = ops.linear(opts, layer_x, num_units_g, scope='h{}_lin'.format(i))
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                    reuse, scope='h{}_bn'.format(i))
+            layer_x = tf.nn.relu(layer_x)
+        log_mixprobs = ops.linear(opts, layer_x, opts['nmixtures'], 'mixprob_lin')
+    else:
+        # encode the mean parameters for non gaussian encoder
+        layer_x = inputs
+        for i in xrange(num_layers_g):
+            layer_x = ops.linear(opts, layer_x, num_units_g, scope='h{}_lin'.format(i))
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                    reuse, scope='h{}_bn'.format(i))
+            layer_x = tf.nn.relu(layer_x)
+        mean = ops.linear(opts, layer_x, opts['zdim'], 'hfinal_lin')
+        #means.append(mean)
+        #res = (tf.stack(means,axis=1),None,None)
+        return mean
+
+    res = (tf.stack(means,axis=1), tf.stack(log_sigmas,axis=1), log_mixprobs)
+    return res
+
+def dcgan_encoder(opts, inputs, is_training=False, reuse=False):
+    num_units_g = opts['e_num_filters_g']
+    num_layers_g = opts['e_num_layers_g']
+    num_units_m = opts['e_num_filters_m']
+    num_layers_m = opts['e_num_layers_m']
+    means, log_sigmas = [], []
+    if opts['e_noise'] == 'gaussian':
+        # encode the mean parameters of gaussian
+        layer_x = inputs
+        for i in range(num_layers_g):
+            scale = 2**(num_layers_g - i - 1)
+            layer_x = ops.conv2d(opts, layer_x, num_units_g / scale,
+                                 scope='h{}_conv'.format(i))
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                         reuse, scope='h{}_bn'.format(i))
+            layer_x = tf.nn.relu(layer_x)
+            mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
+            log_sigma = ops.linear(opts, layer_x,
+                                    opts['zdim'], scope='log_sigmas_lin')
+        means.append(mean)
+        log_sigmas.append(log_sigma)
+        log_mixprobs = None
+    elif opts['e_noise'] == 'mixture_gaussians':
+        # encode the mean parameters of the nmixtures gaussians
+        for k in range(opts['nmixtures']):
+            layer_x = inputs
+            for i in range(num_layers_m):
+                scale = 2**(num_layers_m - i - 1)
+                layer_x = ops.conv2d(opts, layer_x, num_units_m / scale,
+                                     scope='m{}_h{}_conv'.format(k,i))
+                if opts['batch_norm']:
+                    layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                             reuse, scope='m{}_h{}_bn'.format(k,i))
+                layer_x = tf.nn.relu(layer_x)
+                mean = ops.linear(opts, layer_x, opts['zdim'], scope='m{}_mean_lin'.format(k))
+                log_sigma = ops.linear(opts, layer_x,
+                                        opts['zdim'], scope='m{}_log_sigmas_lin'.format(k))
+            means.append(mean)
+            log_sigmas.append(log_sigma)
+        # encode the mean parameters of the weights mixture
+        layer_x = inputs
+        for i in range(num_layers_g):
+            scale = 2**(num_layers_g - i - 1)
+            layer_x = ops.conv2d(opts, layer_x, num_units_g / scale,
+                                 scope='h{}_conv'.format(i))
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                         reuse, scope='h{}_bn'.format(i))
+            layer_x = tf.nn.relu(layer_x)
+        log_mixprobs = ops.linear(opts, layer_x, opts['nmixtures'], 'mixprob_lin')
+    else:
+        # encode the mean parameters for non gaussian encoder
+        layer_x = inputs
+        for i in range(num_layers_g):
+            scale = 2**(num_layers_g - i - 1)
+            layer_x = ops.conv2d(opts, layer_x, num_units_g / scale,
+                                 scope='h{}_conv'.format(i))
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                         reuse, scope='h{}_bn'.format(i))
+            layer_x = tf.nn.relu(layer_x)
+        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
+        #means.append(mean)
+        #res = (tf.stack(means,axis=1),None,None)
+        return mean
+
+    res = (tf.stack(means,axis=1), tf.stack(log_sigmas,axis=1), log_mixprobs)
+    return res
+
+def ali_encoder(opts, inputs, is_training=False, reuse=False):
+    num_units_g = opts['e_num_filters_g']
+    num_layers_g = opts['e_num_layers_g']
+    num_units_m = opts['e_num_filters_m']
+    num_layers_m = opts['e_num_layers_m']
+    layer_params_g = []
+    layer_params_g.append([5, 1, num_units_g / 8])
+    layer_params_g.append([4, 2, num_units_g / 4])
+    layer_params_g.append([4, 1, num_units_g / 2])
+    layer_params_g.append([4, 2, num_units_g])
+    layer_params_g.append([4, 1, num_units_g * 2])
+    layer_params_m = []
+    layer_params_m.append([5, 1, num_units_m / 8])
+    layer_params_m.append([4, 2, num_units_m / 4])
+    layer_params_m.append([4, 1, num_units_m / 2])
+    layer_params_m.append([4, 2, num_units_m])
+    layer_params_m.append([4, 1, num_units_m * 2])
+
+    # For convolution: (n - k) / stride + 1 = s
+    # For transposed: (s - 1) * stride + k = n
+    height = int(layer_x.get_shape()[1])
+    width = int(layer_x.get_shape()[2])
+    assert height == width
+    means, log_sigmas = [], []
+    if opts['e_noise'] == 'gaussian':
+        # encode the mean parameters of gaussian
+        layer_x = inputs
+        for i, (kernel, stride, channels) in enumerate(layer_params_g):
+            height = (height - kernel) / stride + 1
+            width = height
+            layer_x = ops.conv2d(
+                opts, layer_x, channels, d_h=stride, d_w=stride,
+                scope='h{}_conv'.format(i), conv_filters_dim=kernel, padding='VALID')
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                         reuse, scope='h{}_bn'.format(i))
+            layer_x = ops.lrelu(layer_x, 0.1)
+        assert height == 1
+        assert width == 1
+
+        # Then two 1x1 convolutions.
+        layer_x = ops.conv2d(opts, layer_x, num_units_g * 2, d_h=1, d_w=1,
+                             scope='conv2d_1x1', conv_filters_dim=1)
+        if opts['batch_norm']:
+            layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                     reuse, scope='hfinal_bn')
+        layer_x = ops.lrelu(layer_x, 0.1)
+        layer_x = ops.conv2d(opts, layer_x, num_units_g / 2, d_h=1, d_w=1,
+                             scope='conv2d_1x1_2', conv_filters_dim=1)
+        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
+        log_sigma = ops.linear(opts, layer_x,
+                                opts['zdim'], scope='log_sigmas_lin')
+        means.append(mean)
+        log_sigmas.append(log_sigma)
+        log_mixprobs = None
+    elif opts['e_noise'] == 'mixture_gaussians':
+        # encode the mean parameters of the nmixtures gaussians
+        for k in range(opts['nmixtures']):
+            layer_x = inputs
+            for i, (kernel, stride, channels) in enumerate(layer_params_m):
+                height = (height - kernel) / stride + 1
+                width = height
+                layer_x = ops.conv2d(
+                    opts, layer_x, channels, d_h=stride, d_w=stride,
+                    scope='m{}_h{}_conv'.format(k,i), conv_filters_dim=kernel, padding='VALID')
+                if opts['batch_norm']:
+                    layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                             reuse, scope='m{}_h{}_bn'.format(k,i))
+                layer_x = ops.lrelu(layer_x, 0.1)
+            assert height == 1
+            assert width == 1
+
+            # Then two 1x1 convolutions.
+            layer_x = ops.conv2d(opts, layer_x, num_units_m * 2, d_h=1, d_w=1,
+                                 scope='m{}_conv2d_1x1'.format(k), conv_filters_dim=1)
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                         reuse, scope='m{}_hfinal_bn'.format(k))
+            layer_x = ops.lrelu(layer_x, 0.1)
+            layer_x = ops.conv2d(opts, layer_x, num_units_m / 2, d_h=1, d_w=1,
+                                 scope='m{}_conv2d_1x1_2'.format(k), conv_filters_dim=1)
+            mean = ops.linear(opts, layer_x, opts['zdim'], scope='m{}_mean_lin'.format(k))
+            log_sigma = ops.linear(opts, layer_x,
+                                    opts['zdim'], scope='m{}_log_sigmas_lin'.format(k))
+            means.append(mean)
+            log_sigmas.append(log_sigma)
+        # encode the mean parameters of the weights mixture
+        layer_x = inputs
+        for i, (kernel, stride, channels) in enumerate(layer_params_g):
+            height = (height - kernel) / stride + 1
+            width = height
+            layer_x = ops.conv2d(
+                opts, layer_x, channels, d_h=stride, d_w=stride,
+                scope='h{}_conv'.format(i), conv_filters_dim=kernel, padding='VALID')
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                         reuse, scope='h{}_bn'.format(i))
+            layer_x = ops.lrelu(layer_x, 0.1)
+        assert height == 1
+        assert width == 1
+
+        # Then two 1x1 convolutions.
+        layer_x = ops.conv2d(opts, layer_x, num_units_g * 2, d_h=1, d_w=1,
+                             scope='conv2d_1x1', conv_filters_dim=1)
+        if opts['batch_norm']:
+            layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                     reuse, scope='hfinal_bn')
+        layer_x = ops.lrelu(layer_x, 0.1)
+        layer_x = ops.conv2d(opts, layer_x, num_units_g / 2, d_h=1, d_w=1,
+                             scope='conv2d_1x1_2', conv_filters_dim=1)
+        log_mixprobs = ops.linear(opts, layer_x, opts['nmixtures'], 'mixprob_lin')
+    else:
+        # encode the mean parameters for non gaussian encoder
+        layer_x = inputs
+        for i, (kernel, stride, channels) in enumerate(layer_params_g):
+            height = (height - kernel) / stride + 1
+            width = height
+            layer_x = ops.conv2d(
+                opts, layer_x, channels, d_h=stride, d_w=stride,
+                scope='h{}_conv'.format(i), conv_filters_dim=kernel, padding='VALID')
+            if opts['batch_norm']:
+                layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                         reuse, scope='h{}_bn'.format(i))
+            layer_x = ops.lrelu(layer_x, 0.1)
+        assert height == 1
+        assert width == 1
+
+        # Then two 1x1 convolutions.
+        layer_x = ops.conv2d(opts, layer_x, num_units_g * 2, d_h=1, d_w=1,
+                             scope='conv2d_1x1', conv_filters_dim=1)
+        if opts['batch_norm']:
+            layer_x = ops.batch_norm(opts, layer_x, is_training,
+                                     reuse, scope='hfinal_bn')
+        layer_x = ops.lrelu(layer_x, 0.1)
+        layer_x = ops.conv2d(opts, layer_x, num_units_g / 2, d_h=1, d_w=1,
+                             scope='conv2d_1x1_2', conv_filters_dim=1)
+        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
+        #means.append(mean)
+        #res = (tf.stack(means,axis=1),None,None)
+        return mean
+
+    res = (tf.stack(means,axis=1), tf.stack(log_sigmas,axis=1), log_mixprobs)
+    return res
+
+def began_encoder(opts, inputs, is_training=False, reuse=False):
+    num_units_g = opts['e_num_filters_g']
+    assert num_units_g == opts['g_num_filters'], \
+        'BEGAN requires same number of filters in encoder and decoder'
+    num_layers_g = opts['e_num_layers_g']
+    num_units_m = opts['e_num_filters_m']
+    num_layers_m = opts['e_num_layers_m']
+    means, log_sigmas = [], []
+    if opts['e_noise'] == 'gaussian':
+        # encode the mean parameters of gaussian
+        layer_x = ops.conv2d(opts, inputs, num_units_g, scope='hfirst_conv')
+        for i in range(num_layers_g):
+            if i % 3 < 2:
+                if i != num_layers_g - 2:
+                    ii = i - (i / 3)
+                    scale = (ii + 1 - ii / 2)
+                else:
+                    ii = i - (i / 3)
+                    scale = (ii - (ii - 1) / 2)
+                layer_x = ops.conv2d(opts, layer_x, num_units_g * scale, d_h=1, d_w=1,
+                                     scope='h{}_conv'.format(i))
+                layer_x = tf.nn.elu(layer_x)
+            else:
+                if i != num_layers_g - 1:
+                    layer_x = ops.downsample(layer_x, scope='h{}_maxpool'.format(i),
+                                             reuse=reuse)
+        # Tensor should be [N, 8, 8, filters] at this point
+        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
+        log_sigmas = ops.linear(opts, layer_x,
+                                opts['zdim'], scope='log_sigmas_lin')
+        means.append(mean)
+        log_sigmas.append(log_sigma)
+        log_mixprobs = None
+    elif opts['e_noise'] == 'mixture_gaussians':
+        # encode the mean parameters of the nmixtures gaussians
+        for k in range(opts['nmixtures']):
+            layer_x = ops.conv2d(opts, inputs, num_units_m, scope='m{}_hfirst_conv'.format(k))
+            for i in range(num_layers_m):
+                if i % 3 < 2:
+                    if i != num_layers_m - 2:
+                        ii = i - (i / 3)
+                        scale = (ii + 1 - ii / 2)
+                    else:
+                        ii = i - (i / 3)
+                        scale = (ii - (ii - 1) / 2)
+                    layer_x = ops.conv2d(opts, layer_x, num_units_m * scale, d_h=1, d_w=1,
+                                         scope='m{}_h{}_conv'.format(k,i))
+                    layer_x = tf.nn.elu(layer_x)
+                else:
+                    if i != num_layers_m - 1:
+                        layer_x = ops.downsample(layer_x, scope='m{}_h{}_maxpool'.format(k,i),
+                                                 reuse=reuse)
+            # Tensor should be [N, 8, 8, filters] at this point
+            mean = ops.linear(opts, layer_x, opts['zdim'], scope='m{}_mean_lin'.format(k))
+            log_sigmas = ops.linear(opts, layer_x,
+                                    opts['zdim'], scope='m{}_log_sigmas_lin'.format(k))
+            means.append(mean)
+            log_sigmas.append(log_sigma)
+        # encode the mean parameters of the weights mixture
+        layer_x = ops.conv2d(opts, inputs, num_units_g, scope='hfirst_conv')
+        for i in range(num_layers_g):
+            if i % 3 < 2:
+                if i != num_layers_g - 2:
+                    ii = i - (i / 3)
+                    scale = (ii + 1 - ii / 2)
+                else:
+                    ii = i - (i / 3)
+                    scale = (ii - (ii - 1) / 2)
+                layer_x = ops.conv2d(opts, layer_x, num_units_g * scale, d_h=1, d_w=1,
+                                     scope='h{}_conv'.format(i))
+                layer_x = tf.nn.elu(layer_x)
+            else:
+                if i != num_layers_g - 1:
+                    layer_x = ops.downsample(layer_x, scope='h{}_maxpool'.format(i),
+                                             reuse=reuse)
+        # Tensor should be [N, 8, 8, filters] at this point
+        log_mixprobs = ops.linear(opts, layer_x, opts['nmixtures'], 'mixprob_lin')
+    else:
+        # encode the mean parameters for non gaussian encoder
+        layer_x = ops.conv2d(opts, inputs, num_units_g, scope='hfirst_conv')
+        for i in range(num_layers_g):
+            if i % 3 < 2:
+                if i != num_layers_g - 2:
+                    ii = i - (i / 3)
+                    scale = (ii + 1 - ii / 2)
+                else:
+                    ii = i - (i / 3)
+                    scale = (ii - (ii - 1) / 2)
+                layer_x = ops.conv2d(opts, layer_x, num_units_g * scale, d_h=1, d_w=1,
+                                     scope='h{}_conv'.format(i))
+                layer_x = tf.nn.elu(layer_x)
+            else:
+                if i != num_layers_g - 1:
+                    layer_x = ops.downsample(layer_x, scope='h{}_maxpool'.format(i),
+                                             reuse=reuse)
+        # Tensor should be [N, 8, 8, filters] at this point
+        mean = ops.linear(opts, layer_x, opts['zdim'], scope='hfinal_lin')
+        #means.append(mean)
+        #res = (tf.stack(means,axis=1),None,None)
+        return res
+
+    res = (tf.stack(means,axis=1), tf.stack(log_sigmas,axis=1), log_mixprobs)
+    return res
+
+
 def decoder(opts, noise, reuse=False, is_training=True):
     assert opts['dataset'] in datashapes, 'Unknown dataset!'
     output_shape = datashapes[opts['dataset']]
@@ -82,7 +448,7 @@ def decoder(opts, noise, reuse=False, is_training=True):
         if opts['g_arch'] == 'mlp':
             # Architecture with only fully connected layers and ReLUs
             layer_x = noise
-            for i in xrange(opts['g_num_layers']):
+            for i in range(opts['g_num_layers']):
                 layer_x = ops.linear(opts, layer_x, num_units, 'h%d_lin' % i)
                 layer_x = tf.nn.relu(layer_x)
                 if opts['batch_norm']:
@@ -109,126 +475,27 @@ def decoder(opts, noise, reuse=False, is_training=True):
 
         return res
 
-def dcgan_encoder(opts, inputs, is_training=False, reuse=False):
-    num_units = opts['e_num_filters']
-    num_layers = opts['e_num_layers']
-    layer_x = inputs
-    for i in xrange(num_layers):
-        scale = 2**(num_layers - i - 1)
-        layer_x = ops.conv2d(opts, layer_x, num_units / scale,
-                             scope='h%d_conv' % i)
-        if opts['batch_norm']:
-            layer_x = ops.batch_norm(opts, layer_x, is_training,
-                                     reuse, scope='h%d_bn' % i)
-        layer_x = tf.nn.relu(layer_x)
-    if opts['e_noise'] != 'gaussian':
-        res = ops.linear(opts, layer_x, opts['zdim'], scope='hfinal_lin')
-        return res
-    else:
-        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
-        log_sigmas = ops.linear(opts, layer_x,
-                                opts['zdim'], scope='log_sigmas_lin')
-        return mean, log_sigmas
-
-def ali_encoder(opts, inputs, is_training=False, reuse=False):
-    num_units = opts['e_num_filters']
-    layer_params = []
-    layer_params.append([5, 1, num_units / 8])
-    layer_params.append([4, 2, num_units / 4])
-    layer_params.append([4, 1, num_units / 2])
-    layer_params.append([4, 2, num_units])
-    layer_params.append([4, 1, num_units * 2])
-    # For convolution: (n - k) / stride + 1 = s
-    # For transposed: (s - 1) * stride + k = n
-    layer_x = inputs
-    height = int(layer_x.get_shape()[1])
-    width = int(layer_x.get_shape()[2])
-    assert height == width
-    for i, (kernel, stride, channels) in enumerate(layer_params):
-        height = (height - kernel) / stride + 1
-        width = height
-        layer_x = ops.conv2d(
-            opts, layer_x, channels, d_h=stride, d_w=stride,
-            scope='h%d_conv' % i, conv_filters_dim=kernel, padding='VALID')
-        if opts['batch_norm']:
-            layer_x = ops.batch_norm(opts, layer_x, is_training,
-                                     reuse, scope='h%d_bn' % i)
-        layer_x = ops.lrelu(layer_x, 0.1)
-    assert height == 1
-    assert width == 1
-
-    # Then two 1x1 convolutions.
-    layer_x = ops.conv2d(opts, layer_x, num_units * 2, d_h=1, d_w=1,
-                         scope='conv2d_1x1', conv_filters_dim=1)
-    if opts['batch_norm']:
-        layer_x = ops.batch_norm(opts, layer_x, is_training,
-                                 reuse, scope='hfinal_bn')
-    layer_x = ops.lrelu(layer_x, 0.1)
-    layer_x = ops.conv2d(opts, layer_x, num_units / 2, d_h=1, d_w=1,
-                         scope='conv2d_1x1_2', conv_filters_dim=1)
-
-    if opts['e_noise'] != 'gaussian':
-        res = ops.linear(opts, layer_x, opts['zdim'], scope='hlast_lin')
-        return res
-    else:
-        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
-        log_sigmas = ops.linear(opts, layer_x,
-                                opts['zdim'], scope='log_sigmas_lin')
-        return mean, log_sigmas
-
-def began_encoder(opts, inputs, is_training=False, reuse=False):
-    num_units = opts['e_num_filters']
-    assert num_units == opts['g_num_filters'], \
-        'BEGAN requires same number of filters in encoder and decoder'
-    num_layers = opts['e_num_layers']
-    layer_x = ops.conv2d(opts, inputs, num_units, scope='hfirst_conv')
-    for i in xrange(num_layers):
-        if i % 3 < 2:
-            if i != num_layers - 2:
-                ii = i - (i / 3)
-                scale = (ii + 1 - ii / 2)
-            else:
-                ii = i - (i / 3)
-                scale = (ii - (ii - 1) / 2)
-            layer_x = ops.conv2d(opts, layer_x, num_units * scale, d_h=1, d_w=1,
-                                 scope='h%d_conv' % i)
-            layer_x = tf.nn.elu(layer_x)
-        else:
-            if i != num_layers - 1:
-                layer_x = ops.downsample(layer_x, scope='h%d_maxpool' % i,
-                                         reuse=reuse)
-    # Tensor should be [N, 8, 8, filters] at this point
-    if opts['e_noise'] != 'gaussian':
-        res = ops.linear(opts, layer_x, opts['zdim'], scope='hfinal_lin')
-        return res
-    else:
-        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
-        log_sigmas = ops.linear(opts, layer_x,
-                                opts['zdim'], scope='log_sigmas_lin')
-        return mean, log_sigmas
-
-
 def dcgan_decoder(opts, noise, is_training=False, reuse=False):
     output_shape = datashapes[opts['dataset']]
     num_units = opts['g_num_filters']
     batch_size = tf.shape(noise)[0]
     num_layers = opts['g_num_layers']
     if opts['g_arch'] == 'dcgan':
-        height = output_shape[0] / 2**num_layers
-        width = output_shape[1] / 2**num_layers
+        height = int(output_shape[0] / 2**num_layers)
+        width = int(output_shape[1] / 2**num_layers)
     elif opts['g_arch'] == 'dcgan_mod':
-        height = output_shape[0] / 2**(num_layers - 1)
-        width = output_shape[1] / 2**(num_layers - 1)
+        height = int(output_shape[0] / 2**(num_layers - 1))
+        width = int(output_shape[1] / 2**(num_layers - 1))
 
     h0 = ops.linear(
         opts, noise, num_units * height * width, scope='h0_lin')
     h0 = tf.reshape(h0, [-1, height, width, num_units])
     h0 = tf.nn.relu(h0)
     layer_x = h0
-    for i in xrange(num_layers - 1):
+    for i in range(num_layers - 1):
         scale = 2**(i + 1)
         _out_shape = [batch_size, height * scale,
-                      width * scale, num_units / scale]
+                      width * scale, int(num_units / scale)]
         layer_x = ops.deconv2d(opts, layer_x, _out_shape,
                                scope='h%d_deconv' % i)
         if opts['batch_norm']:
@@ -258,10 +525,10 @@ def ali_decoder(opts, noise, is_training=False, reuse=False):
     num_units = opts['g_num_filters']
     layer_params = []
     layer_params.append([4, 1, num_units])
-    layer_params.append([4, 2, num_units / 2])
-    layer_params.append([4, 1, num_units / 4])
-    layer_params.append([4, 2, num_units / 8])
-    layer_params.append([5, 1, num_units / 8])
+    layer_params.append([4, 2, int(num_units / 2)])
+    layer_params.append([4, 1, int(num_units / 4)])
+    layer_params.append([4, 2, int(num_units / 8)])
+    layer_params.append([5, 1, int(num_units / 8)])
     # For convolution: (n - k) / stride + 1 = s
     # For transposed: (s - 1) * stride + k = n
     layer_x = noise
@@ -282,7 +549,7 @@ def ali_decoder(opts, noise, is_training=False, reuse=False):
     assert width == data_width
 
     # Then two 1x1 convolutions.
-    layer_x = ops.conv2d(opts, layer_x, num_units / 8, d_h=1, d_w=1,
+    layer_x = ops.conv2d(opts, layer_x, int(num_units / 8), d_h=1, d_w=1,
                          scope='conv2d_1x1', conv_filters_dim=1)
     if opts['batch_norm']:
         layer_x = ops.batch_norm(opts, layer_x,
@@ -305,7 +572,7 @@ def began_decoder(opts, noise, is_training=False, reuse=False):
     h0 = ops.linear(opts, noise, num_units * 8 * 8, scope='h0_lin')
     h0 = tf.reshape(h0, [-1, 8, 8, num_units])
     layer_x = h0
-    for i in xrange(num_layers):
+    for i in range(num_layers):
         if i % 3 < 2:
             # Don't change resolution
             layer_x = ops.conv2d(opts, layer_x, num_units,
@@ -329,39 +596,11 @@ def began_decoder(opts, noise, is_training=False, reuse=False):
     else:
         return tf.nn.sigmoid(last_h), last_h
 
-def z_adversary(opts, inputs, reuse=False):
-    num_units = opts['d_num_filters']
-    num_layers = opts['d_num_layers']
-    nowozin_trick = opts['gan_p_trick']
-    # No convolutions as GAN happens in the latent space
-    with tf.variable_scope('z_adversary', reuse=reuse):
-        hi = inputs
-        for i in xrange(num_layers):
-            hi = ops.linear(opts, hi, num_units, scope='h%d_lin' % (i + 1))
-            hi = tf.nn.relu(hi)
-        hi = ops.linear(opts, hi, 1, scope='hfinal_lin')
-        if nowozin_trick:
-            # We are doing GAN between our model Qz and the true Pz.
-            # Imagine we know analytical form of the true Pz.
-            # The optimal discriminator for D_JS(Pz, Qz) is given by:
-            # Dopt(x) = log dPz(x) - log dQz(x)
-            # And we know exactly dPz(x). So add log dPz(x) explicitly 
-            # to the discriminator and let it learn only the remaining
-            # dQz(x) term. This appeared in the AVB paper.
-            assert opts['pz'] == 'normal', \
-                'The GAN Pz trick is currently available only for Gaussian Pz'
-            sigma2_p = float(opts['pz_scale']) ** 2
-            normsq = tf.reduce_sum(tf.square(inputs), 1)
-            hi = hi - normsq / 2. / sigma2_p \
-                    - 0.5 * tf.log(2. * np.pi) \
-                    - 0.5 * opts['zdim'] * np.log(sigma2_p)
-    return hi
-
 
 def transform_noise(opts, code, eps, reuse=False):
     hi = code
     T = 3
-    for i in xrange(T):
+    for i in range(T):
         num_units = max(opts['zdim'] ** 2 / 2 ** (T - i), 2)
         hi = ops.linear(opts, hi, num_units, scope='eps_h%d_lin' % (i + 1))
         hi = tf.nn.tanh(hi)

@@ -9,14 +9,17 @@
 import os
 import random
 import logging
+import gzip
 import tensorflow as tf
 import numpy as np
-from six.moves import cPickle
+from six.moves import cPickle, urllib
 import utils
 import PIL
 from utils import ArraySaver
 from PIL import Image
 import sys
+
+import pdb
 
 datashapes = {}
 datashapes['mnist'] = [28, 28, 1]
@@ -24,12 +27,33 @@ datashapes['cifar10'] = [32, 32, 3]
 datashapes['celebA'] = [64, 64, 3]
 datashapes['grassli'] = [64, 64, 3]
 datashapes['dsprites'] = [64, 64, 1]
+DATA_DIRECTORY = '../data'
 
 def _data_dir(opts):
-    if opts['data_dir'].startswith("/"):
-        return opts['data_dir']
-    else:
-        return os.path.join('./', opts['data_dir'])
+    data_path = maybe_download(opts)
+    return data_path
+
+def maybe_download(opts):
+    """Download the data from url, unless it's already here."""
+    if not tf.gfile.Exists(DATA_DIRECTORY):
+        tf.gfile.MakeDirs(DATA_DIRECTORY)
+    data_path = os.path.join(DATA_DIRECTORY, opts['data_dir'])
+    if not tf.gfile.Exists(data_path):
+        tf.gfile.MakeDirs(data_path)
+    maybe_download_file(data_path,'train-images-idx3-ubyte.gz',opts['data_source_url'])
+    maybe_download_file(data_path,'train-labels-idx1-ubyte.gz',opts['data_source_url'])
+    maybe_download_file(data_path,'t10k-images-idx3-ubyte.gz',opts['data_source_url'])
+    maybe_download_file(data_path,'t10k-labels-idx1-ubyte.gz',opts['data_source_url'])
+
+    return data_path
+
+def maybe_download_file(name,filename,url):
+    filepath = os.path.join(name, filename)
+    if not tf.gfile.Exists(filepath):
+        filepath, _ = urllib.request.urlretrieve(url + filename, filepath)
+        with tf.gfile.GFile(filepath) as f:
+            size = f.size()
+        print('Successfully downloaded', filename, size, 'bytes.')
 
 def load_cifar_batch(fpath, label_key='labels'):
     """Internal utility for parsing CIFAR data.
@@ -158,7 +182,7 @@ class Data(object):
                 step = step if step is not None else 1
                 keys = range(start, stop, step)
             else:
-                print type(key)
+                print(type(key))
                 raise Exception('This type of indexing yet not supported for the dataset')
             res = []
             new_keys = []
@@ -295,7 +319,7 @@ class DataHandler(object):
         np.random.seed()
         num = opts['toy_dataset_size']
         X = np.zeros((num, opts['toy_dataset_dim'], 1, 1))
-        for idx in xrange(num):
+        for idx in range(num):
             comp_id = np.random.randint(modes_num)
             mean = mixture_means[comp_id]
             cov = mixture_variance * np.identity(opts["toy_dataset_dim"])
@@ -334,7 +358,7 @@ class DataHandler(object):
         np.random.seed()
         num = opts['toy_dataset_size']
         X = np.zeros((num, opts['toy_dataset_dim'], 1, 1))
-        for idx in xrange(num):
+        for idx in range(num):
             comp_id = np.random.randint(modes_num)
             mean = mixture_means[comp_id]
             cov = mixture_variance * np.identity(opts["toy_dataset_dim"])
@@ -415,21 +439,43 @@ class DataHandler(object):
         te_X = None
         te_Y = None
 
-        with utils.o_gfile((data_dir, 'train-images-idx3-ubyte'), 'rb') as fd:
+        """
+        with utils.o_gfile((data_dir, 'train-images-idx3-ubyte.gz'), 'rb') as fd:
             loaded = np.frombuffer(fd.read(), dtype=np.uint8)
-            tr_X = loaded[16:].reshape((60000, 28, 28, 1)).astype(np.float)
+            tr_X = loaded[16:].reshape((60000, 28, 28, 1)).astype(np.float32)
 
-        with utils.o_gfile((data_dir, 'train-labels-idx1-ubyte'), 'rb') as fd:
+        with utils.o_gfile((data_dir, 'train-labels-idx1-ubyte.gz'), 'rb') as fd:
             loaded = np.frombuffer(fd.read(), dtype=np.uint8)
             tr_Y = loaded[8:].reshape((60000)).astype(np.int)
 
-        with utils.o_gfile((data_dir, 't10k-images-idx3-ubyte'), 'rb') as fd:
+        with utils.o_gfile((data_dir, 't10k-images-idx3-ubyte.gz'), 'rb') as fd:
             loaded = np.frombuffer(fd.read(), dtype=np.uint8)
             te_X = loaded[16:].reshape((10000, 28, 28, 1)).astype(np.float)
 
-        with utils.o_gfile((data_dir, 't10k-labels-idx1-ubyte'), 'rb') as fd:
+        with utils.o_gfile((data_dir, 't10k-labels-idx1-ubyte.gz'), 'rb') as fd:
             loaded = np.frombuffer(fd.read(), dtype=np.uint8)
             te_Y = loaded[8:].reshape((10000)).astype(np.int)
+        """
+
+        with gzip.open(os.path.join(data_dir, 'train-images-idx3-ubyte.gz')) as fd:
+            fd.read(16)
+            loaded = np.frombuffer(fd.read(60000*28*28*1), dtype=np.uint8)
+            tr_X = loaded.reshape((60000, 28, 28, 1)).astype(np.float32)
+
+        with gzip.open(os.path.join(data_dir, 'train-labels-idx1-ubyte.gz')) as fd:
+            fd.read(8)
+            loaded = np.frombuffer(fd.read(60000), dtype=np.uint8)
+            tr_Y = loaded.reshape((60000)).astype(np.int)
+
+        with gzip.open(os.path.join(data_dir, 't10k-images-idx3-ubyte.gz')) as fd:
+            fd.read(16)
+            loaded = np.frombuffer(fd.read(10000*28*28*1), dtype=np.uint8)
+            te_X = loaded.reshape((10000, 28, 28, 1)).astype(np.float32)
+
+        with gzip.open(os.path.join(data_dir, 'train-images-idx3-ubyte.gz')) as fd:
+            fd.read(8)
+            loaded = np.frombuffer(fd.read(10000), dtype=np.uint8)
+            te_Y = loaded.reshape((10000)).astype(np.int)
 
         tr_Y = np.asarray(tr_Y)
         te_Y = np.asarray(te_Y)
@@ -446,7 +492,7 @@ class DataHandler(object):
         np.random.seed()
 
         self.data_shape = (28, 28, 1)
-        test_size = 10000
+        test_size = 1000
 
         if modified:
             self.original_mnist = X
@@ -454,7 +500,7 @@ class DataHandler(object):
             n += test_size
             points = []
             labels = []
-            for _ in xrange(n):
+            for _ in range(n):
                 idx = np.random.randint(len(X))
                 point = X[idx]
                 modes = ['n', 'i', 'sl', 'sr', 'su', 'sd']
@@ -464,7 +510,8 @@ class DataHandler(object):
                 labels.append(y[idx])
             X = np.array(points)
             y = np.array(y)
-        self.data = Data(opts, X[:-test_size])
+        #self.data = Data(opts, X[:-test_size])
+        self.data = Data(opts, X[:opts['train_dataset_size']])
         self.test_data = Data(opts, X[-test_size:])
         self.labels = y[:-test_size]
         self.test_labels = y[-test_size:]
@@ -592,7 +639,7 @@ class DataHandler(object):
         num_samples = 202599
 
         datapoint_ids = range(1, num_samples + 1)
-        paths = ['%.6d.jpg' % i for i in xrange(1, num_samples + 1)]
+        paths = ['%.6d.jpg' % i for i in range(1, num_samples + 1)]
         seed = 123
         random.seed(seed)
         random.shuffle(paths)

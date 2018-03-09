@@ -154,3 +154,6 @@ def log_sum_exp(logits):
                         logits,
                         tf.tile(l_max, tf.stack([1, logits.get_shape()[1]])))),
                     axis=1))
+
+def softmax(logits,axis=None):
+    return tf.nn.softmax(logits,axis=axis)
