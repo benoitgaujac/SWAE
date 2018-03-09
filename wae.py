@@ -298,6 +298,7 @@ class WAE(object):
         lr = opts['lr']
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+        #pdb.set_trace()
         ae_vars = encoder_vars + decoder_vars
 
         if opts['verbose']:

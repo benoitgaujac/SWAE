@@ -137,9 +137,9 @@ def dcgan_encoder(opts, inputs, is_training=False, reuse=False):
                 layer_x = ops.batch_norm(opts, layer_x, is_training,
                                          reuse, scope='h{}_bn'.format(i))
             layer_x = tf.nn.relu(layer_x)
-            mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
-            log_sigma = ops.linear(opts, layer_x,
-                                    opts['zdim'], scope='log_sigmas_lin')
+        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
+        log_sigma = ops.linear(opts, layer_x,
+                                opts['zdim'], scope='log_sigmas_lin')
         means.append(mean)
         log_sigmas.append(log_sigma)
         log_mixprobs = None
@@ -155,9 +155,9 @@ def dcgan_encoder(opts, inputs, is_training=False, reuse=False):
                     layer_x = ops.batch_norm(opts, layer_x, is_training,
                                              reuse, scope='m{}_h{}_bn'.format(k,i))
                 layer_x = tf.nn.relu(layer_x)
-                mean = ops.linear(opts, layer_x, opts['zdim'], scope='m{}_mean_lin'.format(k))
-                log_sigma = ops.linear(opts, layer_x,
-                                        opts['zdim'], scope='m{}_log_sigmas_lin'.format(k))
+            mean = ops.linear(opts, layer_x, opts['zdim'], scope='m{}_mean_lin'.format(k))
+            log_sigma = ops.linear(opts, layer_x,
+                                    opts['zdim'], scope='m{}_log_sigmas_lin'.format(k))
             means.append(mean)
             log_sigmas.append(log_sigma)
         # encode the mean parameters of the weights mixture
@@ -210,8 +210,8 @@ def ali_encoder(opts, inputs, is_training=False, reuse=False):
 
     # For convolution: (n - k) / stride + 1 = s
     # For transposed: (s - 1) * stride + k = n
-    height = int(layer_x.get_shape()[1])
-    width = int(layer_x.get_shape()[2])
+    height = int(inputs.get_shape()[1])
+    width = int(inputs.get_shape()[2])
     assert height == width
     means, log_sigmas = [], []
     if opts['e_noise'] == 'gaussian':
