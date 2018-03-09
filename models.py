@@ -19,10 +19,10 @@ def encoder(opts, inputs, reuse=False, is_training=False):
         if opts['e_arch_g'] == 'mlp':
             # Encoder uses only fully connected layers with ReLus
             res = mlp_encoder(opts, inputs, is_training, reuse)
-        elif opts['e_arch'] == 'dcgan':
+        elif opts['e_arch_g'] == 'dcgan':
             # Fully convolutional architecture similar to DCGAN
             res = dcgan_encoder(opts, inputs, is_training, reuse)
-        elif opts['e_arch'] == 'ali':
+        elif opts['e_arch_g'] == 'ali':
             # Architecture smilar to "Adversarially learned inference" paper
             res = ali_encoder(opts, inputs, is_training, reuse)
         elif opts['e_arch'] == 'began':
