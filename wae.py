@@ -330,7 +330,7 @@ class WAE(object):
                 cov = opts['sigma_prior']*np.ones((opts['zdim']))
                 means = np.zeros([num,opts['nmixtures'], opts['zdim']])
                 for k in range(opts['nmixtures']):
-                    means[:,k,k] = np.sqrt(2.0)*opts['sigma_prior']
+                    means[:,k,k] = np.max([2.0*opts['sigma_prior'],means[:,k,k])
                 # sample for each cluster
                 eps = np.random.normal(0.,1.,[num, opts['nmixtures'],opts['zdim']])
                 noises = means + np.multiply(eps,cov)
