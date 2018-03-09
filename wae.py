@@ -298,7 +298,6 @@ class WAE(object):
         lr = opts['lr']
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
-        #pdb.set_trace()
         ae_vars = encoder_vars + decoder_vars
 
         if opts['verbose']:
@@ -331,7 +330,7 @@ class WAE(object):
                 cov = opts['sigma_prior']*np.ones((opts['zdim']))
                 means = np.zeros([num,opts['nmixtures'], opts['zdim']])
                 for k in range(opts['nmixtures']):
-                    means[:,k,k] = np.max([2.0*opts['sigma_prior'],means[:,k,k]])
+                    means[:,k,k] = np.amax([2.0*opts['sigma_prior'],means[:,k,k]])
                 # sample for each cluster
                 eps = np.random.normal(0.,1.,[num, opts['nmixtures'],opts['zdim']])
                 noises = means + np.multiply(eps,cov)

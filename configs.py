@@ -91,7 +91,7 @@ config_mnist['e_num_filters_g'] = 1024
 config_mnist['e_num_layers_g'] = 4
 config_mnist['e_arch_g'] = 'mlp' # mlp, dcgan, ali
 config_mnist['e_num_filters_m'] = 1024
-config_mnist['e_num_layers_m'] = 4
+config_mnist['e_num_layers_m'] = 1
 config_mnist['e_arch_m'] = 'mlp' # mlp, dcgan, ali
 
 config_mnist['g_num_filters'] = 1024
