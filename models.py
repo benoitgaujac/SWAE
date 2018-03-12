@@ -25,7 +25,7 @@ def encoder(opts, inputs, reuse=False, is_training=False):
         elif opts['e_arch_g'] == 'ali':
             # Architecture smilar to "Adversarially learned inference" paper
             res = ali_encoder(opts, inputs, is_training, reuse)
-        elif opts['e_arch'] == 'began':
+        elif opts['e_ae_arch_grch'] == 'began':
             # Architecture similar to the BEGAN paper
             res = began_encoder(opts, inputs, is_training, reuse)
         else:
@@ -362,7 +362,7 @@ def began_encoder(opts, inputs, is_training=False, reuse=False):
                                              reuse=reuse)
         # Tensor should be [N, 8, 8, filters] at this point
         mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
-        log_sigmas = ops.linear(opts, layer_x,
+        log_sigma = ops.linear(opts, layer_x,
                                 opts['zdim'], scope='log_sigmas_lin')
         means.append(mean)
         log_sigmas.append(log_sigma)
@@ -388,7 +388,7 @@ def began_encoder(opts, inputs, is_training=False, reuse=False):
                                                  reuse=reuse)
             # Tensor should be [N, 8, 8, filters] at this point
             mean = ops.linear(opts, layer_x, opts['zdim'], scope='m{}_mean_lin'.format(k))
-            log_sigmas = ops.linear(opts, layer_x,
+            log_sigma = ops.linear(opts, layer_x,
                                     opts['zdim'], scope='m{}_log_sigmas_lin'.format(k))
             means.append(mean)
             log_sigmas.append(log_sigma)
