@@ -25,7 +25,7 @@ def encoder(opts, inputs, reuse=False, is_training=False):
         elif opts['e_arch_g'] == 'ali':
             # Architecture smilar to "Adversarially learned inference" paper
             res = ali_encoder(opts, inputs, is_training, reuse)
-        elif opts['e_ae_arch_grch'] == 'began':
+        elif opts['e_arch_g'] == 'began':
             # Architecture similar to the BEGAN paper
             res = began_encoder(opts, inputs, is_training, reuse)
         else:
