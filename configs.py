@@ -89,14 +89,14 @@ config_mnist['e_pretrain_sample_size'] = 1000
 config_mnist['e_noise'] = 'mixture_gaussians' # deterministic, implicit, add_noise, gaussian, mixture_gaussians
 config_mnist['e_num_filters_g'] = 1024
 config_mnist['e_num_layers_g'] = 4
-config_mnist['e_arch_g'] = 'mlp' # mlp, dcgan, ali
+config_mnist['e_arch_g'] = 'mlp' # mlp, dcgan, ali, began
 config_mnist['e_num_filters_m'] = 1024
 config_mnist['e_num_layers_m'] = 1
-config_mnist['e_arch_m'] = 'mlp' # mlp, dcgan, ali
+config_mnist['e_arch_m'] = 'mlp' # mlp, dcgan, ali, began
 
 config_mnist['g_num_filters'] = 1024
 config_mnist['g_num_layers'] = 4
-config_mnist['g_arch'] = 'mlp' # mlp, dcgan, dcgan_mod, ali
+config_mnist['g_arch'] = 'mlp' # mlp, dcgan, dcgan_mod, ali, began
 
 config_mnist['gan_p_trick'] = False
 config_mnist['d_num_filters'] = 512
