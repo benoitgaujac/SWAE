@@ -11,7 +11,7 @@ data_dir : mnist
 data_source_url : http://yann.lecun.com/exdb/mnist/
 optimizer : adam
 adam_beta1 : 0.5
-lr : 0.0005
+lr : 0.0003
 lr_adv : 0.0003
 lr_schedule : manual
 batch_size : 100
@@ -22,12 +22,12 @@ init_bias : 0.0
 batch_norm : True
 batch_norm_eps : 1e-05
 batch_norm_decay : 0.9
-conv_filters_dim : 3
+conv_filters_dim : 4
 e_pretrain : False
 e_pretrain_sample_size : 1000
 e_noise : mixture
-e_num_filters_g : 512
-e_num_layers_g : 2
+e_num_filters_g : 1024
+e_num_layers_g : 1
 e_arch_g : dcgan
 e_num_filters_d : 1024
 e_num_layers_d : 4
@@ -38,7 +38,7 @@ g_arch : dcgan
 gan_p_trick : False
 d_num_filters : 512
 d_num_layers : 4
-zdim : 15
+zdim : 12
 pz : mixture
 nmixtures : 10
 sigma_prior : 0.1
