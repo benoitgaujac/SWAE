@@ -42,6 +42,7 @@ class WAE(object):
         self.add_model_placeholders()
         self.add_training_placeholders()
         sample_size = tf.shape(self.sample_points,out_type=tf.int64)[0]
+        self.init_prior()
 
         # -- Transformation ops
 
@@ -54,7 +55,7 @@ class WAE(object):
                 self.encoded, self.encoder_A = res
             else:
                 self.encoded = res
-        elif opts['e_noise'] in ('gaussian', 'mixture_gaussians'):
+        elif opts['e_noise'] in ('gaussian', 'mixture'):
             # Encoder outputs means and variances of Gaussians, and mixing probs
             enc_mean, enc_sigmas, enc_mixprob = encoder(opts, inputs=self.sample_points,
                                                             is_training=self.is_training)
@@ -64,21 +65,14 @@ class WAE(object):
                 self.add_sigmas_debug()
 
             # Encoding
-            # sampling mixture indices
-            if opts['e_noise'] == 'mixture_gaussians':
-                eps = tf.random_normal([sample_size, opts['nmixtures'],opts['zdim']],
-                                                            0., 1., dtype=tf.float32)
+            # sampling from all mixtures
+            self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
+                                                tf.exp(self.enc_sigmas),
+                                                opts['e_noise'],sample_size,'tensor')
+            # Select corresponding mixtures
+            if opts['e_noise'] == 'mixture':
                 mixture_idx = tf.reshape(tf.multinomial(self.enc_mixprob, 1),[-1])
                 self.mixture = tf.stack([tf.range(sample_size),mixture_idx],axis=-1)
-            else:
-                eps = tf.random_normal([sample_size, opts['zdim']],
-                                                            0., 1., dtype=tf.float32)
-                self.mixture = None
-            # sampling from all mixtures
-            self.mixtures_encoded = self.enc_mean + tf.multiply(
-                        eps, tf.sqrt(1e-8 + tf.exp(self.enc_sigmas)))
-            # Select corresponding mixtures
-            if opts['e_noise'] == 'mixture_gaussians':
                 self.encoded = tf.gather_nd(self.mixtures_encoded,self.mixture)
             else:
                 self.encoded = self.mixtures_encoded
@@ -125,6 +119,26 @@ class WAE(object):
         self.wae_lambda = wae_lambda
         self.is_training = is_training
 
+    def init_prior(self):
+        opts = self.opts
+        distr = opts['pz']
+        if distr == 'uniform':
+            self.pz_means = [-1.0,1.0].astype(np.float32)
+            self.pz_covs = None
+        elif distr in ('normal', 'sphere'):
+            self.pz_means = np.zeros(opts['zdim']).astype(np.float32)
+            self.pz_covs = opts['sigma_prior']*np.identity(opts['zdim']).astype(np.float32)
+        elif distr == 'mixture':
+            assert opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
+            means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
+            for k in range(opts['nmixtures']):
+                means[k,k] = np.amax([2.0*opts['sigma_prior'],1]).astype(np.float32)
+                #means[:,k,k] = 2.0*opts['sigma_prior']
+            self.pz_means = means
+            self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
+        else:
+            assert False, 'Unknown latent model.'
+
     def add_savers(self):
         opts = self.opts
         saver = tf.train.Saver(max_to_keep=10)
@@ -139,6 +153,59 @@ class WAE(object):
         tf.add_to_collection('encoder', self.encoded)
         tf.add_to_collection('decoder', self.decoded)
         self.saver = saver
+
+    def sample_mixtures(self,means,cov,distr,num=100,tpe='numpy'):
+        if tpe=='tensor':
+            if distr in ('normal', 'sphere'):
+                eps = tf.random_normal([num, self.opts['zdim']])
+                noises = means + tf.multiply(eps,tf.sqrt(1e-8+cov))
+            elif distr == 'mixture':
+                eps = tf.random_normal([num, self.opts['nmixtures'],self.opts['zdim']],dtype=tf.float32)
+                noises = means + tf.multiply(eps,tf.sqrt(1e-8+cov))
+            else:
+                assert False, 'Unknown latent model.'
+        elif tpe=='numpy':
+            if distr in ('normal', 'sphere'):
+                eps = np.random.normal(0.,1.,(num, self.opts['zdim']))
+                noises = means + np.multiply(eps,np.sqrt(1e-8+cov))
+            elif distr == 'mixture':
+                eps = np.random.normal(0.,1.,(num, self.opts['nmixtures'],self.opts['zdim'])).astype(np.float32)
+                noises = means + np.multiply(eps,np.sqrt(1e-8+cov))
+            else:
+                assert False, 'Unknown latent model.'
+
+
+        return noises
+
+    def sample_pz(self, num=100, sampling='one_mixture'):
+        opts = self.opts
+        noise = None
+        distr = opts['pz']
+        if distr == 'uniform':
+            noise = np.random.uniform(
+                self.pz_means[0], self.pz_means[1], [num, opts['zdim']]).astype(np.float32)
+        elif distr in ('normal', 'sphere'):
+            noise = self.sample_mixtures(self.pz_means,self.pz_covs,distr,num)
+            if distr == 'sphere':
+                noise = noise / np.sqrt(np.sum(noise * noise, axis=1))[:, np.newaxis]
+        elif distr == 'mixture':
+            noises = self.sample_mixtures(self.pz_means,self.pz_covs,distr,num)
+            if sampling == 'one_mixture':
+                mixture = np.random.randint(opts['nmixtures'],size=num)
+                noise = noises[np.arange(num),mixture]
+                #noise = tf.gather_nd(noises,tf.stack([tf.range(num,dtype=tf.int32),mixture],axis=-1))
+            elif sampling == 'per_mixture':
+                samples_per_mixture = int(num / opts['nmixtures'])
+                class_i = np.repeat(np.arange(opts['nmixtures']),samples_per_mixture,axis=0)
+                mixture = np.zeros([num,],dtype='int32')
+                mixture[(num % opts['nmixtures']):] = class_i
+                noise = noises[np.arange(num),mixture]
+                #noise = tf.gather_nd(noises,tf.stack([tf.range(num,dtype=tf.int32),mixture],axis=-1))
+            elif sampling == 'all_mixtures':
+                noise = noises
+        else:
+            assert False, 'Unknown latent model.'
+        return opts['pz_scale'] * noise
 
     def matching_penalty(self):
         opts = self.opts
@@ -177,7 +244,7 @@ class WAE(object):
                 'Prior samples need to have shape [batch,zdim] if prior is gaussian'
             dotprods_pz = tf.matmul(sample_pz, sample_pz, transpose_b=True)
             distances_pz = norms_pz + tf.transpose(norms_pz) - 2. * dotprods_pz
-        if opts['e_noise'] == 'mixture_gaussians':
+        if opts['e_noise'] == 'mixture':
             assert len(sample_qz.get_shape().as_list()) == 3, \
                 'latent samples need to have shape [batch,nmixtures,zdim] if model is mixture of gaussians'
             dotprods_qz = tf.tensordot(sample_qz, tf.transpose(sample_qz), [[-1],[0]])
@@ -309,49 +376,6 @@ class WAE(object):
         opt = self.optimizer(lr, self.lr_decay)
         self.ae_opt = opt.minimize(loss=self.wae_objective,
                               var_list=encoder_vars + decoder_vars)
-
-    def sample_pz(self, num=100, sampling='one_mixture'):
-        opts = self.opts
-        noise = None
-        distr = opts['pz']
-        if distr == 'uniform':
-            noise = np.random.uniform(
-                -1, 1, [num, opts['zdim']]).astype(np.float32)
-        elif distr in ('normal', 'sphere'):
-            mean = np.zeros(opts['zdim'])
-            cov = opts['sigma_prior']*np.identity(opts['zdim'])
-            noise = np.random.multivariate_normal(
-                mean, cov, num).astype(np.float32)
-            if distr == 'sphere':
-                noise = noise / np.sqrt(
-                    np.sum(noise * noise, axis=1))[:, np.newaxis]
-        elif distr == 'mixture':
-            if opts['zdim']>=opts['nmixtures']:
-                cov = opts['sigma_prior']*np.ones((opts['zdim']))
-                means = np.zeros([num,opts['nmixtures'], opts['zdim']])
-                for k in range(opts['nmixtures']):
-                    #means[:,k,k] = np.amax([2.0*opts['sigma_prior'],1])
-                    means[:,k,k] = 2.0*opts['sigma_prior']
-                # sample for each cluster
-                eps = np.random.normal(0.,1.,[num, opts['nmixtures'],opts['zdim']])
-                noises = means + np.multiply(eps,cov)
-                #sample cluster id
-                if sampling == 'one_mixture':
-                    mixture = np.random.randint(opts['nmixtures'],size=num)
-                    noise = noises[np.arange(num),mixture]
-                elif sampling == 'per_mixture':
-                    samples_per_mixture = int(num / opts['nmixtures'])
-                    class_i = np.repeat(np.arange(opts['nmixtures']),samples_per_mixture,axis=0)
-                    mixture = np.zeros([num,],dtype='int32')
-                    mixture[(num % opts['nmixtures']):] = class_i
-                    noise = noises[np.arange(num),mixture]
-                elif sampling == 'all_mixtures':
-                    noise = noises
-            else:
-                assert False, 'Too many mixtures in the latents.'
-        else:
-            assert False, 'Unknown latent model.'
-        return opts['pz_scale'] * noise
 
     def add_least_gaussian2d_ops(self):
         """ Add ops searching for the 2d plane in z_dim hidden space
@@ -505,7 +529,7 @@ class WAE(object):
                 data_ids = np.random.choice(train_size,
                                     opts['batch_size'],
                                     replace=False)
-                batch_images = data.data[data_ids].astype(np.float)
+                batch_images = data.data[data_ids].astype(np.float32)
                 batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
