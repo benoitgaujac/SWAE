@@ -67,9 +67,12 @@ def mixprob_encoder(opts, inputs, is_training=False, reuse=False):
     # elif opts['e_arch_d'] == 'ali':
     #     # Architecture smilar to "Adversarially learned inference" paper
     #     log_mixprobs,_ = ali_encoder(opts, inputs, is_training, reuse)
-    # elif opts['e_arch_d'] == 'began':
-    #     # Architecture similar to the BEGAN paper
-    #     log_mixprobs,_ = began_encoder(opts, inputs, is_training, reuse)
+    elif opts['e_arch_d'] == 'began':
+        # Architecture similar to the BEGAN paper
+        log_mixprobs,_ = began_encoder(opts['e_num_filters_d'], opts['e_num_layers_d'],
+                                                    1, opts['nmixtures'],
+                                                    'mixprob_encoder', inputs, opts,
+                                                    is_training, reuse)
     else:
         raise ValueError('%s Unknown encoder architecture for mixtures' % opts['e_arch'])
 
@@ -91,9 +94,12 @@ def mean_encoder(opts, inputs, is_training=False, reuse=False):
     # elif opts['e_arch_g'] == 'ali':
     #     # Architecture smilar to "Adversarially learned inference" paper
     #     means,log_sigmas = ali_encoder(opts, inputs, is_training, reuse)
-    # elif opts['e_arch_g'] == 'began':
-    #     # Architecture similar to the BEGAN paper
-    #     means,log_sigmas = began_encoder(opts, inputs, is_training, reuse)
+    elif opts['e_arch_g'] == 'began':
+        # Architecture similar to the BEGAN paper
+        means,log_sigmas = began_encoder(opts['e_num_filters_g'], opts['e_num_layers_g'],
+                                                        opts['nmixtures'], opts['zdim'],
+                                                        'mean_encoder', inputs, opts,
+                                                        is_training, reuse)
     else:
         raise ValueError('%s Unknown encoder architecture for gaussian' % opts['e_arch'])
 
@@ -108,7 +114,7 @@ def mlp_encoder(num_units, num_layers, num_mixtures, output_dim, scpe, inputs, o
             if opts['batch_norm']:
                 layer_x = ops.batch_norm(opts, layer_x, is_training,
                                     reuse, scope=scpe+'_m{}_h{}_bn'.format(k,i))
-            layer_x = tf.nn.relu(layer_x)
+            layer_x = tf.nn.elu(layer_x)
         mean = ops.linear(opts, layer_x, output_dim, scope=scpe+'_m{}_mean_lin'.format(k))
         means.append(mean)
         if scpe == 'mean_encoder':
@@ -129,7 +135,7 @@ def dcgan_encoder(num_units, num_layers, num_mixtures, output_dim, scpe, inputs,
             if opts['batch_norm']:
                 layer_x = ops.batch_norm(opts, layer_x, is_training,
                                          reuse, scope=scpe+'_m{}_h{}_bn'.format(k,i))
-            layer_x = tf.nn.relu(layer_x)
+            layer_x = tf.nn.elu(layer_x)
         mean = ops.linear(opts, layer_x, output_dim, scope=scpe+'_m{}_mean_lin'.format(k))
         means.append(mean)
         if scpe == 'mean_encoder':
@@ -283,109 +289,37 @@ def ali_encoder(opts, inputs, is_training=False, reuse=False):
     res = (tf.stack(means,axis=1), tf.stack(log_sigmas,axis=1), log_mixprobs)
     return res
 
-def began_encoder(opts, inputs, is_training=False, reuse=False):
-    num_units_g = opts['e_num_filters_g']
-    assert num_units_g == opts['g_num_filters'], \
+def began_encoder(num_units, num_layers, num_mixtures, output_dim, scpe, inputs, opts, is_training=False, reuse=False):
+    assert num_units == opts['g_num_filters'], \
         'BEGAN requires same number of filters in encoder and decoder'
-    num_layers_g = opts['e_num_layers_g']
-    num_units_m = opts['e_num_filters_m']
-    num_layers_m = opts['e_num_layers_m']
     means, log_sigmas = [], []
-    if opts['e_noise'] == 'gaussian':
-        # encode the mean parameters of gaussian
-        layer_x = ops.conv2d(opts, inputs, num_units_g, scope='hfirst_conv')
-        for i in range(num_layers_g):
+    for k in range(num_mixtures):
+        layer_x = inputs
+        layer_x = ops.conv2d(opts, layer_x, num_units, scope=scpe+'_m{}_hfirst_conv'.format(k))
+        for i in range(num_layers):
             if i % 3 < 2:
-                if i != num_layers_g - 2:
-                    ii = i - (i / 3)
-                    scale = (ii + 1 - ii / 2)
+                if i != num_layers - 2:
+                    ii = i - int(i / 3)
+                    scale = (ii + 1 - int(ii / 2))
                 else:
-                    ii = i - (i / 3)
-                    scale = (ii - (ii - 1) / 2)
-                layer_x = ops.conv2d(opts, layer_x, num_units_g * scale, d_h=1, d_w=1,
-                                     scope='h{}_conv'.format(i))
+                    ii = i - int(i / 3)
+                    scale = (ii - int((ii - 1) / 2))
+                layer_x = ops.conv2d(opts, layer_x, num_units * scale, d_h=1, d_w=1,
+                                     scope=scpe+'_m{}_h{}_conv'.format(k,i))
                 layer_x = tf.nn.elu(layer_x)
             else:
-                if i != num_layers_g - 1:
-                    layer_x = ops.downsample(layer_x, scope='h{}_maxpool'.format(i),
+                if i != num_layers - 1:
+                    layer_x = ops.downsample(layer_x, scope=scpe+'_m{}_h{}_maxpool'.format(k,i),
                                              reuse=reuse)
         # Tensor should be [N, 8, 8, filters] at this point
-        mean = ops.linear(opts, layer_x, opts['zdim'], scope='mean_lin')
-        log_sigma = ops.linear(opts, layer_x,
-                                opts['zdim'], scope='log_sigmas_lin')
+        mean = ops.linear(opts, layer_x, output_dim, scope=scpe+'_m{}_mean_lin'.format(k))
         means.append(mean)
-        log_sigmas.append(log_sigma)
-        log_mixprobs = None
-    elif opts['e_noise'] == 'mixture':
-        # encode the mean parameters of the nmixtures gaussians
-        for k in range(opts['nmixtures']):
-            layer_x = ops.conv2d(opts, inputs, num_units_m, scope='m{}_hfirst_conv'.format(k))
-            for i in range(num_layers_m):
-                if i % 3 < 2:
-                    if i != num_layers_m - 2:
-                        ii = i - (i / 3)
-                        scale = (ii + 1 - ii / 2)
-                    else:
-                        ii = i - (i / 3)
-                        scale = (ii - (ii - 1) / 2)
-                    layer_x = ops.conv2d(opts, layer_x, num_units_m * scale, d_h=1, d_w=1,
-                                         scope='m{}_h{}_conv'.format(k,i))
-                    layer_x = tf.nn.elu(layer_x)
-                else:
-                    if i != num_layers_m - 1:
-                        layer_x = ops.downsample(layer_x, scope='m{}_h{}_maxpool'.format(k,i),
-                                                 reuse=reuse)
-            # Tensor should be [N, 8, 8, filters] at this point
-            mean = ops.linear(opts, layer_x, opts['zdim'], scope='m{}_mean_lin'.format(k))
+        if scpe == 'mean_encoder':
             log_sigma = ops.linear(opts, layer_x,
-                                    opts['zdim'], scope='m{}_log_sigmas_lin'.format(k))
-            means.append(mean)
+                                    output_dim, scope=scpe+'_m{}_log_sigmas_lin'.format(k))
             log_sigmas.append(log_sigma)
-        # encode the mean parameters of the weights mixture
-        layer_x = ops.conv2d(opts, inputs, num_units_g, scope='hfirst_conv')
-        for i in range(num_layers_g):
-            if i % 3 < 2:
-                if i != num_layers_g - 2:
-                    ii = i - (i / 3)
-                    scale = (ii + 1 - ii / 2)
-                else:
-                    ii = i - (i / 3)
-                    scale = (ii - (ii - 1) / 2)
-                layer_x = ops.conv2d(opts, layer_x, num_units_g * scale, d_h=1, d_w=1,
-                                     scope='h{}_conv'.format(i))
-                layer_x = tf.nn.elu(layer_x)
-            else:
-                if i != num_layers_g - 1:
-                    layer_x = ops.downsample(layer_x, scope='h{}_maxpool'.format(i),
-                                             reuse=reuse)
-        # Tensor should be [N, 8, 8, filters] at this point
-        log_mixprobs = ops.linear(opts, layer_x, opts['nmixtures'], 'mixprob_lin')
-    else:
-        # encode the mean parameters for non gaussian encoder
-        layer_x = ops.conv2d(opts, inputs, num_units_g, scope='hfirst_conv')
-        for i in range(num_layers_g):
-            if i % 3 < 2:
-                if i != num_layers_g - 2:
-                    ii = i - (i / 3)
-                    scale = (ii + 1 - ii / 2)
-                else:
-                    ii = i - (i / 3)
-                    scale = (ii - (ii - 1) / 2)
-                layer_x = ops.conv2d(opts, layer_x, num_units_g * scale, d_h=1, d_w=1,
-                                     scope='h{}_conv'.format(i))
-                layer_x = tf.nn.elu(layer_x)
-            else:
-                if i != num_layers_g - 1:
-                    layer_x = ops.downsample(layer_x, scope='h{}_maxpool'.format(i),
-                                             reuse=reuse)
-        # Tensor should be [N, 8, 8, filters] at this point
-        mean = ops.linear(opts, layer_x, opts['zdim'], scope='hfinal_lin')
-        #means.append(mean)
-        #res = (tf.stack(means,axis=1),None,None)
-        return res
 
-    res = (tf.stack(means,axis=1), tf.stack(log_sigmas,axis=1), log_mixprobs)
-    return res
+    return means, log_sigmas
 
 
 def decoder(opts, noise, reuse=False, is_training=True):
@@ -530,7 +464,7 @@ def began_decoder(opts, noise, is_training=False, reuse=False):
         else:
             if i != num_layers - 1:
                 # Upsampling by factor of 2 with NN
-                scale = 2 ** (i / 3 + 1)
+                scale = 2 ** (int(i / 3) + 1)
                 layer_x = ops.upsample_nn(layer_x, [scale * 8, scale * 8],
                                           scope='h%d_upsample' % i, reuse=reuse)
                 # Skip connection
