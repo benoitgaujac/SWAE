@@ -40,7 +40,7 @@ d_num_filters : 512
 d_num_layers : 4
 zdim : 15
 pz : mixture
-nmixtures : 1
+nmixtures : 2
 sigma_prior : 0.1
 pz_scale : 1.0
 cost : l2sq
