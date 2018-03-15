@@ -858,12 +858,12 @@ def save_plots(opts, sample_train, label_train,
     y = np.log(np.abs(losses_match[::x_step]))
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
-    blurr_mod = np.tile(blurr_vals, (opts['print_every'], 1))
-    blurr_mod = blurr_mod.transpose().reshape(-1)
-    x_step = max(int(len(blurr_mod)/ 100), 1)
-    x = np.arange(1, len(blurr_mod) + 1, x_step)
-    y = np.log(blurr_mod[::x_step])
-    plt.plot(x, y, linewidth=2, color='orange', label='log(sharpness)')
+    # blurr_mod = np.tile(blurr_vals, (opts['print_every'], 1))
+    # blurr_mod = blurr_mod.transpose().reshape(-1)
+    # x_step = max(int(len(blurr_mod)/ 100), 1)
+    # x = np.arange(1, len(blurr_mod) + 1, x_step)
+    # y = np.log(blurr_mod[::x_step])
+    # plt.plot(x, y, linewidth=2, color='orange', label='log(sharpness)')
     # if len(encoding_changes) > 0:
     #     x = np.arange(1, len(losses_rec) + 1)
     #     y = np.log(encoding_changes)
