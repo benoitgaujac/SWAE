@@ -20,6 +20,7 @@ from datahandler import datashapes
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import umap
 
 import pdb
 
@@ -597,9 +598,8 @@ class WAE(object):
                                        self.is_training: False})
 
                     # Auto-encoding training images
-                    [loss_rec_train, enc_train, rec_train, mix_train] = self.sess.run(
+                    [loss_rec_train, rec_train, mix_train] = self.sess.run(
                             [self.loss_reconstruct,
-                             self.encoded,
                              self.reconstructed,
                              self.enc_mixprob],
                             feed_dict={self.sample_points: data.data[:self.num_pics],
@@ -628,7 +628,6 @@ class WAE(object):
                                     losses[-1], loss_rec_test,
                                     losses_match[-1], np.min(gen_blurr))
                     logging.error(debug_str)
-
                     # Making plots
                     save_plots(opts, data.data[:self.num_pics],
                                     data.labels[:self.num_pics],
@@ -638,6 +637,7 @@ class WAE(object):
                                     rec_test[:self.num_pics],
                                     mix_train[:self.num_pics],
                                     mix_test[:self.num_pics],
+                                    enc_test,
                                     sample_gen,
                                     losses_rec, losses_match, blurr_vals,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
@@ -674,6 +674,7 @@ def save_plots(opts, sample_train, label_train,
                     sample_test, label_test,
                     recon_train, recon_test,
                     mix_train, mix_test,
+                    enc_test,
                     sample_gen,
                     losses_rec, losses_match, blurr_vals,
                     filename):
@@ -791,61 +792,60 @@ def save_plots(opts, sample_train, label_train,
         ax.axes.set_aspect(1)
 
     ### Then the mean mixtures plots
-    train_probs = np.exp(mix_train)/np.sum(np.exp(mix_train),axis=-1,keepdims=True)
+    #train_probs = np.exp(mix_train)/np.sum(np.exp(mix_train),axis=-1,keepdims=True)
     test_probs = np.exp(mix_test)/np.sum(np.exp(mix_test),axis=-1,keepdims=True)
-    train_probs_labels = []
+    #train_probs_labels = []
     test_probs_labels = []
-    #unique_label = np.unique(label_train).shape[0]
     for i in range(10):
-        tr_prob = [train_probs[k] for k in range(num_pics) if label_train[k]==i]
-        tr_prob = np.mean(np.stack(tr_prob,axis=0),axis=0)
+        #tr_prob = [train_probs[k] for k in range(num_pics) if label_train[k]==i]
+        #tr_prob = np.mean(np.stack(tr_prob,axis=0),axis=0)
         te_prob = [test_probs[k] for k in range(num_pics) if label_test[k]==i]
         te_prob = np.mean(np.stack(te_prob,axis=0),axis=0)
-        train_probs_labels.append(tr_prob)
+        #train_probs_labels.append(tr_prob)
         test_probs_labels.append(te_prob)
-    train_probs_labels = np.stack(train_probs_labels,axis=0).transpose()
+    #train_probs_labels = np.stack(train_probs_labels,axis=0).transpose()
     test_probs_labels = np.stack(test_probs_labels,axis=0).transpose()
 
-    ax = plt.subplot(gs[1, 0])
-    plt.imshow(train_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
-    plt.colorbar()
-    plt.text(0.47, 1., 'Train means probs',
-            ha="center", va="bottom", size=20, transform=ax.transAxes)
+    # ax = plt.subplot(gs[1, 0])
+    # plt.imshow(train_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
+    # plt.colorbar()
+    # plt.text(0.47, 1., 'Train means probs',
+    #         ha="center", va="bottom", size=20, transform=ax.transAxes)
 
-    ax = plt.subplot(gs[1, 1])
+    ax = plt.subplot(gs[1, 0])
     plt.imshow(test_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
     plt.colorbar()
     plt.text(0.47, 1., 'Test means probs',
-            ha="center", va="bottom", size=20, transform=ax.transAxes)
+           ha="center", va="bottom", size=20, transform=ax.transAxes)
 
-    # plt.scatter(Pz[:, 0], Pz[:, 1],
-    #             color='red', s=70, marker='*', label='Pz')
+    ax = plt.subplot(gs[1, 1])
+    embedding = umap.UMAP(n_neighbors=5,
+                            min_dist=0.3,
+                            metric='correlation').fit_transform(enc_test)
+    plt.scatter(embedding[:, 0], embedding[:, 1],
+                c=label_test, s=20, label='test_encoded')
     # plt.scatter(Qz_train[:, 0], Qz_train[:, 1], color='blue',
     #             s=20, marker='x', edgecolors='face', label='Qz_train')
     # plt.scatter(Qz_test[:, 0], Qz_test[:, 1], color='green',
     #             s=20, marker='x', edgecolors='face', label='Qz_test')
-    # plt.text(0.47, 1., 'Pz vs Qz plot',
-    #          ha="center", va="bottom", size=30, transform=ax.transAxes)
-    # xmin = min(np.min(Qz_train[:,0]),
-    #            np.min(Qz_test[:,0]))
-    # xmax = max(np.max(Qz_train[:,0]),
-    #            np.max(Qz_test[:,0]))
-    # magnify = 0.3
-    # width = abs(xmax - xmin)
-    # xmin = xmin - width * magnify
-    # xmax = xmax + width * magnify
-    #
-    # ymin = min(np.min(Qz_train[:,1]),
-    #            np.min(Qz_test[:,1]))
-    # ymax = max(np.max(Qz_train[:,1]),
-    #            np.max(Qz_test[:,1]))
-    # width = abs(ymin - ymax)
-    # ymin = ymin - width * magnify
-    # ymax = ymax + width * magnify
-    # plt.xlim(xmin, xmax)
-    # plt.ylim(ymin, ymax)
-    # plt.legend(loc='upper left')
-    #
+    plt.text(0.47, 1., 'Test encodings',
+             ha="center", va="bottom", size=20, transform=ax.transAxes)
+    xmin = np.amin(embedding[:,0])
+    xmax = np.amax(embedding[:,0])
+    magnify = 0.3
+    width = abs(xmax - xmin)
+    xmin = xmin - width * magnify
+    xmax = xmax + width * magnify
+
+    ymin = np.amin(embedding[:,1])
+    ymax = np.amax(embedding[:,1])
+    width = abs(ymin - ymax)
+    ymin = ymin - width * magnify
+    ymax = ymax + width * magnify
+    plt.xlim(xmin, xmax)
+    plt.ylim(ymin, ymax)
+    #plt.legend(loc='upper left')
+
     ###The loss curves
     ax = plt.subplot(gs[1, 2])
     total_num = len(losses_rec)
@@ -858,17 +858,6 @@ def save_plots(opts, sample_train, label_train,
     y = np.log(np.abs(losses_match[::x_step]))
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
-    # blurr_mod = np.tile(blurr_vals, (opts['print_every'], 1))
-    # blurr_mod = blurr_mod.transpose().reshape(-1)
-    # x_step = max(int(len(blurr_mod)/ 100), 1)
-    # x = np.arange(1, len(blurr_mod) + 1, x_step)
-    # y = np.log(blurr_mod[::x_step])
-    # plt.plot(x, y, linewidth=2, color='orange', label='log(sharpness)')
-    # if len(encoding_changes) > 0:
-    #     x = np.arange(1, len(losses_rec) + 1)
-    #     y = np.log(encoding_changes)
-    #     x_step = int(len(x) / len(y))
-    #     plt.plot(x[::x_step], y, linewidth=2, color='green', label='log(encoding changes)')
     plt.grid(axis='y')
     plt.legend(loc='upper right')
 
