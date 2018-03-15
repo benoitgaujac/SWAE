@@ -2,7 +2,7 @@ Parameters:
 dataset : mnist
 verbose : False
 save_every_epoch : 1001
-print_every : 500
+print_every : 50
 work_dir : results_mnist
 plot_num_pics : 100
 plot_num_cols : 10
@@ -16,7 +16,7 @@ lr_adv : 0.0001
 lr_schedule : manual
 batch_size : 128
 train_dataset_size : -1
-epoch_num : 50
+epoch_num : 10
 init_std : 0.00099999
 init_bias : 0.0
 batch_norm : False
@@ -29,10 +29,10 @@ e_noise : mixture
 e_num_filters_g : 1024
 e_num_layers_g : 2
 e_arch_g : mlp
-e_num_filters_d : 1024
+e_num_filters_d : 512
 e_num_layers_d : 3
 e_arch_d : dcgan
-g_num_filters : 1024
+g_num_filters : 512
 g_num_layers : 3
 g_arch : dcgan
 gan_p_trick : False
