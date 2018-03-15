@@ -27,8 +27,8 @@ e_pretrain : False
 e_pretrain_sample_size : 1000
 e_noise : mixture
 e_num_filters_g : 512
-e_num_layers_g : 3
-e_arch_g : mlp
+e_num_layers_g : 2
+e_arch_g : dcgan
 e_num_filters_d : 512
 e_num_layers_d : 2
 e_arch_d : dcgan
@@ -45,6 +45,6 @@ sigma_prior : 0.1
 pz_scale : 1.0
 cost : l2sq
 z_test : mmd
-mmd_kernel : RBF
+mmd_kernel : IMQ
 lambda : 10.0
 lambda_schedule : constant
