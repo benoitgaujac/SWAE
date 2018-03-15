@@ -472,7 +472,7 @@ class DataHandler(object):
             loaded = np.frombuffer(fd.read(10000*28*28*1), dtype=np.uint8)
             te_X = loaded.reshape((10000, 28, 28, 1)).astype(np.float32)
 
-        with gzip.open(os.path.join(data_dir, 'train-images-idx3-ubyte.gz')) as fd:
+        with gzip.open(os.path.join(data_dir, 't10k-labels-idx1-ubyte.gz')) as fd:
             fd.read(8)
             loaded = np.frombuffer(fd.read(10000), dtype=np.uint8)
             te_Y = loaded.reshape((10000)).astype(np.int)
