@@ -792,25 +792,25 @@ def save_plots(opts, sample_train, label_train,
         ax.axes.set_aspect(1)
 
     ### Then the mean mixtures plots
-    #train_probs = np.exp(mix_train)/np.sum(np.exp(mix_train),axis=-1,keepdims=True)
+    train_probs = np.exp(mix_train)/np.sum(np.exp(mix_train),axis=-1,keepdims=True)
     test_probs = np.exp(mix_test)/np.sum(np.exp(mix_test),axis=-1,keepdims=True)
-    #train_probs_labels = []
+    train_probs_labels = []
     test_probs_labels = []
     for i in range(10):
-        #tr_prob = [train_probs[k] for k in range(num_pics) if label_train[k]==i]
-        #tr_prob = np.mean(np.stack(tr_prob,axis=0),axis=0)
+        tr_prob = [train_probs[k] for k in range(num_pics) if label_train[k]==i]
+        tr_prob = np.mean(np.stack(tr_prob,axis=0),axis=0)
         te_prob = [test_probs[k] for k in range(num_pics) if label_test[k]==i]
         te_prob = np.mean(np.stack(te_prob,axis=0),axis=0)
-        #train_probs_labels.append(tr_prob)
+        train_probs_labels.append(tr_prob)
         test_probs_labels.append(te_prob)
-    #train_probs_labels = np.stack(train_probs_labels,axis=0).transpose()
+    train_probs_labels = np.stack(train_probs_labels,axis=0).transpose()
     test_probs_labels = np.stack(test_probs_labels,axis=0).transpose()
 
-    # ax = plt.subplot(gs[1, 0])
-    # plt.imshow(train_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
-    # plt.colorbar()
-    # plt.text(0.47, 1., 'Train means probs',
-    #         ha="center", va="bottom", size=20, transform=ax.transAxes)
+    ax = plt.subplot(gs[1, 0])
+    plt.imshow(train_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
+    plt.colorbar()
+    plt.text(0.47, 1., 'Train means probs',
+            ha="center", va="bottom", size=20, transform=ax.transAxes)
 
     ax = plt.subplot(gs[1, 0])
     plt.imshow(test_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
@@ -818,33 +818,28 @@ def save_plots(opts, sample_train, label_train,
     plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
 
-    ax = plt.subplot(gs[1, 1])
-    embedding = umap.UMAP(n_neighbors=5,
-                            min_dist=0.3,
-                            metric='correlation').fit_transform(enc_test)
-    plt.scatter(embedding[:, 0], embedding[:, 1],
-                c=label_test, s=20, label='test_encoded')
-    # plt.scatter(Qz_train[:, 0], Qz_train[:, 1], color='blue',
-    #             s=20, marker='x', edgecolors='face', label='Qz_train')
-    # plt.scatter(Qz_test[:, 0], Qz_test[:, 1], color='green',
-    #             s=20, marker='x', edgecolors='face', label='Qz_test')
-    plt.text(0.47, 1., 'Test encodings',
-             ha="center", va="bottom", size=20, transform=ax.transAxes)
-    xmin = np.amin(embedding[:,0])
-    xmax = np.amax(embedding[:,0])
-    magnify = 0.3
-    width = abs(xmax - xmin)
-    xmin = xmin - width * magnify
-    xmax = xmax + width * magnify
-
-    ymin = np.amin(embedding[:,1])
-    ymax = np.amax(embedding[:,1])
-    width = abs(ymin - ymax)
-    ymin = ymin - width * magnify
-    ymax = ymax + width * magnify
-    plt.xlim(xmin, xmax)
-    plt.ylim(ymin, ymax)
-    #plt.legend(loc='upper left')
+    # ax = plt.subplot(gs[1, 1])
+    # embedding = umap.UMAP(n_neighbors=5,
+    #                         min_dist=0.3,
+    #                         metric='correlation').fit_transform(enc_test)
+    # plt.scatter(embedding[:, 0], embedding[:, 1],
+    #             c=label_test, s=20, label='test_encoded')
+    # plt.text(0.47, 1., 'Test encodings',
+    #          ha="center", va="bottom", size=20, transform=ax.transAxes)
+    # xmin = np.amin(embedding[:,0])
+    # xmax = np.amax(embedding[:,0])
+    # magnify = 0.3
+    # width = abs(xmax - xmin)
+    # xmin = xmin - width * magnify
+    # xmax = xmax + width * magnify
+    #
+    # ymin = np.amin(embedding[:,1])
+    # ymax = np.amax(embedding[:,1])
+    # width = abs(ymin - ymax)
+    # ymin = ymin - width * magnify
+    # ymax = ymax + width * magnify
+    # plt.xlim(xmin, xmax)
+    # plt.ylim(ymin, ymax)
 
     ###The loss curves
     ax = plt.subplot(gs[1, 2])
