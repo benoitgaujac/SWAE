@@ -89,7 +89,8 @@ class WAE(object):
         self.loss_reconstruct = self.reconstruction_loss()
         self.wae_objective = self.loss_reconstruct + self.wae_lambda * self.penalty
         self.blurriness = self.compute_blurriness()
-        self.add_least_gaussian2d_ops()
+
+        #self.add_least_gaussian2d_ops()
 
         # -- Optimizers, savers, etc
         self.add_optimizers()
@@ -119,26 +120,6 @@ class WAE(object):
         self.wae_lambda = wae_lambda
         self.is_training = is_training
 
-    def init_prior(self):
-        opts = self.opts
-        distr = opts['pz']
-        if distr == 'uniform':
-            self.pz_means = [-1.0,1.0].astype(np.float32)
-            self.pz_covs = None
-        elif distr in ('normal', 'sphere'):
-            self.pz_means = np.zeros(opts['zdim']).astype(np.float32)
-            self.pz_covs = opts['sigma_prior']*np.identity(opts['zdim']).astype(np.float32)
-        elif distr == 'mixture':
-            assert opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
-            means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
-            for k in range(opts['nmixtures']):
-                means[k,k] = np.amax([2.0*opts['sigma_prior'],1]).astype(np.float32)
-                #means[:,k,k] = 2.0*opts['sigma_prior']
-            self.pz_means = means
-            self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
-        else:
-            assert False, 'Unknown latent model.'
-
     def add_savers(self):
         opts = self.opts
         saver = tf.train.Saver(max_to_keep=10)
@@ -153,6 +134,26 @@ class WAE(object):
         tf.add_to_collection('encoder', self.encoded)
         tf.add_to_collection('decoder', self.decoded)
         self.saver = saver
+
+    def init_prior(self):
+        opts = self.opts
+        distr = opts['pz']
+        if distr == 'uniform':
+            self.pz_means = [-1.0,1.0].astype(np.float32)
+            self.pz_covs = None
+        elif distr in ('normal', 'sphere'):
+            self.pz_means = np.zeros(opts['zdim']).astype(np.float32)
+            self.pz_covs = opts['sigma_prior']*np.identity(opts['zdim']).astype(np.float32)
+        elif distr == 'mixture':
+            assert opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
+            means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
+            for k in range(opts['nmixtures']):
+                #means[k,k] = np.amax([2.0*opts['sigma_prior'],0.]).astype(np.float32)
+                means[k,k] = 2.0*opts['sigma_prior']
+            self.pz_means = means
+            self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
+        else:
+            assert False, 'Unknown latent model.'
 
     def sample_mixtures(self,means,cov,distr,num=100,tpe='numpy'):
         if tpe=='tensor':
@@ -230,90 +231,66 @@ class WAE(object):
         nf = tf.cast(n, tf.float32)
         half_size = tf.cast((n * n - n) / 2,tf.int32)
 
-        norms_pz = tf.reduce_sum(tf.square(sample_pz), axis=-1, keepdims=True)
-        norms_qz = tf.reduce_sum(tf.square(sample_qz), axis=1, keepdims=True)
-        if opts['pz'] == 'mixture':
-            assert len(sample_pz.get_shape().as_list()) == 3, \
-                'Prior samples need to have shape [batch,nmixtures,zdim] if prior is mixture'
-            dotprods_pz = tf.tensordot(sample_pz, tf.transpose(sample_pz), [[-1],[0]])
-            norm_nk = tf.tensordot(norms_pz,tf.ones(tf.shape(tf.transpose(norms_pz))),[[-1],[0]])
-            norm_lm = tf.tensordot(tf.ones(tf.shape(norms_pz)),tf.transpose(norms_pz),[[-1],[0]])
-            distances_pz = norm_nk + norm_lm - 2. * dotprods_pz
-        else:
-            assert len(sample_pz.get_shape().as_list()) == 2, \
-                'Prior samples need to have shape [batch,zdim] if prior is gaussian'
-            dotprods_pz = tf.matmul(sample_pz, sample_pz, transpose_b=True)
-            distances_pz = norms_pz + tf.transpose(norms_pz) - 2. * dotprods_pz
-        if opts['e_noise'] == 'mixture':
-            assert len(sample_qz.get_shape().as_list()) == 3, \
-                'latent samples need to have shape [batch,nmixtures,zdim] if model is mixture of gaussians'
-            dotprods_qz = tf.tensordot(sample_qz, tf.transpose(sample_qz), [[-1],[0]])
-            norm_nk = tf.tensordot(norms_qz,tf.ones(tf.shape(tf.transpose(norms_qz))),[[-1],[0]])
-            norm_lm = tf.tensordot(tf.ones(tf.shape(norms_qz)),tf.transpose(norms_qz),[[-1],[0]])
-            distances_qz = norm_nk + norm_lm - 2. * dotprods_qz
-        else:
-            assert len(sample_qz.get_shape().as_list()) == 2, \
-                'latent samples need to have shape [batch,zdim] if model is gaussian'
-            dotprods_qz = tf.matmul(sample_qz, sample_qz, transpose_b=True)
-            distances_qz = norms_qz + tf.transpose(norms_qz) - 2. * dotprods_qz
         """
         TODO : add case where qz is different from pz: pz=mixture, qz=gaussian
         """
-        if opts['pz'] == 'mixture':
-            dotprods = tf.tensordot(sample_qz, tf.transpose(sample_pz), [[-1],[0]])
-            norm_nk = tf.tensordot(norms_qz,tf.ones(tf.shape(tf.transpose(norms_qz))),[[-1],[0]])
-            norm_lm = tf.tensordot(tf.ones(tf.shape(norms_pz)),tf.transpose(norms_pz),[[-1],[0]])
-            distances = norm_nk + norm_lm - 2. * dotprods
-        else:
-            dotprods = tf.matmul(sample_qz, sample_pz, transpose_b=True)
-            distances = norms_qz + tf.transpose(norms_pz) - 2. * dotprods
+        norms_pz = tf.reduce_sum(tf.square(sample_pz), axis=-1, keepdims=True)
+        norms_qz = tf.reduce_sum(tf.square(sample_qz), axis=1, keepdims=True)
+        distances_pz = self.square_dist(sample_pz, norms_pz, sample_pz, norms_pz, opts['pz'])
+        distances_qz = self.square_dist(sample_qz, norms_qz, sample_qz, norms_qz, opts['e_noise'])
+        distances = self.square_dist(sample_qz, norms_qz, sample_pz, norms_pz, opts['e_noise'])
+
         if kernel == 'RBF':
             # Median heuristic for the sigma^2 of Gaussian kernel
             sigma2_k = tf.nn.top_k(
                 tf.reshape(distances, [-1]), half_size).values[half_size - 1]
             sigma2_k += tf.nn.top_k(
                 tf.reshape(distances_qz, [-1]), half_size).values[half_size - 1]
-            # Maximal heuristic for the sigma^2 of Gaussian kernel
-            # sigma2_k = tf.nn.top_k(tf.reshape(distances_qz, [-1]), 1).values[0]
-            # sigma2_k += tf.nn.top_k(tf.reshape(distances, [-1]), 1).values[0]
-            # sigma2_k = opts['latent_space_dim'] * sigma2_p
+
             if opts['verbose']:
                 sigma2_k = tf.Print(sigma2_k, [sigma2_k], 'Kernel width:')
 
             res1 = tf.exp( - distances_qz / 2. / sigma2_k)
             if opts['pz'] == 'mixture':
-                res1 += tf.exp( - distances_pz / (2.*sigma2_k)) / opts['nmixtures']**2
-                res1 = tf.multiply(tf.transpose(res1,perm=(1,2,0,3)),
-                    1.-tf.eye(n,batch_shape=[opts['nmixtures'],opts['nmixtures']]))
+                res1 += tf.exp( - distances_pz / 2. / sigma2_k) / (opts['nmixtures']*opts['nmixtures'])
+                res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
+                res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
+
+                res1 = tf.reduce_sum(res1) / (nf * nf) \
+                        - tf.reduce_sum(res1_ddiag) / (nf * nf - nf) \
+                        + tf.reduce_sum(res1_diag) / (nf*(nf * nf - nf))
             else:
                 res1 += tf.exp( - distances_pz / 2. / sigma2_k)
                 res1 = tf.multiply(res1, 1. - tf.eye(n))
-            res1 = tf.reduce_sum(res1) / (nf * nf - nf)
+                res1 = tf.reduce_sum(res1) / (nf * nf - nf)
             if opts['pz'] == 'mixture':
                 res2 = tf.exp( - distances / 2. / sigma2_k) / opts['nmixtures']
             else:
                 res2 = tf.exp( - distances / 2. / sigma2_k)
-            res2 = 2*tf.reduce_sum(res2) * 2. / (nf * nf)
+            res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
             stat = res1 - res2
-        # elif kernel == 'IMQ':
-        #     # k(x, y) = C / (C + ||x - y||^2)
-        #     # C = tf.nn.top_k(tf.reshape(distances, [-1]), half_size).values[half_size - 1]
-        #     # C += tf.nn.top_k(tf.reshape(distances_qz, [-1]), half_size).values[half_size - 1]
-        #     Cbase = 2 * opts['zdim'] * sigma2_p
-        #     stat = 0.
-        #     for scale in [.1, .2, .5, 1., 2., 5., 10.]:
-        #         C = Cbase * scale
-        #         res1 = C / (C + distances_qz)
-        #         res1 += C / (C + distances_pz)
-        #         res1 = tf.multiply(res1, 1. - tf.eye(n))
-        #         res1 = tf.reduce_sum(res1) / (nf * nf - nf)
-        #         res2 = C / (C + distances)
-        #         res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
-        #         stat += res1 - res2
         else:
             raise ValueError('%s Unknown kernel' % kernel)
 
         return stat
+
+    def square_dist(self,sample_x, norms_x, sample_y, norms_y, distr):
+        assert sample_x.get_shape().as_list() == sample_x.get_shape().as_list(), \
+            'Prior samples need to have same shape as posterior samples'
+        if distr == 'mixture':
+            assert len(sample_x.get_shape().as_list()) == 3, \
+                'Prior samples need to have shape [batch,nmixtures,zdim] for mixture model'
+            dotprod = tf.tensordot(sample_x, tf.transpose(sample_y), [[-1],[0]])
+            norm_nk = tf.tensordot(norms_x,tf.ones(tf.shape(tf.transpose(norms_x))),[[-1],[0]])
+            norm_lm = tf.tensordot(tf.ones(tf.shape(norms_y)),tf.transpose(norms_y),[[-1],[0]])
+            distances = norm_nk + norm_lm - 2. * dotprod
+        else:
+            assert len(sample_x.get_shape().as_list()) == 2, \
+                'Prior samples need to have shape [batch,zdim] for gaussian model'
+            dotprod = tf.matmul(sample_x, sample_y, transpose_b=True)
+            distances = norms_x + tf.transpose(norms_y) - 2. * dotprod
+
+        return distances
 
     def reconstruction_loss(self):
         opts = self.opts
@@ -481,7 +458,6 @@ class WAE(object):
         losses_match = []
         blurr_vals = []
         encoding_changes = []
-        enc_test_prev = None
         batches_num = int(data.num_points / opts['batch_size'])
         train_size = data.num_points
         self.num_pics = opts['plot_num_pics']
@@ -544,7 +520,13 @@ class WAE(object):
                                    self.lr_decay: decay,
                                    self.wae_lambda: wae_lambda,
                                    self.is_training: True})
-
+                # print("means:")
+                # print(enc_mean[:3])
+                # print("sigmas:")
+                # print(enc_sigmas[:3])
+                # print("mix:")
+                # print(enc_mixprob[:3])
+                # pdb.set_trace()
                 # Update learning rate if necessary
                 if opts['lr_schedule'] == 'plateau':
                     # First 30 epochs do nothing
@@ -587,27 +569,20 @@ class WAE(object):
                     now = time.time()
 
                     # Auto-encoding test images
-                    [loss_rec_test, enc_test, rec_test] = self.sess.run(
+                    [loss_rec_test, enc_test, rec_test, mix_test] = self.sess.run(
                             [self.loss_reconstruct,
                              self.encoded,
-                             self.reconstructed],
+                             self.reconstructed,
+                             self.enc_mixprob],
                             feed_dict={self.sample_points: data.test_data[:self.num_pics],
                                        self.is_training: False})
 
-                    if enc_test_prev is not None:
-                        changes = np.mean((enc_test - enc_test_prev) ** 2.)
-                        encoding_changes.append(changes)
-                    else:
-                        changes = np.mean((enc_test) ** 2.)
-                        encoding_changes.append(changes)
-
-                    enc_test_prev = enc_test
-
                     # Auto-encoding training images
-                    [loss_rec_train, enc_train, rec_train] = self.sess.run(
+                    [loss_rec_train, enc_train, rec_train, mix_train] = self.sess.run(
                             [self.loss_reconstruct,
                              self.encoded,
-                             self.reconstructed],
+                             self.reconstructed,
+                             self.enc_mixprob],
                             feed_dict={self.sample_points: data.data[:self.num_pics],
                                        self.is_training: False})
 
@@ -628,67 +603,33 @@ class WAE(object):
                         epoch + 1, opts['epoch_num'],
                         it + 1, batches_num,
                         float(counter) / (now - self.start_time))
-                    debug_str += ' (WAE_LOSS=%.5f, RECON_LOSS=%.5f, ' \
+                    debug_str += ' (WAE_LOSS=%.5f, RECON_LOSS_TEST=%.5f, ' \
                                  'MATCH_LOSS=%.5f, ' \
-                                 'RECON_LOSS_TEST=%.5f, ' \
                                  'SHARPNESS=%.5f)' % (
-                                    losses[-1], losses_rec[-1],
-                                    losses_match[-1], loss_rec_test, np.min(gen_blurr))
+                                    losses[-1], loss_rec_test,
+                                    losses_match[-1], np.min(gen_blurr))
                     logging.error(debug_str)
-
-                    # Printing debug info for encoder variances if applicable
-                    if False:
-                    #if opts['e_noise'] == 'gaussian':
-                        logging.error('Per dimension encoder variances:')
-                        per_dim_range = self.debug_sigmas.eval(
-                            session = self.sess,
-                            feed_dict={self.sample_points: data.test_data[:500],
-                                       self.is_training: False})
-                        for idim in range(per_dim_range.shape[0]):
-                            if per_dim_range[idim][1] > 0.:
-                                logging.error(
-                                    'dim%.4d: [%.2f; %.2f]  <------' % (idim,
-                                       per_dim_range[idim][0],
-                                       per_dim_range[idim][1]))
-                            else:
-                                logging.error(
-                                    'dim%.4d: [%.2f; %.2f]' % (idim,
-                                       per_dim_range[idim][0],
-                                       per_dim_range[idim][1]))
-
-                    # Choosing the 2d projection for Pz vs Qz plots
-                    pz_noise = self.sample_pz(opts['plot_num_pics'])
-                    if opts['pz'] == 'normal' and opts['zdim'] > 2:
-                        # Finding the least Gaussian projection for Qz
-                        proj_mat, check = self.least_gaussian_2d(
-                            np.vstack([enc_train, enc_test]))
-                        # Projecting samples from Qz and Pz on this 2d plain
-                        Qz_train = np.dot(enc_train, proj_mat)
-                        Qz_test = np.dot(enc_test, proj_mat)
-                        Pz = np.dot(pz_noise, proj_mat)
-                    else:
-                        Qz_train = enc_train[:, :2]
-                        Qz_test = enc_test[:, :2]
-                        Pz = pz_noise[:, :2]
 
                     # Making plots
                     save_plots(opts, data.data[:self.num_pics],
-                               data.test_data[:self.num_pics],
-                               rec_train[:self.num_pics],
-                               rec_test[:self.num_pics],
-                               sample_gen,
-                               Qz_train, Qz_test, Pz,
-                               losses_rec, losses_match, blurr_vals,
-                               encoding_changes,
-                               'res_e%04d_mb%05d.png' % (epoch, it))
+                                    data.labels[:self.num_pics],
+                                    data.test_data[:self.num_pics],
+                                    data.test_labels[:self.num_pics],
+                                    rec_train[:self.num_pics],
+                                    rec_test[:self.num_pics],
+                                    mix_train[:self.num_pics],
+                                    mix_test[:self.num_pics],
+                                    sample_gen,
+                                    losses_rec, losses_match, blurr_vals,
+                                    'res_e%04d_mb%05d.png' % (epoch, it))
 
-        # Save the final model
-        if epoch > 0:
-            self.saver.save(self.sess,
-                             os.path.join(opts['work_dir'],
-                                          'checkpoints',
-                                          'trained-wae-final'),
-                             global_step=counter)
+        # # Save the final model
+        # if epoch > 0:
+        #     self.saver.save(self.sess,
+        #                      os.path.join(opts['work_dir'],
+        #                                   'checkpoints',
+        #                                   'trained-wae-final'),
+        #                      global_step=counter)
 
     def add_sigmas_debug(self):
 
@@ -710,13 +651,13 @@ class WAE(object):
         per_dim = tf.concat([min_per_dim, max_per_dim], axis=1)
         self.debug_sigmas = per_dim
 
-def save_plots(opts, sample_train, sample_test,
-               recon_train, recon_test,
-               sample_gen,
-               Qz_train, Qz_test, Pz,
-               losses_rec, losses_match, blurr_vals,
-               encoding_changes,
-               filename):
+def save_plots(opts, sample_train, label_train,
+                    sample_test, label_test,
+                    recon_train, recon_test,
+                    mix_train, mix_test,
+                    sample_gen,
+                    losses_rec, losses_match, blurr_vals,
+                    filename):
     """ Generates and saves the plot of the following layout:
         img1 | img2 | img3
         img4 | img6 | img5
@@ -724,7 +665,7 @@ def save_plots(opts, sample_train, sample_test,
         img1    -   test reconstructions
         img2    -   train reconstructions
         img3    -   samples
-        img4    -   Qz vs Pz plots
+        img4    -   Means mixture weights
         img5    -   real pics
         img6    -   loss curves
 
@@ -744,7 +685,7 @@ def save_plots(opts, sample_train, sample_test,
 
     images = []
 
-    # Reconstruction plots
+    ### Reconstruction plots
     for pair in [(sample_train, recon_train),
                  (sample_test, recon_test)]:
 
@@ -774,7 +715,7 @@ def save_plots(opts, sample_train, sample_test,
         image = np.concatenate(image, axis=0)
         images.append(image)
 
-    # Sample plots
+    ### Sample plots
     for sample in [sample_gen, sample_train]:
 
         assert len(sample) == num_pics
@@ -806,11 +747,10 @@ def save_plots(opts, sample_train, sample_test,
     # Filling in separate parts of the plot
 
     # First samples and reconstructions
-    for img, (gi, gj, title) in zip([img1, img2, img3, img5],
-                             [(0, 0, 'train reconstruction'),
-                              (0, 1, 'test reconstruction'),
-                              (0, 2, 'generated samples'),
-                              (1, 2, 'data points')]):
+    for img, (gi, gj, title) in zip([img1, img2, img3],
+                             [(0, 0, 'Train reconstruction'),
+                              (0, 1, 'Test reconstruction'),
+                              (0, 2, 'Generated samples')]):
         plt.subplot(gs[gi, gj])
         if greyscale:
             image = img[:, :, 0]
@@ -822,7 +762,7 @@ def save_plots(opts, sample_train, sample_test,
 
         ax = plt.subplot(gs[gi, gj])
         plt.text(0.47, 1., title,
-                 ha="center", va="bottom", size=30, transform=ax.transAxes)
+                 ha="center", va="bottom", size=20, transform=ax.transAxes)
 
         # Removing ticks
         ax.axes.get_xaxis().set_ticks([])
@@ -831,38 +771,64 @@ def save_plots(opts, sample_train, sample_test,
         ax.axes.set_ylim([height_pic, 0])
         ax.axes.set_aspect(1)
 
-    # Then the Pz vs Qz plot
+    ### Then the mean mixtures plots
+    train_probs = np.exp(mix_train)/np.sum(np.exp(mix_train),axis=-1,keepdims=True)
+    test_probs = np.exp(mix_test)/np.sum(np.exp(mix_test),axis=-1,keepdims=True)
+    train_probs_labels = []
+    test_probs_labels = []
+    #unique_label = np.unique(label_train).shape[0]
+    for i in range(10):
+        tr_prob = [train_probs[k] for k in range(num_pics) if label_train[k]==i]
+        tr_prob = np.mean(np.stack(tr_prob,axis=0),axis=0)
+        te_prob = [test_probs[k] for k in range(num_pics) if label_test[k]==i]
+        te_prob = np.mean(np.stack(te_prob,axis=0),axis=0)
+        train_probs_labels.append(tr_prob)
+        test_probs_labels.append(te_prob)
+    train_probs_labels = np.stack(train_probs_labels,axis=0).transpose()
+    test_probs_labels = np.stack(test_probs_labels,axis=0).transpose()
+
     ax = plt.subplot(gs[1, 0])
-    plt.scatter(Pz[:, 0], Pz[:, 1],
-                color='red', s=70, marker='*', label='Pz')
-    plt.scatter(Qz_train[:, 0], Qz_train[:, 1], color='blue',
-                s=20, marker='x', edgecolors='face', label='Qz_train')
-    plt.scatter(Qz_test[:, 0], Qz_test[:, 1], color='green',
-                s=20, marker='x', edgecolors='face', label='Qz_test')
-    plt.text(0.47, 1., 'Pz vs Qz plot',
-             ha="center", va="bottom", size=30, transform=ax.transAxes)
-    xmin = min(np.min(Qz_train[:,0]),
-               np.min(Qz_test[:,0]))
-    xmax = max(np.max(Qz_train[:,0]),
-               np.max(Qz_test[:,0]))
-    magnify = 0.3
-    width = abs(xmax - xmin)
-    xmin = xmin - width * magnify
-    xmax = xmax + width * magnify
+    plt.imshow(train_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
+    plt.colorbar()
+    plt.text(0.47, 1., 'Train means probs',
+            ha="center", va="bottom", size=20, transform=ax.transAxes)
 
-    ymin = min(np.min(Qz_train[:,1]),
-               np.min(Qz_test[:,1]))
-    ymax = max(np.max(Qz_train[:,1]),
-               np.max(Qz_test[:,1]))
-    width = abs(ymin - ymax)
-    ymin = ymin - width * magnify
-    ymax = ymax + width * magnify
-    plt.xlim(xmin, xmax)
-    plt.ylim(ymin, ymax)
-    plt.legend(loc='upper left')
-
-    # The loss curves
     ax = plt.subplot(gs[1, 1])
+    plt.imshow(test_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
+    plt.colorbar()
+    plt.text(0.47, 1., 'Test means probs',
+            ha="center", va="bottom", size=20, transform=ax.transAxes)
+
+    # plt.scatter(Pz[:, 0], Pz[:, 1],
+    #             color='red', s=70, marker='*', label='Pz')
+    # plt.scatter(Qz_train[:, 0], Qz_train[:, 1], color='blue',
+    #             s=20, marker='x', edgecolors='face', label='Qz_train')
+    # plt.scatter(Qz_test[:, 0], Qz_test[:, 1], color='green',
+    #             s=20, marker='x', edgecolors='face', label='Qz_test')
+    # plt.text(0.47, 1., 'Pz vs Qz plot',
+    #          ha="center", va="bottom", size=30, transform=ax.transAxes)
+    # xmin = min(np.min(Qz_train[:,0]),
+    #            np.min(Qz_test[:,0]))
+    # xmax = max(np.max(Qz_train[:,0]),
+    #            np.max(Qz_test[:,0]))
+    # magnify = 0.3
+    # width = abs(xmax - xmin)
+    # xmin = xmin - width * magnify
+    # xmax = xmax + width * magnify
+    #
+    # ymin = min(np.min(Qz_train[:,1]),
+    #            np.min(Qz_test[:,1]))
+    # ymax = max(np.max(Qz_train[:,1]),
+    #            np.max(Qz_test[:,1]))
+    # width = abs(ymin - ymax)
+    # ymin = ymin - width * magnify
+    # ymax = ymax + width * magnify
+    # plt.xlim(xmin, xmax)
+    # plt.ylim(ymin, ymax)
+    # plt.legend(loc='upper left')
+    #
+    ###The loss curves
+    ax = plt.subplot(gs[1, 2])
     total_num = len(losses_rec)
     x_step = max(int(total_num / 100), 1)
     x = np.arange(1, len(losses_rec) + 1, x_step)
@@ -879,11 +845,11 @@ def save_plots(opts, sample_train, sample_test,
     x = np.arange(1, len(blurr_mod) + 1, x_step)
     y = np.log(blurr_mod[::x_step])
     plt.plot(x, y, linewidth=2, color='orange', label='log(sharpness)')
-    if len(encoding_changes) > 0:
-        x = np.arange(1, len(losses_rec) + 1)
-        y = np.log(encoding_changes)
-        x_step = int(len(x) / len(y))
-        plt.plot(x[::x_step], y, linewidth=2, color='green', label='log(encoding changes)')
+    # if len(encoding_changes) > 0:
+    #     x = np.arange(1, len(losses_rec) + 1)
+    #     y = np.log(encoding_changes)
+    #     x_step = int(len(x) / len(y))
+    #     plt.plot(x[::x_step], y, linewidth=2, color='green', label='log(encoding changes)')
     plt.grid(axis='y')
     plt.legend(loc='upper right')
 
