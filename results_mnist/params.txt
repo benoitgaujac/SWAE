@@ -29,10 +29,10 @@ e_noise : mixture
 e_num_filters_g : 256
 e_num_layers_g : 1
 e_arch_g : dcgan
-e_num_filters_d : 256
+e_num_filters_d : 512
 e_num_layers_d : 3
 e_arch_d : dcgan
-g_num_filters : 256
+g_num_filters : 512
 g_num_layers : 3
 g_arch : dcgan
 gan_p_trick : False
