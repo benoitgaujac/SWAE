@@ -1,7 +1,7 @@
 Parameters:
 dataset : mnist
 verbose : False
-save_every_epoch : 101
+save_every_epoch : 1001
 print_every : 20
 work_dir : results_mnist
 plot_num_pics : 100
@@ -15,8 +15,8 @@ lr : 0.0003
 lr_adv : 0.0003
 lr_schedule : manual
 batch_size : 64
-train_dataset_size : 128
-epoch_num : 200
+train_dataset_size : 256
+epoch_num : 100
 init_std : 0.00099999
 init_bias : 0.0
 batch_norm : False
