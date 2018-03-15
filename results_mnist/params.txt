@@ -2,9 +2,9 @@ Parameters:
 dataset : mnist
 verbose : False
 save_every_epoch : 1001
-print_every : 800
+print_every : 500
 work_dir : results_mnist
-plot_num_pics : 50
+plot_num_pics : 100
 plot_num_cols : 10
 input_normalize_sym : False
 data_dir : mnist
@@ -15,8 +15,8 @@ lr : 0.0003
 lr_adv : 0.0001
 lr_schedule : manual
 batch_size : 128
-train_dataset_size : 8192
-epoch_num : 500
+train_dataset_size : -1
+epoch_num : 50
 init_std : 0.00099999
 init_bias : 0.0
 batch_norm : False
@@ -26,9 +26,9 @@ conv_filters_dim : 4
 e_pretrain : False
 e_pretrain_sample_size : 1000
 e_noise : mixture
-e_num_filters_g : 512
+e_num_filters_g : 1024
 e_num_layers_g : 2
-e_arch_g : dcgan
+e_arch_g : mlp
 e_num_filters_d : 1024
 e_num_layers_d : 3
 e_arch_d : dcgan
