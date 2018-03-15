@@ -801,7 +801,7 @@ def save_plots(opts, sample_train, label_train,
         # tr_prob = np.mean(np.stack(tr_prob,axis=0),axis=0)
         te_prob = [test_probs[k] for k in range(num_pics) if label_test[k]==i]
         te_prob = np.mean(np.stack(te_prob,axis=0),axis=0)
-        train_probs_labels.append(tr_prob)
+        # train_probs_labels.append(tr_prob)
         test_probs_labels.append(te_prob)
     #train_probs_labels = np.stack(train_probs_labels,axis=0).transpose()
     test_probs_labels = np.stack(test_probs_labels,axis=0).transpose()
