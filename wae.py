@@ -269,6 +269,25 @@ class WAE(object):
                 res2 = tf.exp( - distances / 2. / sigma2_k)
             res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
             stat = res1 - res2
+        elif kernel == 'IMQ':
+            # k(x, y) = C / (C + ||x - y||^2)
+            # C = tf.nn.top_k(tf.reshape(distances, [-1]), half_size).values[half_size - 1]
+            # C += tf.nn.top_k(tf.reshape(distances_qz, [-1]), half_size).values[half_size - 1]
+            Cbase = 2 * opts['zdim'] * sigma2_p
+            stat = 0.
+            for scale in [.1, .2, .5, 1., 2., 5., 10.]:
+                C = Cbase * scale
+                res1 = C / (C + distances_qz)
+                res1 += C / (C + distances_pz) / (opts['nmixtures']*opts['nmixtures'])
+                res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
+                res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
+                res1 = tf.reduce_sum(res1) / (nf * nf) \
+                        - tf.reduce_sum(res1_ddiag) / (nf * nf - nf) \
+                        + tf.reduce_sum(res1_diag) / (nf*(nf * nf - nf))
+
+                res2 = C / (C + distances) / opts['nmixtures']
+                res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
+                stat += res1 - res2
         else:
             raise ValueError('%s Unknown kernel' % kernel)
 
