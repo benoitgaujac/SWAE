@@ -19,7 +19,7 @@ train_dataset_size : 10000
 epoch_num : 100
 init_std : 0.099999
 init_bias : 0.0
-batch_norm : True
+batch_norm : False
 batch_norm_eps : 1e-05
 batch_norm_decay : 0.9
 conv_filters_dim : 4
