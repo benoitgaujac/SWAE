@@ -804,7 +804,7 @@ def save_plots(opts, sample_train, label_train,
         # train_probs_labels.append(tr_prob)
         test_probs_labels.append(te_prob)
     #train_probs_labels = np.stack(train_probs_labels,axis=0).transpose()
-    test_probs_labels = np.stack(test_probs_labels,axis=0).transpose()
+    test_probs_labels = np.stack(test_probs_labels,axis=0)
 
     # ax = plt.subplot(gs[1, 0])
     # plt.imshow(train_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
