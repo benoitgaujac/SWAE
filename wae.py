@@ -840,7 +840,7 @@ def save_plots(opts, sample_train, label_train,
     ymax = ymax + width * magnify
     plt.xlim(xmin, xmax)
     plt.ylim(ymin, ymax)
-    plt.colorbar()
+    plt.colorbar(ticks = range(10))
 
     ###The loss curves
     ax = plt.subplot(gs[1, 2])
