@@ -813,7 +813,7 @@ def save_plots(opts, sample_train, label_train,
     #         ha="center", va="bottom", size=20, transform=ax.transAxes)
 
     ax = plt.subplot(gs[1, 0])
-    plt.imshow(test_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
+    plt.imshow(test_probs_labels,cmap='hot', interpolation='none') #, vmin=0., vmax=1.)
     plt.colorbar()
     plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
