@@ -4,7 +4,7 @@ verbose : False
 save_every_epoch : 1001
 print_every : 30
 work_dir : results_mnist
-plot_num_pics : 50
+plot_num_pics : 100
 plot_num_cols : 10
 input_normalize_sym : False
 data_dir : mnist
@@ -38,7 +38,7 @@ g_arch : dcgan
 gan_p_trick : False
 d_num_filters : 512
 d_num_layers : 4
-zdim : 12
+zdim : 15
 pz : mixture
 nmixtures : 10
 sigma_prior : 0.1
