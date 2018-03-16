@@ -29,7 +29,7 @@ e_noise : mixture
 e_num_filters_g : 256
 e_num_layers_g : 3
 e_arch_g : mlp
-e_num_filters_d : 256
+e_num_filters_d : 1024
 e_num_layers_d : 3
 e_arch_d : dcgan
 g_num_filters : 256
