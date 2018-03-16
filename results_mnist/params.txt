@@ -14,9 +14,9 @@ adam_beta1 : 0.5
 lr : 0.0001
 lr_adv : 0.0001
 lr_schedule : manual
-batch_size : 256
+batch_size : 300
 train_dataset_size : 10000
-epoch_num : 100
+epoch_num : 200
 init_std : 0.00099999
 init_bias : 0.0
 batch_norm : False
@@ -26,9 +26,9 @@ conv_filters_dim : 4
 e_pretrain : False
 e_pretrain_sample_size : 1000
 e_noise : mixture
-e_num_filters_g : 1024
+e_num_filters_g : 256
 e_num_layers_g : 2
-e_arch_g : mlp
+e_arch_g : dcgan
 e_num_filters_d : 1024
 e_num_layers_d : 3
 e_arch_d : dcgan
@@ -38,7 +38,7 @@ g_arch : dcgan
 gan_p_trick : False
 d_num_filters : 512
 d_num_layers : 4
-zdim : 15
+zdim : 12
 pz : mixture
 nmixtures : 5
 sigma_prior : 0.1
