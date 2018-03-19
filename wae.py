@@ -635,7 +635,7 @@ class WAE(object):
                                 losses_match[-1])
                     logging.error(debug_str)
                     probs = np.exp(mix_test[:10])/np.sum(np.exp(mix_test[:10]),axis=-1,keepdims=True)
-                    debug = np.concatenate(probs,data.labels[:10],axis=-1)
+                    debug = np.concatenate((probs,data.labels[:10]),axis=-1)
                     print(debug)
 
                     # Making plots
