@@ -61,7 +61,14 @@ class WAE(object):
             enc_mean, enc_sigmas, enc_mixprob = encoder(opts, inputs=self.sample_points,
                                                             is_training=self.is_training)
             enc_sigmas = tf.clip_by_value(enc_sigmas, -50, 50)
-            self.enc_mean, self.enc_sigmas, self.enc_mixprob = enc_mean, enc_sigmas, enc_mixprob
+            self.enc_mixprob = enc_mixprob
+            if opts['stop_grad']:
+                self.enc_mean = tf.stop_grad(enc_mean)
+                self.enc_sigmas = tf.stop_grad(enc_sigmas)
+            else:
+                self.enc_mean = enc_mean
+                self.enc_sigmas = enc_sigmas
+
             if opts['verbose']:
                 self.add_sigmas_debug()
 
@@ -818,6 +825,7 @@ def save_plots(opts, sample_train, label_train,
     plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
 
+    ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])
     embedding = umap.UMAP(n_neighbors=5,
                             min_dist=0.3,

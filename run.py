@@ -17,6 +17,7 @@ parser.add_argument("--z_test",
                     help='method of choice for verifying Pz=Qz [mmd/gan]')
 parser.add_argument("--wae_lambda", help='WAE regularizer', type=int)
 parser.add_argument("--work_dir")
+parser.add_argument("--stop_grad", help='Stop gradient for debug')
 parser.add_argument("--lambda_schedule",
                     help='constant or adaptive')
 parser.add_argument("--enc_noise",
@@ -60,6 +61,8 @@ def main():
         opts['lambda'] = FLAGS.wae_lambda
     if FLAGS.enc_noise:
         opts['e_noise'] = FLAGS.enc_noise
+    if FLAGS.stop_grad:
+        opts['stop_grad'] = FLAGS.stop_grad
 
     if opts['verbose']:
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
