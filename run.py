@@ -8,7 +8,7 @@ from datahandler import DataHandler
 import utils
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--exp", default='mnist_small',
+parser.add_argument("--exp", default='mnist',
                     help='dataset [mnist/celebA/dsprites]')
 parser.add_argument("--zdim",
                     help='dimensionality of the latent space',
