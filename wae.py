@@ -63,8 +63,8 @@ class WAE(object):
             enc_sigmas = tf.clip_by_value(enc_sigmas, -50, 50)
             self.enc_mixprob = enc_mixprob
             if opts['stop_grad']:
-                self.enc_mean = tf.stop_grad(enc_mean)
-                self.enc_sigmas = tf.stop_grad(enc_sigmas)
+                self.enc_mean = tf.stop_gradient(enc_mean)
+                self.enc_sigmas = tf.stop_gradient(enc_sigmas)
             else:
                 self.enc_mean = enc_mean
                 self.enc_sigmas = enc_sigmas
