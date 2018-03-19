@@ -605,10 +605,11 @@ class WAE(object):
                                        self.is_training: False})
 
                     # Auto-encoding training images
-                    [loss_rec_train, rec_train, mix_train] = self.sess.run(
+                    [loss_rec_train, rec_train, mix_train, mean_train] = self.sess.run(
                             [self.loss_reconstruct,
                              self.reconstructed,
-                             self.enc_mixprob],
+                             self.enc_mixprob,
+                             self.enc_mean],
                             feed_dict={self.sample_points: data.data[:self.num_pics],
                                        self.is_training: False})
 
@@ -618,23 +619,25 @@ class WAE(object):
                             feed_dict={self.sample_noise: self.fixed_noise,
                                        self.is_training: False})
 
-                    # Blurriness measures
-                    gen_blurr = self.sess.run(
-                            self.blurriness,
-                            feed_dict={self.sample_points: sample_gen})
-                    blurr_vals.append(np.min(gen_blurr))
+                    # # Blurriness measures
+                    # gen_blurr = self.sess.run(
+                    #         self.blurriness,
+                    #         feed_dict={self.sample_points: sample_gen})
+                    # blurr_vals.append(np.min(gen_blurr))
 
                     # Printing various loss values
-                    debug_str = 'EPOCH: %d/%d, BATCH:%d/%d, BATCH/SEC:%.2f' % (
-                        epoch + 1, opts['epoch_num'],
-                        it + 1, batches_num,
-                        float(counter) / (now - self.start_time))
+                    debug_str = 'EPOCH: %d/%d, BATCH:%d/%d' % (
+                                epoch + 1, opts['epoch_num'],
+                                it + 1, batches_num)
                     debug_str += ' (WAE_LOSS=%.5f, RECON_LOSS_TEST=%.5f, ' \
-                                 'MATCH_LOSS=%.5f, ' \
-                                 'SHARPNESS=%.5f)' % (
-                                    losses[-1], loss_rec_test,
-                                    losses_match[-1], np.min(gen_blurr))
+                                'MATCH_LOSS=%.5f' % (
+                                losses[-1], loss_rec_test,
+                                losses_match[-1])
                     logging.error(debug_str)
+                    probs = np.exp(mix_test[:10])/np.sum(np.exp(mix_test[:10]),axis=-1,keepdims=True)
+                    debug = np.concatenate(probs,data.labels[:10],axis=-1)
+                    print(debug)
+
                     # Making plots
                     save_plots(opts, data.data[:self.num_pics],
                                     data.labels[:self.num_pics],
