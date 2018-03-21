@@ -272,11 +272,15 @@ class WAE(object):
                 res1 = tf.multiply(tf.transpose(res1),tf.transpose(probs))
                 res1 += tf.exp( - distances_pz / 2. / sigma2_k) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
-                res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
+                # Correcting for diagonal terms
+                # res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
+                # res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[0,3]))
+                # res1 = tf.reduce_sum(res1) / (nf * nf - 1) \
+                #         + tf.reduce_sum(res1_diag) / (nf * (nf * nf - nf)) \
+                #         - tf.reduce_sum(res1_ddiag) / (nf * nf - nf)
                 res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
-                res1 = tf.reduce_sum(res1) / (nf * nf) \
-                        + tf.reduce_sum(res1_diag) / (nf * (nf * nf - nf)) \
-                        - tf.reduce_sum(res1_ddiag) / (nf * nf - nf)
+                res1 = (tf.reduce_sum(res1)\
+                        - tf.reduce_sum(res1_diag)) / (nf * nf - nf)
             else:
                 res1 += tf.exp( - distances_pz / 2. / sigma2_k)
                 res1 = tf.multiply(res1, 1. - tf.eye(n))
