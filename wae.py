@@ -306,7 +306,7 @@ class WAE(object):
                 res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
                 res1 = tf.reduce_sum(res1) / (nf * nf) \
                         + tf.reduce_sum(res1_diag) / (nf * (nf * nf - nf)) \
-                        - tf.reduce_sum(res1_ddiag) / (nf * nf - nf
+                        - tf.reduce_sum(res1_ddiag) / (nf * nf - nf)
                 # Cross term of the MMD
                 res2 = C / (C + distances)
                 res2 =  tf.multiply(tf.transpose(res2),tf.transpose(probs))
