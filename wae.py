@@ -304,9 +304,9 @@ class WAE(object):
                 # Correcting for diagonal terms
                 res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
                 res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
-                res1 = tf.reduce_sum(res1) / (nf * nf - nf) \
-                        + tf.reduce_sum(res1_diag) * (nf-2) / (nf * nf - nf) \
-                        - tf.reduce_sum(res1_ddiag) / nf
+                res1 = tf.reduce_sum(res1) / (nf * nf) \
+                        + tf.reduce_sum(res1_diag) / (nf * (nf * nf - nf)) \
+                        - tf.reduce_sum(res1_ddiag) / (nf * nf - nf
                 # Cross term of the MMD
                 res2 = C / (C + distances)
                 res2 =  tf.multiply(tf.transpose(res2),tf.transpose(probs))
