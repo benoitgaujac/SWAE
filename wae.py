@@ -253,6 +253,7 @@ class WAE(object):
         distances_pz = self.square_dist(sample_pz, norms_pz, sample_pz, norms_pz, opts['pz'])
         distances_qz = self.square_dist(sample_qz, norms_qz, sample_qz, norms_qz, opts['e_noise'])
         distances = self.square_dist(sample_qz, norms_qz, sample_pz, norms_pz, opts['e_noise'])
+        probs = tf.exp(self.enc_mixprob)/tf.reduce_sum(self.enc_mixprob,axis=-1,keepdims=True)
 
         if kernel == 'RBF':
             # Median heuristic for the sigma^2 of Gaussian kernel
@@ -267,8 +268,8 @@ class WAE(object):
             # First 2 terms of the MMD
             res1 = tf.exp( - distances_qz / 2. / sigma2_k)
             if opts['pz'] == 'mixture':
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
+                res1 = tf.multiply(tf.transpose(res1),tf.transpose(probs))
+                res1 = tf.multiply(tf.transpose(res1),tf.transpose(probs))
                 res1 += tf.exp( - distances_pz / 2. / sigma2_k) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
                 res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
@@ -283,7 +284,7 @@ class WAE(object):
             # Cross term of the MMD
             res2 = tf.exp( - distances / 2. / sigma2_k)
             if opts['pz'] == 'mixture':
-                res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixprob))
+                res2 =  tf.multiply(tf.transpose(res2),tf.transpose(probs))
                 res2 = tf.transpose(res2) / opts['nmixtures']
             else:
                 res2 = tf.exp( - distances / 2. / sigma2_k)
@@ -297,8 +298,8 @@ class WAE(object):
                 C = Cbase * scale
                 # First 2 terms of the MMD
                 res1 = C / (C + distances_qz)
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
+                res1 = tf.multiply(tf.transpose(res1),tf.transpose(probs))
+                res1 = tf.multiply(tf.transpose(res1),tf.transpose(probs))
                 res1 += C / (C + distances_pz) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
                 res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
@@ -308,7 +309,7 @@ class WAE(object):
                         - tf.reduce_sum(res1_ddiag) / nf
                 # Cross term of the MMD
                 res2 = C / (C + distances)
-                res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixprob))
+                res2 =  tf.multiply(tf.transpose(res2),tf.transpose(probs))
                 res2 = tf.transpose(res2) / opts['nmixtures']
                 res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
                 stat += res1 - res2
