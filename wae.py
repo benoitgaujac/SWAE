@@ -302,11 +302,14 @@ class WAE(object):
                 res1 = tf.multiply(tf.transpose(res1),tf.transpose(probs))
                 res1 += C / (C + distances_pz) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
-                res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
-                res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[0,3]))
-                res1 = tf.reduce_sum(res1) / (nf * nf) \
-                        + tf.reduce_sum(res1_diag) / (nf * (nf * nf - nf)) \
-                        - tf.reduce_sum(res1_ddiag) / (nf * nf - nf)
+                # res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
+                # res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[0,3]))
+                # res1 = tf.reduce_sum(res1) / (nf * nf - 1) \
+                #         + tf.reduce_sum(res1_diag) / (nf * (nf * nf - nf)) \
+                #         - tf.reduce_sum(res1_ddiag) / (nf * nf - nf)
+                res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
+                res1 = tf.reduce_sum(res1) / (nf * nf - 1) \
+                        - tf.reduce_sum(res1_diag) / (nf * nf - 1)
                 # Cross term of the MMD
                 res2 = C / (C + distances)
                 res2 =  tf.multiply(tf.transpose(res2),tf.transpose(probs))
@@ -847,30 +850,30 @@ def save_plots(opts, sample_train, label_train,
     plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
 
-    # ###UMAP visualization of the embedings
-    # ax = plt.subplot(gs[1, 1])
-    # embedding = umap.UMAP(n_neighbors=5,
-    #                         min_dist=0.3,
-    #                         metric='correlation').fit_transform(enc_test)
-    # plt.scatter(embedding[:, 0], embedding[:, 1],
-    #             c=label_test, s=20, label='test_encoded',cmap='Accent')
-    # plt.text(0.47, 1., 'Test encodings',
-    #          ha="center", va="bottom", size=20, transform=ax.transAxes)
-    # xmin = np.amin(embedding[:,0])
-    # xmax = np.amax(embedding[:,0])
-    # magnify = 0.3
-    # width = abs(xmax - xmin)
-    # xmin = xmin - width * magnify
-    # xmax = xmax + width * magnify
-    #
-    # ymin = np.amin(embedding[:,1])
-    # ymax = np.amax(embedding[:,1])
-    # width = abs(ymin - ymax)
-    # ymin = ymin - width * magnify
-    # ymax = ymax + width * magnify
-    # plt.xlim(xmin, xmax)
-    # plt.ylim(ymin, ymax)
-    # plt.colorbar()
+    ###UMAP visualization of the embedings
+    ax = plt.subplot(gs[1, 1])
+    embedding = umap.UMAP(n_neighbors=5,
+                            min_dist=0.3,
+                            metric='correlation').fit_transform(enc_test)
+    plt.scatter(embedding[:, 0], embedding[:, 1],
+                c=label_test, s=20, label='test_encoded',cmap='Accent')
+    plt.text(0.47, 1., 'Test encodings',
+             ha="center", va="bottom", size=20, transform=ax.transAxes)
+    xmin = np.amin(embedding[:,0])
+    xmax = np.amax(embedding[:,0])
+    magnify = 0.3
+    width = abs(xmax - xmin)
+    xmin = xmin - width * magnify
+    xmax = xmax + width * magnify
+
+    ymin = np.amin(embedding[:,1])
+    ymax = np.amax(embedding[:,1])
+    width = abs(ymin - ymax)
+    ymin = ymin - width * magnify
+    ymax = ymax + width * magnify
+    plt.xlim(xmin, xmax)
+    plt.ylim(ymin, ymax)
+    plt.colorbar()
 
     ###The loss curves
     ax = plt.subplot(gs[1, 2])
