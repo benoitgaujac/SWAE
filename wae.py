@@ -847,30 +847,30 @@ def save_plots(opts, sample_train, label_train,
     plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
 
-    ###UMAP visualization of the embedings
-    ax = plt.subplot(gs[1, 1])
-    embedding = umap.UMAP(n_neighbors=5,
-                            min_dist=0.3,
-                            metric='correlation').fit_transform(enc_test)
-    plt.scatter(embedding[:, 0], embedding[:, 1],
-                c=label_test, s=20, label='test_encoded',cmap='Accent')
-    plt.text(0.47, 1., 'Test encodings',
-             ha="center", va="bottom", size=20, transform=ax.transAxes)
-    xmin = np.amin(embedding[:,0])
-    xmax = np.amax(embedding[:,0])
-    magnify = 0.3
-    width = abs(xmax - xmin)
-    xmin = xmin - width * magnify
-    xmax = xmax + width * magnify
-
-    ymin = np.amin(embedding[:,1])
-    ymax = np.amax(embedding[:,1])
-    width = abs(ymin - ymax)
-    ymin = ymin - width * magnify
-    ymax = ymax + width * magnify
-    plt.xlim(xmin, xmax)
-    plt.ylim(ymin, ymax)
-    plt.colorbar()
+    # ###UMAP visualization of the embedings
+    # ax = plt.subplot(gs[1, 1])
+    # embedding = umap.UMAP(n_neighbors=5,
+    #                         min_dist=0.3,
+    #                         metric='correlation').fit_transform(enc_test)
+    # plt.scatter(embedding[:, 0], embedding[:, 1],
+    #             c=label_test, s=20, label='test_encoded',cmap='Accent')
+    # plt.text(0.47, 1., 'Test encodings',
+    #          ha="center", va="bottom", size=20, transform=ax.transAxes)
+    # xmin = np.amin(embedding[:,0])
+    # xmax = np.amax(embedding[:,0])
+    # magnify = 0.3
+    # width = abs(xmax - xmin)
+    # xmin = xmin - width * magnify
+    # xmax = xmax + width * magnify
+    #
+    # ymin = np.amin(embedding[:,1])
+    # ymax = np.amax(embedding[:,1])
+    # width = abs(ymin - ymax)
+    # ymin = ymin - width * magnify
+    # ymax = ymax + width * magnify
+    # plt.xlim(xmin, xmax)
+    # plt.ylim(ymin, ymax)
+    # plt.colorbar()
 
     ###The loss curves
     ax = plt.subplot(gs[1, 2])
