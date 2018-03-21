@@ -253,7 +253,7 @@ class WAE(object):
         distances_pz = self.square_dist(sample_pz, norms_pz, sample_pz, norms_pz, opts['pz'])
         distances_qz = self.square_dist(sample_qz, norms_qz, sample_qz, norms_qz, opts['e_noise'])
         distances = self.square_dist(sample_qz, norms_qz, sample_pz, norms_pz, opts['e_noise'])
-        probs = tf.exp(self.enc_mixprob)/tf.reduce_sum(self.enc_mixprob,axis=-1,keepdims=True)
+        probs = tf.exp(self.enc_mixprob)/tf.reduce_sum(tf.exp(self.enc_mixprob),axis=-1,keepdims=True)
 
         if kernel == 'RBF':
             # Median heuristic for the sigma^2 of Gaussian kernel
