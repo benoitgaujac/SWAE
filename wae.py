@@ -10,6 +10,7 @@
 import sys
 import time
 import os
+from math import sqrt
 import numpy as np
 import tensorflow as tf
 import logging
@@ -159,7 +160,7 @@ class WAE(object):
             means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
             for k in range(opts['nmixtures']):
                 #means[k,k] = np.amax([2.0*opts['sigma_prior'],0.]).astype(np.float32)
-                means[k,k] = 2.0*opts['sigma_prior']
+                means[k,k] = sqrt(2.0)*max(opts['sigma_prior'],1)
             self.pz_means = means
             self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
         else:
@@ -674,6 +675,7 @@ class WAE(object):
                                     mix_train[:self.num_pics],
                                     mix_test[:self.num_pics],
                                     enc_test,
+                                    self.fixed_noise,
                                     sample_gen,
                                     losses_rec, losses_match, blurr_vals,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
@@ -711,6 +713,7 @@ def save_plots(opts, sample_train, label_train,
                     recon_train, recon_test,
                     mix_train, mix_test,
                     enc_test,
+                    sample_prior,
                     sample_gen,
                     losses_rec, losses_match, blurr_vals,
                     filename):
@@ -858,11 +861,13 @@ def save_plots(opts, sample_train, label_train,
     ax = plt.subplot(gs[1, 1])
     embedding = umap.UMAP(n_neighbors=5,
                             min_dist=0.3,
-                            metric='correlation').fit_transform(enc_test)
-    plt.scatter(embedding[:, 0], embedding[:, 1],
-                c=label_test, s=20, label='test_encoded',cmap='Accent')
-    plt.text(0.47, 1., 'Test encodings',
-             ha="center", va="bottom", size=20, transform=ax.transAxes)
+                            metric='correlation').fit_transform(np.concatenate((enc_test,sample_prior),axis=0))
+    plt.scatter(embedding[:np.shape(enc_test)[0], 0], embedding[:np.shape(enc_test)[0], 1],
+                c=label_test, s=20, label='Qz test',cmap='Accent')
+    plt.colorbar()
+    plt.scatter(embedding[np.shape(enc_test)[0]:, 0], embedding[np.shape(enc_test)[0]:, 1],
+                            color='navy', s=20, marker='*',label='Pz')
+
     xmin = np.amin(embedding[:,0])
     xmax = np.amax(embedding[:,0])
     magnify = 0.3
@@ -877,7 +882,7 @@ def save_plots(opts, sample_train, label_train,
     ymax = ymax + width * magnify
     plt.xlim(xmin, xmax)
     plt.ylim(ymin, ymax)
-    plt.colorbar()
+    plt.legend(loc='upper left')
 
     ###The loss curves
     ax = plt.subplot(gs[1, 2])
@@ -893,6 +898,9 @@ def save_plots(opts, sample_train, label_train,
 
     plt.grid(axis='y')
     plt.legend(loc='upper right')
+    plt.text(0.47, 1., 'UMAP latents', ha="center", va="bottom",
+                                size=20, transform=ax.transAxes)
+
 
     # Saving
     utils.create_dir(opts['work_dir'])
