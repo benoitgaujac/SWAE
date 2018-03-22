@@ -59,14 +59,18 @@ class WAE(object):
                 self.encoded = res
         elif opts['e_noise'] in ('gaussian', 'mixture'):
             # Encoder outputs means and variances of Gaussians, and mixing probs
-            enc_mean, enc_sigmas, enc_mixprob = encoder(opts, inputs=self.sample_points,
-                                                            is_training=self.is_training)
-            enc_sigmas = tf.clip_by_value(enc_sigmas, -50, 50)
-            self.enc_mixprob = enc_mixprob
             if opts['stop_grad']:
-                self.enc_mean = tf.stop_gradient(enc_mean)
-                self.enc_sigmas = tf.stop_gradient(enc_sigmas)
+                _, _, enc_mixprob = encoder(opts, inputs=self.sample_points,
+                                                                is_training=self.is_training)
+                self.enc_mixprob = enc_mixprob
+                eps = tf.random_normal([sample_size,opts['nmixtures'],opts['zdim']],mean=0.0,stddev=0.0099999,dtype=tf.float32)
+                self.enc_mean = self.pz_means + eps
+                self.enc_sigmas = opts['init_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
             else:
+                enc_mean, enc_sigmas, enc_mixprob = encoder(opts, inputs=self.sample_points,
+                                                                is_training=self.is_training)
+                enc_sigmas = tf.clip_by_value(enc_sigmas, -50, 50)
+                self.enc_mixprob = enc_mixprob
                 self.enc_mean = enc_mean
                 self.enc_sigmas = enc_sigmas
 
