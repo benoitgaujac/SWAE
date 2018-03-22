@@ -79,8 +79,6 @@ def mixprob_encoder(opts, inputs, is_training=False, reuse=False):
     return tf.reshape(tf.stack(log_mixprobs,axis=1),[-1,opts['nmixtures']])
 
 def mean_encoder(opts, inputs, is_training=False, reuse=False):
-    if opts['stop_grad']:
-        is_training = False
     if opts['e_arch_g'] == 'mlp':
         # Encoder uses only fully connected layers with ReLus
         means,log_sigmas = mlp_encoder(opts['e_num_filters_g'], opts['e_num_layers_g'],

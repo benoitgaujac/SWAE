@@ -63,14 +63,12 @@ class WAE(object):
                                                             is_training=self.is_training)
             enc_sigmas = tf.clip_by_value(enc_sigmas, -50, 50)
             self.enc_mixprob = enc_mixprob
-            # if opts['stop_grad']:
-            #     self.enc_mean = tf.stop_gradient(enc_mean)
-            #     self.enc_sigmas = tf.stop_gradient(enc_sigmas)
-            # else:
-            #     self.enc_mean = enc_mean
-            #     self.enc_sigmas = enc_sigmas
-            self.enc_mean = enc_mean
-            self.enc_sigmas = enc_sigmas
+            if opts['stop_grad']:
+                self.enc_mean = tf.stop_gradient(enc_mean)
+                self.enc_sigmas = tf.stop_gradient(enc_sigmas)
+            else:
+                self.enc_mean = enc_mean
+                self.enc_sigmas = enc_sigmas
 
             if opts['verbose']:
                 self.add_sigmas_debug()
@@ -159,7 +157,7 @@ class WAE(object):
             assert opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
             means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
             for k in range(opts['nmixtures']):
-                means[k,k] = sqrt(2.0)*max(opts['sigma_prior'],0.)
+                means[k,k] = sqrt(2.0)*max(opts['sigma_prior'],1.)
             self.pz_means = means
             self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
         else:
@@ -882,6 +880,9 @@ def save_plots(opts, sample_train, label_train,
     plt.xlim(xmin, xmax)
     plt.ylim(ymin, ymax)
     plt.legend(loc='upper left')
+    plt.text(0.47, 1., 'UMAP latents', ha="center", va="bottom",
+                                size=20, transform=ax.transAxes)
+
 
     ###The loss curves
     ax = plt.subplot(gs[1, 2])
@@ -897,8 +898,9 @@ def save_plots(opts, sample_train, label_train,
 
     plt.grid(axis='y')
     plt.legend(loc='upper right')
-    plt.text(0.47, 1., 'UMAP latents', ha="center", va="bottom",
+    plt.text(0.47, 1., 'Loss curves', ha="center", va="bottom",
                                 size=20, transform=ax.transAxes)
+
 
 
     # Saving
