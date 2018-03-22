@@ -159,8 +159,7 @@ class WAE(object):
             assert opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
             means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
             for k in range(opts['nmixtures']):
-                #means[k,k] = np.amax([2.0*opts['sigma_prior'],0.]).astype(np.float32)
-                means[k,k] = sqrt(2.0)*max(opts['sigma_prior'],1)
+                means[k,k] = sqrt(2.0)*max(opts['sigma_prior'],0.)
             self.pz_means = means
             self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
         else:
@@ -863,10 +862,10 @@ def save_plots(opts, sample_train, label_train,
                             min_dist=0.3,
                             metric='correlation').fit_transform(np.concatenate((enc_test,sample_prior),axis=0))
     plt.scatter(embedding[:np.shape(enc_test)[0], 0], embedding[:np.shape(enc_test)[0], 1],
-                c=label_test, s=20, label='Qz test',cmap='Accent')
+                c=label_test, s=30, label='Qz test',cmap='Accent')
     plt.colorbar()
     plt.scatter(embedding[np.shape(enc_test)[0]:, 0], embedding[np.shape(enc_test)[0]:, 1],
-                            color='navy', s=20, marker='*',label='Pz')
+                            color='navy', s=10, marker='*',label='Pz')
 
     xmin = np.amin(embedding[:,0])
     xmax = np.amax(embedding[:,0])
