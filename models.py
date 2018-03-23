@@ -76,8 +76,9 @@ def mixprob_encoder(opts, inputs, is_training=False, reuse=False):
     else:
         raise ValueError('%s Unknown encoder architecture for mixtures' % opts['e_arch'])
 
-    return tf.reshape(tf.stack(log_mixprobs,axis=1),[-1,opts['nmixtures']])
-
+    logits = tf.reshape(tf.stack(log_mixprobs,axis=1),[-1,opts['nmixtures']])
+    return tf.nn.softmax(logits,axis=-1)
+    
 def mean_encoder(opts, inputs, is_training=False, reuse=False):
     if opts['e_arch_g'] == 'mlp':
         # Encoder uses only fully connected layers with ReLus
