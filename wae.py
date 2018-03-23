@@ -269,34 +269,34 @@ class WAE(object):
                 sigma2_k = tf.Print(sigma2_k, [sigma2_k], 'Kernel width:')
 
             # First 2 terms of the MMD
-            res1 = tf.exp( - distances_qz / 2. / sigma2_k)
+            self.res1 = tf.exp( - distances_qz / 2. / sigma2_k)
             if opts['pz'] == 'mixture':
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
-                res1 += tf.exp( - distances_pz / 2. / sigma2_k) / (opts['nmixtures']*opts['nmixtures'])
+                self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixprob))
+                self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixprob))
+                self.res1 += tf.exp( - distances_pz / 2. / sigma2_k) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
                 # Correcting for diagonal terms
-                # res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
-                # res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[0,3]))
-                # res1 = tf.reduce_sum(res1) / (nf * nf - 1) \
-                #         + tf.reduce_sum(res1_diag) / (nf * (nf * nf - nf)) \
-                #         - tf.reduce_sum(res1_ddiag) / (nf * nf - nf)
-                res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
-                res1 = (tf.reduce_sum(res1)\
-                        - tf.reduce_sum(res1_diag)) / (nf * nf - nf)
+                # self.res1_ddiag = tf.diag_part(tf.transpose(self.res1,perm=(0,1,3,2)))
+                # self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[0,3]))
+                # self.res1 = tf.reduce_sum(self.res1) / (nf * nf - 1) \
+                #         + tf.reduce_sum(self.res1_diag) / (nf * (nf * nf - nf)) \
+                #         - tf.reduce_sum(self.res1_ddiag) / (nf * nf - nf)
+                self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[1,2]))
+                self.res1 = (tf.reduce_sum(self.res1)\
+                        - tf.reduce_sum(self.res1_diag)) / (nf * nf - nf)
             else:
-                res1 += tf.exp( - distances_pz / 2. / sigma2_k)
-                res1 = tf.multiply(res1, 1. - tf.eye(n))
-                res1 = tf.reduce_sum(res1) / (nf * nf - nf)
+                self.res1 += tf.exp( - distances_pz / 2. / sigma2_k)
+                self.res1 = tf.multiply(self.res1, 1. - tf.eye(n))
+                self.res1 = tf.reduce_sum(self.res1) / (nf * nf - nf)
             # Cross term of the MMD
-            res2 = tf.exp( - distances / 2. / sigma2_k)
+            self.res2 = tf.exp( - distances / 2. / sigma2_k)
             if opts['pz'] == 'mixture':
-                res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixprob))
-                res2 = tf.transpose(res2) / opts['nmixtures']
+                self.res2 =  tf.multiply(tf.transpose(self.res2),tf.transpose(self.enc_mixprob))
+                self.res2 = tf.transpose(self.res2) / opts['nmixtures']
             else:
-                res2 = tf.exp( - distances / 2. / sigma2_k)
-            res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
-            stat = res1 - res2
+                self.res2 = tf.exp( - distances / 2. / sigma2_k)
+            self.res2 = tf.reduce_sum(self.res2) * 2. / (nf * nf)
+            stat = self.res1 - self.res2
         elif kernel == 'IMQ':
             # k(x, y) = C / (C + ||x - y||^2)
             Cbase = 2 * opts['zdim'] * sigma2_p
@@ -304,25 +304,25 @@ class WAE(object):
             for scale in [.1, .2, .5, 1., 2., 5., 10.]:
                 C = Cbase * scale
                 # First 2 terms of the MMD
-                res1 = C / (C + distances_qz)
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
-                res1 += (C / (C + distances_pz)) / (opts['nmixtures']*opts['nmixtures'])
+                self.res1 = C / (C + distances_qz)
+                self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixprob))
+                self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixprob))
+                self.res1 += (C / (C + distances_pz)) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
-                # res1_ddiag = tf.diag_part(tf.transpose(res1,perm=(0,1,3,2)))
-                # res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[0,3]))
-                # res1 = tf.reduce_sum(res1) / (nf * nf - 1) \
-                #         + tf.reduce_sum(res1_diag) / (nf * (nf * nf - nf)) \
-                #         - tf.reduce_sum(res1_ddiag) / (nf * nf - nf)
-                res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
-                res1 = (tf.reduce_sum(res1)\
-                        - tf.reduce_sum(res1_diag)) / (nf * nf - nf)
+                # self.res1_ddiag = tf.diag_part(tf.transpose(self.res1,perm=(0,1,3,2)))
+                # self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[0,3]))
+                # self.res1 = tf.reduce_sum(self.res1) / (nf * nf - 1) \
+                #         + tf.reduce_sum(self.res1_diag) / (nf * (nf * nf - nf)) \
+                #         - tf.reduce_sum(self.res1_ddiag) / (nf * nf - nf)
+                self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[1,2]))
+                self.res1 = (tf.reduce_sum(self.res1)\
+                        - tf.reduce_sum(self.res1_diag)) / (nf * nf - nf)
                 # Cross term of the MMD
-                res2 = C / (C + distances)
-                res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixprob))
-                res2 = tf.transpose(res2) / opts['nmixtures']
-                res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
-                stat += res1 - res2
+                self.res2 = C / (C + distances)
+                self.res2 =  tf.multiply(tf.transpose(self.res2),tf.transpose(self.enc_mixprob))
+                self.res2 = tf.transpose(self.res2) / opts['nmixtures']
+                self.res2 = tf.reduce_sum(self.res2) * 2. / (nf * nf)
+                stat += self.res1 - self.res2
         else:
             raise ValueError('%s Unknown kernel' % kernel)
 
@@ -510,6 +510,8 @@ class WAE(object):
         losses = []
         losses_rec = []
         losses_match = []
+        mmds_same = []
+        mmds_cross = []
         blurr_vals = []
         encoding_changes = []
         batches_num = int(data.num_points / opts['batch_size'])
@@ -563,11 +565,13 @@ class WAE(object):
                 batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match] = self.sess.run(
+                [_, loss, loss_rec, loss_match, mmd_same, mmd_cross] = self.sess.run(
                         [self.ae_opt,
                          self.wae_objective,
                          self.loss_reconstruct,
-                         self.penalty],
+                         self.penalty,
+                         self.res1,
+                         self.res2],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_noise: batch_noise,
                                    self.sample_mix_noise: batch_mix_noise,
@@ -599,6 +603,8 @@ class WAE(object):
                 losses.append(loss)
                 losses_rec.append(loss_rec)
                 losses_match.append(loss_match)
+                mmds_same.append(mmd_same)
+                mmds_cross.append(mmd_cross)
                 if opts['verbose']:
                     logging.error('Matching penalty after %d steps: %f' % (
                         counter, losses_match[-1]))
@@ -679,7 +685,7 @@ class WAE(object):
                                     enc_test,
                                     self.fixed_noise,
                                     sample_gen,
-                                    losses_rec, losses_match, blurr_vals,
+                                    losses_rec, losses_match, mmds_same, mmds_cross,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
 
         # # Save the final model
@@ -717,7 +723,7 @@ def save_plots(opts, sample_train, label_train,
                     enc_test,
                     sample_prior,
                     sample_gen,
-                    losses_rec, losses_match, blurr_vals,
+                    losses_rec, losses_match, mmds_same, mmds_cross,
                     filename):
     """ Generates and saves the plot of the following layout:
         img1 | img2 | img3
@@ -834,7 +840,7 @@ def save_plots(opts, sample_train, label_train,
 
     ### Then the mean mixtures plots
     #train_probs = np.exp(mix_train)/np.sum(np.exp(mix_train),axis=-1,keepdims=True)
-    test_probs = np.exp(mix_test)/np.sum(np.exp(mix_test),axis=-1,keepdims=True)
+    #test_probs = np.exp(mix_test)/np.sum(np.exp(mix_test),axis=-1,keepdims=True)
     #train_probs_labels = []
     test_probs_labels = []
     for i in range(10):
@@ -900,6 +906,12 @@ def save_plots(opts, sample_train, label_train,
 
     y = np.log(np.abs(losses_match[::x_step]))
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
+
+    y = np.log(np.abs(mmds_same[::x_step]))
+    plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(|mmd first|)')
+
+    y = np.log(np.abs(mmds_cross[::x_step]))
+    plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(|mmd cross|)')
 
     plt.grid(axis='y')
     plt.legend(loc='upper right')
