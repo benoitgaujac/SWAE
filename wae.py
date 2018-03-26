@@ -680,13 +680,11 @@ class WAE(object):
 
                     # Making plots
                     save_plots(opts, data.data[:self.num_pics],
-                                    data.labels[:self.num_pics],
                                     data.test_data[:self.num_pics],
-                                    data.test_labels[:self.num_pics],
+                                    data.test_labels,
                                     rec_train[:self.num_pics],
                                     rec_test[:self.num_pics],
-                                    mix_train[:self.num_pics],
-                                    mix_test[:self.num_pics],
+                                    mix_test,
                                     enc_test,
                                     self.fixed_noise,
                                     sample_gen,
@@ -721,10 +719,10 @@ class WAE(object):
         per_dim = tf.concat([min_per_dim, max_per_dim], axis=1)
         self.debug_sigmas = per_dim
 
-def save_plots(opts, sample_train, label_train,
-                    sample_test, label_test,
+def save_plots(opts, sample_train,sample_test,
+                    label_test,
                     recon_train, recon_test,
-                    mix_train, mix_test,
+                    mix_test,
                     enc_test,
                     sample_prior,
                     sample_gen,
@@ -844,26 +842,13 @@ def save_plots(opts, sample_train, label_train,
         ax.axes.set_aspect(1)
 
     ### Then the mean mixtures plots
-    #train_probs = np.exp(mix_train)/np.sum(np.exp(mix_train),axis=-1,keepdims=True)
-    #test_probs = np.exp(mix_test)/np.sum(np.exp(mix_test),axis=-1,keepdims=True)
-    #train_probs_labels = []
     test_probs_labels = []
+    n = np.shape(mix_test)[0]
     for i in range(10):
-        # tr_prob = [train_probs[k] for k in range(num_pics) if label_train[k]==i]
-        # tr_prob = np.mean(np.stack(tr_prob,axis=0),axis=0)
-        te_prob = [mix_test[k] for k in range(num_pics) if label_test[k]==i]
+        te_prob = [mix_test[k] for k in range(n) if label_test[k]==i]
         te_prob = np.mean(np.stack(te_prob,axis=0),axis=0)
-        # train_probs_labels.append(tr_prob)
         test_probs_labels.append(te_prob)
-    #train_probs_labels = np.stack(train_probs_labels,axis=0).transpose()
     test_probs_labels = np.stack(test_probs_labels,axis=0)
-
-    # ax = plt.subplot(gs[1, 0])
-    # plt.imshow(train_probs_labels,cmap='hot', interpolation='none', vmin=0., vmax=1.)
-    # plt.colorbar()
-    # plt.text(0.47, 1., 'Train means probs',
-    #         ha="center", va="bottom", size=20, transform=ax.transAxes)
-
     ax = plt.subplot(gs[1, 0])
     plt.imshow(test_probs_labels,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
     plt.colorbar()
@@ -876,7 +861,7 @@ def save_plots(opts, sample_train, label_train,
                             min_dist=0.3,
                             metric='correlation').fit_transform(np.concatenate((enc_test,sample_prior),axis=0))
     plt.scatter(embedding[:np.shape(enc_test)[0], 0], embedding[:np.shape(enc_test)[0], 1],
-                c=label_test, s=30, label='Qz test',cmap='Accent')
+                c=label_test[:num_pics], s=30, label='Qz test',cmap='Accent')
     plt.colorbar()
     plt.scatter(embedding[np.shape(enc_test)[0]:, 0], embedding[np.shape(enc_test)[0]:, 1],
                             color='navy', s=10, marker='*',label='Pz')
