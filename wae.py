@@ -309,28 +309,31 @@ class WAE(object):
             # k(x, y) = C / (C + ||x - y||^2)
             Cbase = 2 * opts['zdim'] * sigma2_p
             stat = 0.
+            self.res1, self.res2 = 0.0, 0.0
             for scale in [.1, .2, .5, 1., 2., 5., 10.]:
                 C = Cbase * scale
                 # First 2 terms of the MMD
-                self.res1 = C / (C + distances_qz)
-                self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixprob))
-                self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixprob))
-                self.res1 += (C / (C + distances_pz)) / (opts['nmixtures']*opts['nmixtures'])
+                res1 = C / (C + distances_qz)
+                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
+                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixprob))
+                res1 += (C / (C + distances_pz)) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
                 # self.res1_ddiag = tf.diag_part(tf.transpose(self.res1,perm=(0,1,3,2)))
                 # self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[0,3]))
                 # self.res1 = tf.reduce_sum(self.res1) / (nf * nf - 1) \
                 #         + tf.reduce_sum(self.res1_diag) / (nf * (nf * nf - nf)) \
                 #         - tf.reduce_sum(self.res1_ddiag) / (nf * nf - nf)
-                self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[1,2]))
-                self.res1 = (tf.reduce_sum(self.res1)\
-                        - tf.reduce_sum(self.res1_diag)) / (nf * nf - nf)
+                res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[1,2]))
+                res1 = (tf.reduce_sum(res1)\
+                        - tf.reduce_sum(res1_diag)) / (nf * nf - nf)
+                self.res1 += res1
                 # Cross term of the MMD
-                self.res2 = C / (C + distances)
-                self.res2 =  tf.multiply(tf.transpose(self.res2),tf.transpose(self.enc_mixprob))
-                self.res2 = tf.transpose(self.res2) / opts['nmixtures']
-                self.res2 = tf.reduce_sum(self.res2) * 2. / (nf * nf)
-                stat += self.res1 - self.res2
+                res2 = C / (C + distances)
+                res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixprob))
+                res2 = tf.transpose(res2) / opts['nmixtures']
+                res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
+                self.res2 += res2
+                stat += res1 - res2
         else:
             raise ValueError('%s Unknown kernel' % kernel)
 
@@ -586,13 +589,7 @@ class WAE(object):
                                    self.lr_decay: decay,
                                    self.wae_lambda: wae_lambda,
                                    self.is_training: True})
-                # print("means:")
-                # print(enc_mean[:3])
-                # print("sigmas:")
-                # print(enc_sigmas[:3])
-                # print("mix:")
-                # print(enc_mixprob[:3])
-                # pdb.set_trace()
+
                 # Update learning rate if necessary
                 if opts['lr_schedule'] == 'plateau':
                     # First 30 epochs do nothing
