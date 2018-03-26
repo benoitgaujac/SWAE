@@ -323,7 +323,7 @@ class WAE(object):
                 # self.res1 = tf.reduce_sum(self.res1) / (nf * nf - 1) \
                 #         + tf.reduce_sum(self.res1_diag) / (nf * (nf * nf - nf)) \
                 #         - tf.reduce_sum(self.res1_ddiag) / (nf * nf - nf)
-                res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[1,2]))
+                res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
                 res1 = (tf.reduce_sum(res1)\
                         - tf.reduce_sum(res1_diag)) / (nf * nf - nf)
                 self.res1 += res1
