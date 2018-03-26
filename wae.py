@@ -382,7 +382,7 @@ class WAE(object):
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
 
-    def means_loss(self):
+    def mean_loss(self):
         mean_loss = tf.reduce_mean(tf.square(self.enc_mean - self.pz_means))
         return mean_loss
 
