@@ -67,7 +67,7 @@ class WAE(object):
                 #eps = tf.random_normal([sample_size,opts['nmixtures'],opts['zdim']],mean=0.0,stddev=0.0099999,dtype=tf.float32)
                 eps = tf.zeros([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
                 self.enc_mean = self.pz_means + eps
-                self.enc_sigmas = opts['init_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
+                self.enc_sigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
             else:
                 enc_mean, enc_sigmas, enc_mixprob = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
