@@ -167,7 +167,6 @@ class WAE(object):
                     means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
                 else:
                     means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
-            pdb.set_trace()
             self.pz_means = opts['pz_scale']*means
             self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
         else:
