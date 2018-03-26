@@ -63,7 +63,6 @@ class WAE(object):
                 _, _, enc_mixprob = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
                 self.enc_mixprob = enc_mixprob
-                self.enc_mean = enc_mean
                 eps = tf.zeros([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
                 self.enc_mean = self.pz_means + eps
                 self.enc_sigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
