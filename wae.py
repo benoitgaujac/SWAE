@@ -106,7 +106,12 @@ class WAE(object):
         # -- Objectives, losses, penalties, vizu
         self.penalty = self.matching_penalty()
         self.loss_reconstruct = self.reconstruction_loss()
-        self.wae_objective = self.loss_reconstruct + self.wae_lambda * self.penalty
+        self.loss_means = self.mean_loss()
+        if opts['mean_loss']:
+            self.wae_objective = self.loss_reconstruct + self.wae_lambda * self.penalty \
+                                    + opts['gamma'] * self.loss_means
+        else:
+            self.wae_objective = self.loss_reconstruct + self.wae_lambda * self.penalty
         self.blurriness = self.compute_blurriness()
 
         #self.add_least_gaussian2d_ops()
@@ -297,8 +302,8 @@ class WAE(object):
                 self.res1 = tf.multiply(self.res1, 1. - tf.eye(n))
                 self.res1 = tf.reduce_sum(self.res1) / (nf * nf - nf)
             # Cross term of the MMD
-            self.res2 = tf.exp( - distances / 2. / sigma2_k)
             if opts['pz'] == 'mixture':
+                self.res2 = tf.exp( - distances / 2. / sigma2_k)
                 self.res2 =  tf.multiply(tf.transpose(self.res2),tf.transpose(self.enc_mixprob))
                 self.res2 = tf.transpose(self.res2) / opts['nmixtures']
             else:
@@ -376,6 +381,10 @@ class WAE(object):
         else:
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
+
+    def means_loss(self):
+        mean_loss = tf.reduce_mean(tf.square(self.enc_mean - self.pz_means))
+        return mean_loss
 
     def compute_blurriness(self):
         images = self.sample_points
@@ -851,7 +860,7 @@ def save_plots(opts, sample_train,sample_test,
     test_probs_labels = np.stack(test_probs_labels,axis=0)
     ax = plt.subplot(gs[1, 0])
     plt.imshow(test_probs_labels,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
-    plt.colorbar()
+    #plt.colorbar()
     plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
 
