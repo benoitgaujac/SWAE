@@ -160,10 +160,14 @@ class WAE(object):
             self.pz_means = np.zeros(opts['zdim']).astype(np.float32)
             self.pz_covs = opts['sigma_prior']*np.identity(opts['zdim']).astype(np.float32)
         elif distr == 'mixture':
-            assert opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
+            assert 2*opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
             means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
             for k in range(opts['nmixtures']):
-                means[k,k] = sqrt(2.0)*max(opts['sigma_prior'],1.)
+                if k % 2 == 0:
+                    means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
+                else:
+                    means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
+            pdb.set_trace()
             self.pz_means = opts['pz_scale']*means
             self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
         else:
