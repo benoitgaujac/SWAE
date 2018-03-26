@@ -907,26 +907,26 @@ def save_plots(opts, sample_train, label_train,
     x = np.arange(1, len(losses_rec) + 1, x_step)
 
     y = np.log(np.abs(losses_rec[::x_step]))
-    ymin = np.amin(y)
-    ymax = np.amax(y)
+    #ymin = np.amin(y)
+    #ymax = np.amax(y)
     plt.plot(x, y, linewidth=2, color='red', label='log(|rec loss|)')
 
     y = np.log(np.abs(losses_match[::x_step]))
-    ymin = min(ymin,np.amin(y))
-    ymax = max(ymax,np.amax(y))
+    #ymin = min(ymin,np.amin(y))
+    #ymax = max(ymax,np.amax(y))
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
     y = np.log(np.abs(mmds_same[::x_step]))
-    ymin = min(ymin,np.amin(y))
-    ymax = max(ymax,np.amax(y))
+    #ymin = min(ymin,np.amin(y))
+    #ymax = max(ymax,np.amax(y))
     plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(|mmd first|)')
 
     y = np.log(np.abs(mmds_cross[::x_step]))
-    ymin = min(ymin,np.amin(y))
-    ymax = max(ymax,np.amax(y))
+    #ymin = min(ymin,np.amin(y))
+    #ymax = max(ymax,np.amax(y))
     plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(|mmd cross|)')
 
-    plt.ylim(ymin, ymax)
+    #plt.ylim(ymin, ymax)
     plt.grid(axis='y')
     plt.legend(loc='upper right')
     plt.text(0.47, 1., 'Loss curves', ha="center", va="bottom",
