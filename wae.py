@@ -59,16 +59,21 @@ class WAE(object):
                 self.encoded = res
         elif opts['e_noise'] in ('gaussian', 'mixture'):
             # Encoder outputs means and variances of Gaussians, and mixing probs
-            if opts['stop_grad']:
+            if opts['e_means']=='fixed':
+                _, _, enc_mixprob = encoder(opts, inputs=self.sample_points,
+                                                                is_training=self.is_training)
+                self.enc_mixprob = enc_mixprob
+                self.enc_mean = enc_mean
+                eps = tf.zeros([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
+                self.enc_mean = self.pz_means + eps
+                self.enc_sigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
+            elif opts['e_means']=='mean':
                 enc_mean, _, enc_mixprob = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
                 self.enc_mixprob = enc_mixprob
                 self.enc_mean = enc_mean
-                #eps = tf.random_normal([sample_size,opts['nmixtures'],opts['zdim']],mean=0.0,stddev=0.0099999,dtype=tf.float32)
-                #eps = tf.zeros([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
-                #self.enc_mean = self.pz_means + eps
                 self.enc_sigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
-            else:
+            elif opts['e_means']=='learnable':
                 enc_mean, enc_sigmas, enc_mixprob = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
                 enc_sigmas = tf.clip_by_value(enc_sigmas, -50, 50)
@@ -906,17 +911,26 @@ def save_plots(opts, sample_train, label_train,
     x = np.arange(1, len(losses_rec) + 1, x_step)
 
     y = np.log(np.abs(losses_rec[::x_step]))
+    ymin = np.amin(y)
+    ymax = np.amax(y)
     plt.plot(x, y, linewidth=2, color='red', label='log(|rec loss|)')
 
     y = np.log(np.abs(losses_match[::x_step]))
+    ymin = min(ymin,np.amin(y))
+    ymax = max(ymax,np.amax(y))
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
     y = np.log(np.abs(mmds_same[::x_step]))
+    ymin = min(ymin,np.amin(y))
+    ymax = max(ymax,np.amax(y))
     plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(|mmd first|)')
 
     y = np.log(np.abs(mmds_cross[::x_step]))
+    ymin = min(ymin,np.amin(y))
+    ymax = max(ymax,np.amax(y))
     plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(|mmd cross|)')
 
+    plt.ylim(ymin, ymax)
     plt.grid(axis='y')
     plt.legend(loc='upper right')
     plt.text(0.47, 1., 'Loss curves', ha="center", va="bottom",
