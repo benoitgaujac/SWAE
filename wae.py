@@ -386,8 +386,9 @@ class WAE(object):
         return loss
 
     def mean_loss(self):
+        opts = self.opts
         mean_loss = tf.reduce_mean(tf.square(self.enc_mean - self.pz_means))
-        return mean_loss
+        return mean_loss / opts['batch_size']
 
     def compute_blurriness(self):
         images = self.sample_points
