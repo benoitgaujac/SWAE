@@ -93,8 +93,11 @@ class WAE(object):
                 mixture_idx = tf.reshape(tf.multinomial(tf.log(self.enc_mixprob), 1),[-1])
                 self.mixture = tf.stack([tf.range(sample_size),mixture_idx],axis=-1)
                 self.encoded = tf.gather_nd(self.mixtures_encoded,self.mixture)
+                self.encoded_means = tf.gather_nd(self.enc_mean,self.mixture)
             else:
                 self.encoded = self.mixtures_encoded
+                self.encoded_means = self.enc_mean
+
         # Decode the points encoded above (i.e. reconstruct)
         self.reconstructed, self.reconstructed_logits = \
                         decoder(opts, noise=self.encoded,
@@ -173,9 +176,9 @@ class WAE(object):
             means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
             for k in range(opts['nmixtures']):
                 if k % 2 == 0:
-                    means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
+                    means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],0.)
                 else:
-                    means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
+                    means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],0.)
             self.pz_means = opts['pz_scale']*means
             self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
         else:
@@ -643,20 +646,20 @@ class WAE(object):
                     now = time.time()
 
                     # Auto-encoding test images
-                    [loss_rec_test, enc_test, rec_test, mix_test] = self.sess.run(
+                    [loss_rec_test, enc_test, enc_means_test, rec_test, mix_test] = self.sess.run(
                             [self.loss_reconstruct,
                              self.encoded,
+                             self.encoded_means,
                              self.reconstructed,
                              self.enc_mixprob],
                             feed_dict={self.sample_points: data.test_data[:self.num_pics],
                                                                 self.is_training: False})
 
                     # Auto-encoding training images
-                    [loss_rec_train, rec_train, mix_train, mean_train] = self.sess.run(
+                    [loss_rec_train, rec_train, mix_train] = self.sess.run(
                             [self.loss_reconstruct,
                              self.reconstructed,
-                             self.enc_mixprob,
-                             self.enc_mean],
+                             self.enc_mixprob],
                             feed_dict={self.sample_points: data.data[:self.num_pics],
                                                             self.is_training: False})
 
@@ -688,13 +691,11 @@ class WAE(object):
                     # print(debug)
 
                     # Making plots
-                    save_plots(opts, data.data[:self.num_pics],
-                                    data.test_data[:self.num_pics],
+                    save_plots(opts, data.data[:self.num_pics], data.test_data[:self.num_pics],
                                     data.test_labels,
-                                    rec_train[:self.num_pics],
-                                    rec_test[:self.num_pics],
+                                    rec_train[:self.num_pics], rec_test[:self.num_pics],
                                     mix_test,
-                                    enc_test,
+                                    enc_test, enc_means_test,
                                     self.fixed_noise,
                                     sample_gen,
                                     losses_rec, losses_match, mmds_same, mmds_cross,
@@ -732,7 +733,7 @@ def save_plots(opts, sample_train,sample_test,
                     label_test,
                     recon_train, recon_test,
                     mix_test,
-                    enc_test,
+                    enc_test, enc_means_test,
                     sample_prior,
                     sample_gen,
                     losses_rec, losses_match, mmds_same, mmds_cross,
@@ -852,9 +853,9 @@ def save_plots(opts, sample_train,sample_test,
 
     ### Then the mean mixtures plots
     test_probs_labels = []
-    n = np.shape(mix_test)[0]
+    #n = np.shape(mix_test)[0]
     for i in range(10):
-        te_prob = [mix_test[k] for k in range(n) if label_test[k]==i]
+        te_prob = [mix_test[k] for k in range(num_pics) if label_test[k]==i]
         te_prob = np.mean(np.stack(te_prob,axis=0),axis=0)
         test_probs_labels.append(te_prob)
     test_probs_labels = np.stack(test_probs_labels,axis=0)
@@ -868,16 +869,19 @@ def save_plots(opts, sample_train,sample_test,
     ax = plt.subplot(gs[1, 1])
     embedding = umap.UMAP(n_neighbors=5,
                             min_dist=0.3,
-                            metric='correlation').fit_transform(np.concatenate((enc_test,sample_prior),axis=0))
-    plt.scatter(embedding[:np.shape(enc_test)[0], 0], embedding[:np.shape(enc_test)[0], 1],
+                            metric='correlation').fit_transform(np.concatenate((enc_test,enc_means_test,sample_prior),axis=0))
+    #n = np.shape(enc_test)[0]
+    plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
                 c=label_test[:num_pics], s=30, label='Qz test',cmap='Accent')
     plt.colorbar()
-    plt.scatter(embedding[np.shape(enc_test)[0]:, 0], embedding[np.shape(enc_test)[0]:, 1],
+    plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
+                color='deepskyblue', s=10, marker='P',label='mean Qz test')
+    plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
                             color='navy', s=10, marker='*',label='Pz')
 
     xmin = np.amin(embedding[:,0])
     xmax = np.amax(embedding[:,0])
-    magnify = 0.3
+    magnify = 0.1
     width = abs(xmax - xmin)
     xmin = xmin - width * magnify
     xmax = xmax + width * magnify
