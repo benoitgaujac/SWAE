@@ -318,7 +318,7 @@ class WAE(object):
             Cbase = 2 * opts['zdim'] * sigma2_p
             stat = 0.
             self.res1, self.res2 = 0.0, 0.0
-            for scale in [.1, .2, .5, 1., 2., 5., 10.]:
+            for scale in [.1, .2, .5, 1., 2., 5., 10., 20., 50., 100.]:
                 C = Cbase * scale
                 # First 2 terms of the MMD
                 res1 = C / (C + distances_qz)
