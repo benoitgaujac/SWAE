@@ -875,7 +875,7 @@ def save_plots(opts, sample_train,sample_test,
                 c=label_test[:num_pics], s=40, label='Qz test',cmap='Accent')
     plt.colorbar()
     plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
-                color='deepskyblue', s=20, marker='x',label='mean Qz test')
+                color='deepskyblue', s=10, marker='x',label='mean Qz test')
     plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
                             color='navy', s=10, marker='*',label='Pz')
 
