@@ -534,8 +534,7 @@ class WAE(object):
         losses = []
         losses_rec = []
         losses_match = []
-        mmds_same = []
-        mmds_cross = []
+        losses_means = []
         blurr_vals = []
         encoding_changes = []
         batches_num = int(data.num_points / opts['batch_size'])
@@ -589,13 +588,12 @@ class WAE(object):
                 batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match, mmd_same, mmd_cross] = self.sess.run(
+                [_, loss, loss_rec, loss_match, loss_means] = self.sess.run(
                         [self.ae_opt,
                          self.wae_objective,
                          self.loss_reconstruct,
                          self.penalty,
-                         self.res1,
-                         self.res2],
+                         self.loss_means],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_noise: batch_noise,
                                    self.sample_mix_noise: batch_mix_noise,
@@ -621,8 +619,7 @@ class WAE(object):
                 losses.append(loss)
                 losses_rec.append(loss_rec)
                 losses_match.append(loss_match)
-                mmds_same.append(mmd_same)
-                mmds_cross.append(mmd_cross)
+                losses_means.append(loss_means)
                 if opts['verbose']:
                     logging.error('Matching penalty after %d steps: %f' % (
                         counter, losses_match[-1]))
@@ -699,7 +696,7 @@ class WAE(object):
                                     enc_test, enc_means_test,
                                     self.fixed_noise,
                                     sample_gen,
-                                    losses_rec, losses_match, mmds_same, mmds_cross,
+                                    losses_rec, losses_match, losses_means,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
 
         # # Save the final model
@@ -737,7 +734,7 @@ def save_plots(opts, sample_train,sample_test,
                     enc_test, enc_means_test,
                     sample_prior,
                     sample_gen,
-                    losses_rec, losses_match, mmds_same, mmds_cross,
+                    losses_rec, losses_match, losses_means,
                     filename):
     """ Generates and saves the plot of the following layout:
         img1 | img2 | img3
@@ -906,32 +903,18 @@ def save_plots(opts, sample_train,sample_test,
     x = np.arange(1, len(losses_rec) + 1, x_step)
 
     y = np.log(np.abs(losses_rec[::x_step]))
-    #ymin = np.amin(y)
-    #ymax = np.amax(y)
     plt.plot(x, y, linewidth=2, color='red', label='log(|rec loss|)')
 
     y = np.log(np.abs(losses_match[::x_step]))
-    #ymin = min(ymin,np.amin(y))
-    #ymax = max(ymax,np.amax(y))
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
-    y = np.log(np.abs(mmds_same[::x_step]))
-    #ymin = min(ymin,np.amin(y))
-    #ymax = max(ymax,np.amax(y))
-    plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(|mmd first|)')
+    y = np.log(np.abs(losses_means[::x_step]))
+    plt.plot(x, y, linewidth=2, color='green', label='log(|means loss|)')
 
-    y = np.log(np.abs(mmds_cross[::x_step]))
-    #ymin = min(ymin,np.amin(y))
-    #ymax = max(ymax,np.amax(y))
-    plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(|mmd cross|)')
-
-    #plt.ylim(ymin, ymax)
     plt.grid(axis='y')
     plt.legend(loc='upper right')
     plt.text(0.47, 1., 'Loss curves', ha="center", va="bottom",
                                 size=20, transform=ax.transAxes)
-
-
 
     # Saving
     utils.create_dir(opts['work_dir'])
