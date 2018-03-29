@@ -75,7 +75,7 @@ class WAE(object):
             elif opts['e_means']=='learnable':
                 enc_mean, enc_sigmas, enc_mixprob = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
-                enc_sigmas = tf.clip_by_value(enc_sigmas, -50, 50)
+                enc_sigmas = tf.clip_by_value(enc_sigmas, -5, 5)
                 self.enc_mixprob = enc_mixprob
                 self.enc_mean = enc_mean
                 self.enc_sigmas = enc_sigmas
