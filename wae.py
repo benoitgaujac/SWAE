@@ -10,7 +10,7 @@
 import sys
 import time
 import os
-from math import sqrt
+from math import sqrt, cos, sin, pi
 import numpy as np
 import tensorflow as tf
 import logging
@@ -172,23 +172,10 @@ class WAE(object):
             self.pz_means = np.zeros(opts['zdim']).astype(np.float32)
             self.pz_covs = opts['sigma_prior']*np.identity(opts['zdim']).astype(np.float32)
         elif distr == 'mixture':
-            if opts['zdim']==2 and opts['nmixtures']==8:
+            if opts['zdim']==2 and opts['nmixtures']==10:
                 means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
-                for k in range(1,opts['nmixtures']+1):
-                    if int(k/3)<2:
-                        if k % 3 == 0:
-                            means[k-1] = sqrt(2.0)*np.array([int(k/3),0]).astype(np.float32)
-                        elif k % 3 == 1:
-                            means[k-1] = sqrt(2.0)*np.array([int(k/3),1]).astype(np.float32)
-                        elif k % 3 == 2:
-                            means[k-1] = sqrt(2.0)*np.array([int(k/3),-1]).astype(np.float32)
-                    else:
-                        if k % 3 == 0:
-                            means[k-1] = sqrt(2.0)*np.array([-1,0]).astype(np.float32)
-                        elif k % 3 == 1:
-                            means[k-1] = sqrt(2.0)*np.array([-1,1]).astype(np.float32)
-                        elif k % 3 == 2:
-                            means[k-1] = sqrt(2.0)*np.array([-1,-1]).astype(np.float32)
+                for k in range(0,opts['nmixtures']):
+                    means[k] = sqrt(2.0)*np.array([cos(k * 2*pi/opts['nmixtures']),sin(k * 2*pi/opts['nmixtures'])]).astype(np.float32)
             else:
                 assert 2*opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
                 means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
