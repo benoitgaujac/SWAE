@@ -176,11 +176,11 @@ class WAE(object):
                 means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
                 for k in range(1,opts['nmixtures']+1):
                     if k % 3 == 0:
-                        means[k] = sqrt(2.0)*np.array([int(k/3),0]).astype(np.float32)
+                        means[k-1] = sqrt(2.0)*np.array([int(k/3),0]).astype(np.float32)
                     elif k % 3 == 1:
-                        means[k] = sqrt(2.0)*np.array([int(k/3),1]).astype(np.float32)
+                        means[k-1] = sqrt(2.0)*np.array([int(k/3),1]).astype(np.float32)
                     elif k % 3 == 2:
-                        means[k] = sqrt(2.0)*np.array([int(k/3),-1]).astype(np.float32)
+                        means[k-1] = sqrt(2.0)*np.array([int(k/3),-1]).astype(np.float32)
             else:
                 assert 2*opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
                 means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
