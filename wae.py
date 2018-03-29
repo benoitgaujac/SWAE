@@ -911,14 +911,17 @@ def save_plots(opts, sample_train,sample_test,
     x_step = max(int(total_num / 100), 1)
     x = np.arange(1, len(losses_rec) + 1, x_step)
 
-    y = np.log(np.abs(losses_rec[::x_step]))
-    plt.plot(x, y, linewidth=2, color='red', label='log(|rec loss|)')
+    y = np.log(losses_rec[::x_step])
+    plt.plot(x, y, linewidth=2, color='red', label='log(rec loss)')
 
-    y = np.log(np.abs(losses_match[::x_step]))
-    plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
+    y = np.log(losses_match[::x_step])
+    plt.plot(x, y, linewidth=2, color='blue', label='log(match loss)')
 
-    y = np.log(np.abs(losses_means[::x_step]))
-    plt.plot(x, y, linewidth=2, color='green', label='log(|means loss|)')
+    y = np.log(losses_means[::x_step])
+    plt.plot(x, y, linewidth=2, color='green', label='log(means loss)')
+
+    y = np.log(losses_rec[::x_step] + opts['lambda']*losses_match[::x_step])
+    plt.plot(x, y, linewidth=2, color='black', label='log(means loss - lamb * match loss)')
 
     plt.grid(axis='y')
     plt.legend(loc='upper right')
