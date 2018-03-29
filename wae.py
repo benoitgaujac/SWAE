@@ -181,7 +181,6 @@ class WAE(object):
                         means[k] = sqrt(2.0)*np.array([int(k/3),1]).astype(np.float32)
                     elif k % 3 == 2:
                         means[k] = sqrt(2.0)*np.array([int(k/3),-1]).astype(np.float32)
-                    elif
             else:
                 assert 2*opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
                 means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
