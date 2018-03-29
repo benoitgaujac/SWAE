@@ -172,15 +172,26 @@ class WAE(object):
             self.pz_means = np.zeros(opts['zdim']).astype(np.float32)
             self.pz_covs = opts['sigma_prior']*np.identity(opts['zdim']).astype(np.float32)
         elif distr == 'mixture':
-            assert 2*opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
-            means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
-            for k in range(opts['nmixtures']):
-                if k % 2 == 0:
-                    means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
-                else:
-                    means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
-            self.pz_means = opts['pz_scale']*means
-            self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
+            if opts['zdim']==2 and opts['nmixtures']==8:
+                means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
+                for k in range(1,opts['nmixtures']+1):
+                    if k % 3 == 0:
+                        means[k] = sqrt(2.0)*np.array([int(k/3),0]).astype(np.float32)
+                    elif k % 3 == 1:
+                        means[k] = sqrt(2.0)*np.array([int(k/3),1]).astype(np.float32)
+                    elif k % 3 == 2:
+                        means[k] = sqrt(2.0)*np.array([int(k/3),-1]).astype(np.float32)
+                    elif
+            else:
+                assert 2*opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
+                means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
+                for k in range(opts['nmixtures']):
+                    if k % 2 == 0:
+                        means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
+                    else:
+                        means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
+                self.pz_means = opts['pz_scale']*means
+                self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
         else:
             assert False, 'Unknown latent model.'
 
