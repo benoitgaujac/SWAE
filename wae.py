@@ -920,7 +920,6 @@ def save_plots(opts, sample_train,sample_test,
     y = np.log(losses_means[::x_step])
     plt.plot(x, y, linewidth=2, color='green', label='log(means loss)')
 
-    pdb.set_trace()
     y = np.log(losses_rec[::x_step] + opts['lambda']*np.array(losses_match[::x_step]))
     plt.plot(x, y, linewidth=2, color='black', label='log(means loss - lamb * match loss)')
 
