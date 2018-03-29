@@ -172,7 +172,7 @@ class WAE(object):
             self.pz_means = np.zeros(opts['zdim']).astype(np.float32)
             self.pz_covs = opts['sigma_prior']*np.identity(opts['zdim']).astype(np.float32)
         elif distr == 'mixture':
-            if opts['zdim']==2 and opts['nmixtures']==10:
+            if opts['zdim']==2:
                 means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
                 for k in range(0,opts['nmixtures']):
                     means[k] = sqrt(2.0)*np.array([cos(k * 2*pi/opts['nmixtures']),sin(k * 2*pi/opts['nmixtures'])]).astype(np.float32)
