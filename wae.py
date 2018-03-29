@@ -865,9 +865,13 @@ def save_plots(opts, sample_train,sample_test,
 
     ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])
-    embedding = umap.UMAP(n_neighbors=5,
-                            min_dist=0.3,
-                            metric='correlation').fit_transform(np.concatenate((enc_test,enc_means_test,sample_prior),axis=0))
+    if opts['zdim']==2:
+        embedding = np.concatenate((enc_test,enc_means_test,sample_prior),axis=0)
+    else:
+        embedding = umap.UMAP(n_neighbors=5,
+                                min_dist=0.3,
+                                metric='correlation').fit_transform(np.concatenate((enc_test,enc_means_test,sample_prior),axis=0))
+
     #n = np.shape(enc_test)[0]
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
                 c=label_test[:num_pics], s=40, label='Qz test',cmap='Accent')
