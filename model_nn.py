@@ -18,9 +18,9 @@ def encoder(opts, inputs, reuse=False, is_training=False):
 
     with tf.variable_scope("encoder", reuse=reuse):
         if opts['e_noise']== 'mixture':
-            log_mixprobs = mixprob_encoder(opts, inputs, is_training, reuse)
+            mixweights = mixweight_encoder(opts, inputs, is_training, reuse)
         else:
-            log_mixprobs = None
+            mixweights = None
         res = mean_encoder(opts, inputs, is_training, reuse)
 
         if opts['e_noise'] == 'implicit':
@@ -48,37 +48,34 @@ def encoder(opts, inputs, reuse=False, is_training=False):
             # res = tf.Print(res, [-tf.nn.top_k(tf.transpose(-res), 1).values], 'Res min')
             return res, A
 
-        return res[0], res[1], log_mixprobs
+        return res[0], res[1], mixweights
 
 
-def mixprob_encoder(opts, inputs, is_training=False, reuse=False):
+def mixweight_encoder(opts, inputs, is_training=False, reuse=False):
     if opts['e_arch_d'] == 'mlp':
         # Encoder uses only fully connected layers with ReLus
-        log_mixprobs,_ = mlp_encoder(opts['e_num_filters_d'], opts['e_num_layers_d'],
+        mixweights,_ = mlp_encoder(opts['e_num_filters_d'], opts['e_num_layers_d'],
                                                     1, opts['nmixtures'],
-                                                    'mixprob_encoder', inputs, opts,
+                                                    'mixweight_encoder', inputs, opts,
                                                     is_training, reuse)
     elif opts['e_arch_d'] == 'dcgan':
         # Fully convolutional architecture similar to DCGAN
-        log_mixprobs,_ = dcgan_encoder(opts['e_num_filters_d'], opts['e_num_layers_d'],
+        mixweights,_ = dcgan_encoder(opts['e_num_filters_d'], opts['e_num_layers_d'],
                                                     1, opts['nmixtures'],
-                                                    'mixprob_encoder', inputs, opts,
+                                                    'mixweight_encoder', inputs, opts,
                                                     is_training, reuse)
-    # elif opts['e_arch_d'] == 'ali':
-    #     # Architecture smilar to "Adversarially learned inference" paper
-    #     log_mixprobs,_ = ali_encoder(opts, inputs, is_training, reuse)
     elif opts['e_arch_d'] == 'began':
         # Architecture similar to the BEGAN paper
-        log_mixprobs,_ = began_encoder(opts['e_num_filters_d'], opts['e_num_layers_d'],
+        mixweights,_ = began_encoder(opts['e_num_filters_d'], opts['e_num_layers_d'],
                                                     1, opts['nmixtures'],
-                                                    'mixprob_encoder', inputs, opts,
+                                                    'mixweight_encoder', inputs, opts,
                                                     is_training, reuse)
     else:
         raise ValueError('%s Unknown encoder architecture for mixtures' % opts['e_arch'])
 
-    logits = tf.reshape(tf.stack(log_mixprobs,axis=1),[-1,opts['nmixtures']])
+    logits = tf.reshape(tf.stack(mixweights,axis=1),[-1,opts['nmixtures']])
     return tf.nn.softmax(logits,axis=-1)
-    
+
 def mean_encoder(opts, inputs, is_training=False, reuse=False):
     if opts['e_arch_g'] == 'mlp':
         # Encoder uses only fully connected layers with ReLus
@@ -92,9 +89,6 @@ def mean_encoder(opts, inputs, is_training=False, reuse=False):
                                                         opts['nmixtures'], opts['zdim'],
                                                         'mean_encoder', inputs, opts,
                                                         is_training, reuse)
-    # elif opts['e_arch_g'] == 'ali':
-    #     # Architecture smilar to "Adversarially learned inference" paper
-    #     means,log_sigmas = ali_encoder(opts, inputs, is_training, reuse)
     elif opts['e_arch_g'] == 'began':
         # Architecture similar to the BEGAN paper
         means,log_sigmas = began_encoder(opts['e_num_filters_g'], opts['e_num_layers_g'],
@@ -200,7 +194,7 @@ def ali_encoder(opts, inputs, is_training=False, reuse=False):
                                 opts['zdim'], scope='log_sigmas_lin')
         means.append(mean)
         log_sigmas.append(log_sigma)
-        log_mixprobs = None
+        log_mixweights = None
     elif opts['e_noise'] == 'mixture':
         # encode the mean parameters of the nmixtures gaussians
         for k in range(opts['nmixtures']):
@@ -256,7 +250,7 @@ def ali_encoder(opts, inputs, is_training=False, reuse=False):
         layer_x = ops.lrelu(layer_x, 0.1)
         layer_x = ops.conv2d(opts, layer_x, num_units_g / 2, d_h=1, d_w=1,
                              scope='conv2d_1x1_2', conv_filters_dim=1)
-        log_mixprobs = ops.linear(opts, layer_x, opts['nmixtures'], 'mixprob_lin')
+        log_mixweights = ops.linear(opts, layer_x, opts['nmixtures'], 'mixweight_lin')
     else:
         # encode the mean parameters for non gaussian encoder
         layer_x = inputs
@@ -287,7 +281,7 @@ def ali_encoder(opts, inputs, is_training=False, reuse=False):
         #res = (tf.stack(means,axis=1),None,None)
         return mean
 
-    res = (tf.stack(means,axis=1), tf.stack(log_sigmas,axis=1), log_mixprobs)
+    res = (tf.stack(means,axis=1), tf.stack(log_sigmas,axis=1), log_mixweights)
     return res
 
 def began_encoder(num_units, num_layers, num_mixtures, output_dim, scpe, inputs, opts, is_training=False, reuse=False):
@@ -494,4 +488,3 @@ def transform_noise(opts, code, eps, reuse=False):
     res = tf.matmul(code, A)
     res = tf.reshape(res, [-1, opts['zdim']])
     return res, A
-    # return ops.linear(opts, hi, opts['zdim'] ** 2, scope='eps_hfinal_lin')
