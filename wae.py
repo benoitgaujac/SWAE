@@ -145,7 +145,7 @@ class WAE(object):
 
         self.mmd_objective = self.loss_reconstruct \
                                 + self.MMD_lambda * self.MMD_penalty \
-                                + self.AE_lambda * self.MMD_regu
+                                - self.AE_lambda * self.MMD_regu
 
         # --- Optimizers, savers, etc
         self.add_optimizers()
