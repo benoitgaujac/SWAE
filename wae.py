@@ -376,7 +376,7 @@ class WAE(object):
         elif opts['cost'] == 'l2sq':
             # c(x,y) = ||x - y||_2^2
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = .1 * tf.reduce_mean(loss)
+            loss = .5 * tf.reduce_mean(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
             loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[1, 2, 3])
@@ -428,6 +428,34 @@ class WAE(object):
                                 var_list=k_encoder_vars + k_decoder_vars)
         clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
         self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
+
+    def pretrain_encoder(self, data):
+        opts = self.opts
+        steps_max = 200
+        batch_size = opts['e_pretrain_sample_size']
+        logging.error('Pretraining means...')
+        for step in xrange(steps_max):
+            train_size = data.num_points
+            data_ids = np.random.choice(train_size, min(train_size, batch_size),
+                                        replace=False)
+            batch_images = data.data[data_ids].astype(np.float)
+            batch_noise =  self.sample_pz(batch_size)
+
+            [_, loss_pretrain] = self.sess.run(
+                [self.pretrain_opt,
+                 self.loss_pretrain],
+                feed_dict={self.sample_points: batch_images,
+                           self.sample_noise: batch_noise,
+                           self.is_training: True})
+
+            if opts['verbose']:
+                logging.error('Step %d/%d, loss=%f' % (
+                    step, steps_max, loss_pretrain))
+
+            if loss_pretrain < 0.1:
+                logging.error('Pretraining done.')
+                break
+        logging.error('Pretraining done.')
 
     def train(self, data):
         opts = self.opts
