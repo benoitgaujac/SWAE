@@ -807,8 +807,8 @@ def save_plots(opts, sample_train,sample_test,
     y = np.log(losses_rec[::x_step])
     plt.plot(x, y, linewidth=2, color='red', label='log(rec loss)')
 
-    y = np.log(losses_match[::x_step])
-    plt.plot(x, y, linewidth=2, color='blue', label='log(match loss)')
+    y = np.log(np.abs(losses_match[::x_step]))
+    plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
     y = np.log(losses_rec[::x_step] + opts['lambda']*np.array(losses_match[::x_step]))
     plt.plot(x, y, linewidth=2, color='black', label='log(rec loss + lamb * match loss)')
