@@ -377,7 +377,7 @@ class WAE(object):
         elif opts['cost'] == 'l2sq':
             # c(x,y) = ||x - y||_2^2
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = .5 * tf.reduce_mean(loss)
+            loss = .05 * tf.reduce_mean(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
             loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[1, 2, 3])
