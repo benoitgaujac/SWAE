@@ -372,15 +372,15 @@ class WAE(object):
         if opts['cost'] == 'l2':
             # c(x,y) = ||x - y||_2
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = 1.0 * tf.reduce_mean(tf.sqrt(1e-08 + loss))
+            loss = .1 * tf.reduce_mean(tf.sqrt(1e-08 + loss))
         elif opts['cost'] == 'l2sq':
             # c(x,y) = ||x - y||_2^2
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = 1.0 * tf.reduce_mean(loss)
+            loss = .1 * tf.reduce_mean(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
             loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[1, 2, 3])
-            loss = 1.0 * tf.reduce_mean(loss)
+            loss = .1 * tf.reduce_mean(loss)
         else:
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
@@ -473,24 +473,25 @@ class WAE(object):
 
             # Iterate over batches
             for it in range(batches_num):
-                # Maximize MMD
-                for Dit in range(opts['mmd_iter']):
-                    # Sample batches of data points and Pz noise
-                    data_ids = np.random.choice(train_size,
-                                        opts['batch_size'],
-                                        replace=False)
-                    batch_images = data.data[data_ids].astype(np.float32)
-                    batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
-                    batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
-                    # Update encoder and decoder
-                    [_, loss] = self.sess.run([self.MMD_opt,self.wae_objective],
-                            feed_dict={self.sample_points: batch_images,
-                                       self.sample_noise: batch_noise,
-                                       self.sample_mix_noise: batch_mix_noise,
-                                       self.lr_decay: decay,
-                                       self.MMD_lambda: wae_lambda,
-                                       self.is_training: True})
-                    mmd_losses.append(loss)
+                if it % opts['mmd_every'] ==0:
+                    # Maximize MMD
+                    for Dit in range(opts['mmd_iter']):
+                        # Sample batches of data points and Pz noise
+                        data_ids = np.random.choice(train_size,
+                                            opts['batch_size'],
+                                            replace=False)
+                        batch_images = data.data[data_ids].astype(np.float32)
+                        batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
+                        batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
+                        # Update encoder and decoder
+                        [_, loss] = self.sess.run([self.MMD_opt,self.wae_objective],
+                                feed_dict={self.sample_points: batch_images,
+                                           self.sample_noise: batch_noise,
+                                           self.sample_mix_noise: batch_mix_noise,
+                                           self.lr_decay: decay,
+                                           self.MMD_lambda: wae_lambda,
+                                           self.is_training: True})
+                        mmd_losses.append(loss)
 
                 # Sample batches of data points and Pz noise
                 data_ids = np.random.choice(train_size,
