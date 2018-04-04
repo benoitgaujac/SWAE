@@ -131,19 +131,21 @@ class WAE(object):
             sample_qz = self.mixtures_encoded
         # Compute MMD
         self.MMD_penalty = self.matching_penalty(sample_pz,sample_qz)
-        # Add mean regularizer if needed
-        if opts['mean_regularizer']:
-            self.mean_regu = tf.reduce_mean(tf.square(self.enc_mean - self.pz_means))
-            self.mean_regu = self.mean_regu / (opts['sigma_prior'] * opts['sigma_prior'])
-        else:
-            self.mean_regu = tf.zeros([0,])
+        # # Add mean regularizer if needed
+        # if opts['mean_regularizer']:
+        #     self.mean_regu = tf.reduce_mean(tf.square(self.enc_mean - self.pz_means))
+        #     self.mean_regu = self.mean_regu / (opts['sigma_prior'] * opts['sigma_prior'])
+        # else:
+        #     self.mean_regu = tf.zeros([0,])
         # Compute reconstruction cost
         self.loss_reconstruct = self.reconstruction_loss()
         # final WAE objective
         self.wae_objective = self.loss_reconstruct \
+                                + self.MMD_lambda * self.MMD_penalty
+
+        self.mmd_objective = self.loss_reconstruct \
                                 + self.MMD_lambda * self.MMD_penalty \
-                                + self.AE_lambda * self.MMD_regu \
-                                + self.MEAN_lambda * self.mean_regu
+                                + self.AE_lambda * self.MMD_regu
 
         # --- Optimizers, savers, etc
         self.add_optimizers()
@@ -174,7 +176,6 @@ class WAE(object):
         self.is_training = is_training
         self.MMD_lambda = wae_lambda
         self.AE_lambda = opts['ae_lambda']
-        self.MEAN_lambda = opts['mean_lambda']
 
     def add_savers(self):
         opts = self.opts
@@ -385,21 +386,6 @@ class WAE(object):
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
 
-    def compute_blurriness(self):
-        images = self.sample_points
-        sample_size = tf.shape(self.sample_points)[0]
-        # First convert to greyscale
-        if self.data_shape[-1] > 1:
-            # We have RGB
-            images = tf.image.rgb_to_grayscale(images)
-        # Next convolve with the Laplace filter
-        lap_filter = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-        lap_filter = lap_filter.reshape([3, 3, 1, 1])
-        conv = tf.nn.conv2d(images, lap_filter,
-                            strides=[1, 1, 1, 1], padding='VALID')
-        _, lapvar = tf.nn.moments(conv, axes=[1, 2, 3])
-        return lapvar
-
     def optimizer(self, lr, decay=1.):
         opts = self.opts
         lr *= decay
@@ -424,7 +410,7 @@ class WAE(object):
         self.swae_opt = opt.minimize(loss=self.wae_objective,
                         var_list=encoder_vars + decoder_vars)
         mmd_opt = self.optimizer(mmd_lr, self.lr_decay)
-        grads_and_vars = mmd_opt.compute_gradients(loss=-self.wae_objective,
+        grads_and_vars = mmd_opt.compute_gradients(loss=-self.mmd_objective,
                                 var_list=k_encoder_vars + k_decoder_vars)
         clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
         self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
@@ -463,7 +449,7 @@ class WAE(object):
             logging.error(opts)
         logging.error('Training SWAE')
         losses, losses_rec, losses_match, losses_means  = [], [], [], []
-        mmd_losses, losses_rec, losses_match, losses_means  = [], [], [], []
+        mmd_losses= []
         batches_num = int(data.num_points / opts['batch_size'])
         train_size = data.num_points
         self.num_pics = opts['plot_num_pics']
@@ -512,7 +498,7 @@ class WAE(object):
                         batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                         batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                         # Update encoder and decoder
-                        [_, loss] = self.sess.run([self.MMD_opt,self.wae_objective],
+                        [_, loss] = self.sess.run([self.MMD_opt,self.mmd_objective],
                                 feed_dict={self.sample_points: batch_images,
                                            self.sample_noise: batch_noise,
                                            self.sample_mix_noise: batch_mix_noise,
@@ -529,12 +515,11 @@ class WAE(object):
                 batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match, loss_means] = self.sess.run(
+                [_, loss, loss_rec, loss_match] = self.sess.run(
                         [self.swae_opt,
                          self.wae_objective,
                          self.loss_reconstruct,
-                         self.MMD_penalty,
-                         self.mean_regu],
+                         self.MMD_penalty],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_noise: batch_noise,
                                    self.sample_mix_noise: batch_mix_noise,
@@ -560,7 +545,6 @@ class WAE(object):
                 losses.append(loss)
                 losses_rec.append(loss_rec)
                 losses_match.append(loss_match)
-                losses_means.append(loss_means)
                 if opts['verbose']:
                     logging.error('Matching penalty after %d steps: %f' % (
                         counter, losses_match[-1]))
@@ -631,7 +615,7 @@ class WAE(object):
                                     enc_test, enc_means_test,
                                     self.fixed_noise,
                                     sample_gen,
-                                    losses_rec, losses_match, losses_means,
+                                    losses_rec, losses_match,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
 
         # # Save the final model
@@ -649,7 +633,7 @@ def save_plots(opts, sample_train,sample_test,
                     enc_test, enc_means_test,
                     sample_prior,
                     sample_gen,
-                    losses_rec, losses_match, losses_means,
+                    losses_rec, losses_match,
                     filename):
     """ Generates and saves the plot of the following layout:
         img1 | img2 | img3
@@ -826,12 +810,8 @@ def save_plots(opts, sample_train,sample_test,
     y = np.log(losses_match[::x_step])
     plt.plot(x, y, linewidth=2, color='blue', label='log(match loss)')
 
-    if opts['mean_regularizer']:
-        y = np.log(losses_means[::x_step])
-        plt.plot(x, y, linewidth=2, color='green', label='log(means loss)')
-
     y = np.log(losses_rec[::x_step] + opts['lambda']*np.array(losses_match[::x_step]))
-    plt.plot(x, y, linewidth=2, color='black', label='log(rec loss - lamb * match loss)')
+    plt.plot(x, y, linewidth=2, color='black', label='log(rec loss + lamb * match loss)')
 
     plt.grid(axis='y')
     plt.legend(loc='upper right')
