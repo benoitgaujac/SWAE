@@ -106,9 +106,8 @@ class WAE(object):
                                     is_training=self.is_training)
             recons_pz = tf.reshape(f_d_pz,[-1,opts['nmixtures'],opts['zdim']])
             l2sq_pz = tf.reduce_sum(tf.square(self.sample_mix_noise - recons_pz),axis=-1)
-            MMD_regu_pz = tf.reduce_mean(l2sq_pz, axis=0) / opts['nmixtures']
-            MMD_regu_pz = tf.reduce_sum(MMD_regu_pz)
-
+            MMD_regu_pz = tf.reduce_mean(l2sq_pz, axis=0)
+            MMD_regu_pz = tf.reduce_sum(MMD_regu_pz) / opts['nmixtures']
             # Qz samples
             input_qz = tf.reshape(self.mixtures_encoded,[-1,opts['zdim']])
             f_e_qz = k_encoder(opts, inputs=input_qz,
@@ -120,7 +119,6 @@ class WAE(object):
             weighted_l2sq_qz = tf.multiply(l2sq_pz, self.enc_mixweight)
             MMD_regu_qz = tf.reduce_mean(weighted_l2sq_qz,axis=0)
             MMD_regu_qz = tf.reduce_sum(MMD_regu_qz)
-
             # MMD GAN obj
             self.MMD_regu = MMD_regu_pz + MMD_regu_qz
             sample_pz = tf.reshape(f_e_pz,[-1,opts['nmixtures'],opts['k_outdim']])
@@ -131,21 +129,22 @@ class WAE(object):
             sample_qz = self.mixtures_encoded
         # Compute MMD
         self.MMD_penalty = self.matching_penalty(sample_pz,sample_qz)
-        # # Add mean regularizer if needed
-        # if opts['mean_regularizer']:
-        #     self.mean_regu = tf.reduce_mean(tf.square(self.enc_mean - self.pz_means))
-        #     self.mean_regu = self.mean_regu / (opts['sigma_prior'] * opts['sigma_prior'])
-        # else:
-        #     self.mean_regu = tf.zeros([0,])
         # Compute reconstruction cost
         self.loss_reconstruct = self.reconstruction_loss()
         # final WAE objective
         self.wae_objective = self.loss_reconstruct \
                                 + self.MMD_lambda * self.MMD_penalty
-
-        self.mmd_objective = self.loss_reconstruct \
-                                + self.MMD_lambda * self.MMD_penalty \
-                                - self.AE_lambda * self.MMD_regu
+        if opts['MMD_gan']:
+            self.mmd_objective = self.loss_reconstruct \
+                                    + self.MMD_lambda * self.MMD_penalty \
+                                    - self.AE_lambda * self.MMD_regu
+        else:
+            self.mmd_objective = None
+        # Add pretraining
+        if opts['e_pretrain']:
+            self.loss_pretrain = self.pretrain_loss()
+        else:
+            self.loss_pretrain = None
 
         # --- Optimizers, savers, etc
         self.add_optimizers()
@@ -366,6 +365,23 @@ class WAE(object):
 
         return distances
 
+    def pretrain_loss(self):
+        opts = self.opts
+        # Adding ops to pretrain the encoder so that mean and covariance
+        # of Qz will try to match those of Pz
+        mean_pz = tf.reduce_mean(self.sample_mix_noise, axis=0)
+        mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=0)
+        mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz)) / opts['nmixtures']
+        # cov_pz = tf.matmul(self.sample_noise - mean_pz,
+        #                    self.sample_noise - mean_pz, transpose_a=True)
+        # cov_pz /= opts['e_pretrain_sample_size'] - 1.
+        # cov_qz = tf.matmul(self.encoded - mean_qz,
+        #                    self.encoded - mean_qz, transpose_a=True)
+        # cov_qz /= opts['e_pretrain_sample_size'] - 1.
+        # cov_loss = tf.reduce_mean(tf.square(cov_pz - cov_qz))
+        # return mean_loss + cov_loss
+        return mean_loss
+
     def reconstruction_loss(self):
         opts = self.opts
         real = self.sample_points
@@ -398,50 +414,50 @@ class WAE(object):
 
     def add_optimizers(self):
         opts = self.opts
+        # SWAE optimizer
         lr = opts['lr']
-        mmd_lr = opts['mmd_lr']
+        opt = self.optimizer(lr, self.lr_decay)
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
-        k_encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_encoder')
-        k_decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_generator')
-
-        # Optimizer
-        opt = self.optimizer(lr, self.lr_decay)
         self.swae_opt = opt.minimize(loss=self.wae_objective,
-                        var_list=encoder_vars + decoder_vars)
-        mmd_opt = self.optimizer(mmd_lr, self.lr_decay)
-        grads_and_vars = mmd_opt.compute_gradients(loss=-self.mmd_objective,
-                                var_list=k_encoder_vars + k_decoder_vars)
-        clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
-        self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
+                                    var_list=encoder_vars + decoder_vars)
+        # MMD optimizer
+        if opts['MMD_gan']:
+            k_encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_encoder')
+            k_decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_generator')
+            mmd_lr = opts['mmd_lr']
+            mmd_opt = self.optimizer(mmd_lr, self.lr_decay)
+            grads_and_vars = mmd_opt.compute_gradients(loss=-self.mmd_objective,
+                                    var_list=k_encoder_vars + k_decoder_vars)
+            clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
+            self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
+        else:
+            self.MMD_opt = None
+        # Pretraining optimizer
+        if opts['e_pretrain']:
+            pre_opt = self.optimizer(lr)
+            self.pretrain_opt = pre_opt.minimize(loss=self.loss_pretrain,
+                                    var_list=encoder_vars)
+        else:
+            self.pretrain_opt = None
 
     def pretrain_encoder(self, data):
         opts = self.opts
         steps_max = 200
         batch_size = opts['e_pretrain_sample_size']
-        logging.error('Pretraining means...')
-        for step in xrange(steps_max):
+        for step in range(steps_max):
             train_size = data.num_points
             data_ids = np.random.choice(train_size, min(train_size, batch_size),
                                         replace=False)
-            batch_images = data.data[data_ids].astype(np.float)
-            batch_noise =  self.sample_pz(batch_size)
+            batch_images = data.data[data_ids].astype(np.float32)
+            batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
 
             [_, loss_pretrain] = self.sess.run(
                 [self.pretrain_opt,
                  self.loss_pretrain],
                 feed_dict={self.sample_points: batch_images,
-                           self.sample_noise: batch_noise,
-                           self.is_training: True})
-
-            if opts['verbose']:
-                logging.error('Step %d/%d, loss=%f' % (
-                    step, steps_max, loss_pretrain))
-
-            if loss_pretrain < 0.1:
-                logging.error('Pretraining done.')
-                break
-        logging.error('Pretraining done.')
+                            self.sample_mix_noise: batch_mix_noise,
+                            self.is_training: True})
 
     def train(self, data):
         opts = self.opts
@@ -456,6 +472,12 @@ class WAE(object):
         self.fixed_noise = self.sample_pz(opts['plot_num_pics'],sampling = 'per_mixture')
 
         self.sess.run(self.init)
+
+        if opts['e_pretrain']:
+            logging.error('Pretraining the encoder')
+            self.pretrain_encoder(data)
+            logging.error('Pretraining the encoder done.')
+
 
         self.start_time = time.time()
         counter = 0
@@ -811,10 +833,10 @@ def save_plots(opts, sample_train,sample_test,
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
     y = np.log(losses_rec[::x_step] + opts['lambda']*np.array(losses_match[::x_step]))
-    plt.plot(x, y, linewidth=2, color='black', label='log(rec loss + lamb * match loss)')
+    plt.plot(x, y, linewidth=2, color='black', label='log(wae loss)')
 
     plt.grid(axis='y')
-    plt.legend(loc='upper right')
+    plt.legend(loc='lower left')
     plt.text(0.47, 1., 'Loss curves', ha="center", va="bottom",
                                 size=20, transform=ax.transAxes)
 
