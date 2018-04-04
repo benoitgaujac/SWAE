@@ -624,9 +624,9 @@ class WAE(object):
                     #             losses[-1], loss_rec_test,
                     #             losses_match[-1], mmd_losses[-1])
                     debug_str = 'WAE_LOSS=%.5f, RECON_LOSS_TEST=%.5f, ' \
-                                'MATCH_LOSS=%.5f' % (
+                                'MATCH_LOSS=%.5f, MDD_LOSS=%.5f' % (
                                 losses[-1], loss_rec_test,
-                                losses_match[-1])
+                                losses_match[-1],mmd_losses[-1])
                     logging.error(debug_str)
 
                     # Making plots
