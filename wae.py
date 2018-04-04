@@ -371,7 +371,8 @@ class WAE(object):
         # of Qz will try to match those of Pz
         mean_pz = tf.reduce_mean(self.sample_mix_noise, axis=0)
         mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=0)
-        mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz)) / opts['nmixtures']
+        mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))\
+                    / (opts['sigma_prior'] * (opts['sigma_prior'])
         # cov_pz = tf.matmul(self.sample_noise - mean_pz,
         #                    self.sample_noise - mean_pz, transpose_a=True)
         # cov_pz /= opts['e_pretrain_sample_size'] - 1.
@@ -461,8 +462,6 @@ class WAE(object):
 
     def train(self, data):
         opts = self.opts
-        if opts['verbose']:
-            logging.error(opts)
         logging.error('Training SWAE')
         losses, losses_rec, losses_match, losses_means  = [], [], [], []
         mmd_losses= []
