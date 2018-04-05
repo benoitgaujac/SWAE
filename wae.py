@@ -448,7 +448,7 @@ class WAE(object):
 
     def pretrain_encoder(self, data):
         opts = self.opts
-        steps_max = 400
+        steps_max = 500
         batch_size = opts['e_pretrain_sample_size']
         for step in range(steps_max):
             train_size = data.num_points
