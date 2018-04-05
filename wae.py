@@ -135,9 +135,8 @@ class WAE(object):
         self.wae_objective = self.loss_reconstruct \
                                 + self.MMD_lambda * self.MMD_penalty
         if opts['MMD_gan']:
-            self.mmd_objective = self.loss_reconstruct \
-                                    + self.MMD_lambda * self.MMD_penalty \
-                                    - self.AE_lambda * self.MMD_regu
+            self.mmd_objective = self.MMD_penalty \
+                                - self.AE_lambda * self.MMD_regu
         else:
             self.mmd_objective = None
         # Add pretraining
