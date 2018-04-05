@@ -369,19 +369,22 @@ class WAE(object):
         opts = self.opts
         # Adding ops to pretrain the encoder so that mean and covariance
         # of Qz will try to match those of Pz
-        mean_pz = tf.reduce_mean(self.sample_mix_noise, axis=0)
-        mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=0)
-        mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))\
-                    / (opts['sigma_prior'] * opts['sigma_prior'])
-        # cov_pz = tf.matmul(self.sample_noise - mean_pz,
-        #                    self.sample_noise - mean_pz, transpose_a=True)
-        # cov_pz /= opts['e_pretrain_sample_size'] - 1.
-        # cov_qz = tf.matmul(self.encoded - mean_qz,
-        #                    self.encoded - mean_qz, transpose_a=True)
-        # cov_qz /= opts['e_pretrain_sample_size'] - 1.
-        # cov_loss = tf.reduce_mean(tf.square(cov_pz - cov_qz))
-        # return mean_loss + cov_loss
-        return mean_loss
+        # Means
+        mean_pz = tf.reduce_mean(self.sample_mix_noise, axis=0, keepdims=True)
+        mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=0, keepdims=True)
+        mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))
+        # Covariances
+        centered_pz = self.sample_mix_noise - mean_pz
+        cov_pz = tf.matmul(centered_pz, tf.transpose(centered_pz,perm=[0,2,1]),
+                            transpose_a=False)
+        cov_pz /= opts['e_pretrain_sample_size'] - 1.
+        centered_qz = self.mixtures_encoded - mean_qz
+        cov_qz = tf.matmul(centered_qz, tf.transpose(centered_qz,perm=[0,2,1]),
+                            transpose_a=False)
+        cov_qz /= opts['e_pretrain_sample_size'] - 1.
+        cov_loss = tf.reduce_sum(tf.square(cov_pz - cov_qz))
+
+        return mean_loss + cov_loss
 
     def reconstruction_loss(self):
         opts = self.opts
@@ -444,15 +447,14 @@ class WAE(object):
 
     def pretrain_encoder(self, data):
         opts = self.opts
-        steps_max = 200
+        steps_max = 400
         batch_size = opts['e_pretrain_sample_size']
         for step in range(steps_max):
             train_size = data.num_points
             data_ids = np.random.choice(train_size, min(train_size, batch_size),
                                         replace=False)
             batch_images = data.data[data_ids].astype(np.float32)
-            batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
-
+            batch_mix_noise = self.sample_pz(batch_size,sampling='all_mixtures')
             [_, loss_pretrain] = self.sess.run(
                 [self.pretrain_opt,
                  self.loss_pretrain],
