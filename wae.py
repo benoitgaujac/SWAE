@@ -370,7 +370,8 @@ class WAE(object):
         # Adding ops to pretrain the encoder so that mean and covariance
         # of Qz will try to match those of Pz
         # Means
-        mean_pz = tf.reduce_mean(self.sample_mix_noise, axis=0, keepdims=True)
+        #mean_pz = tf.reduce_mean(self.sample_mix_noise, axis=0, keepdims=True)
+        mean_pz = tf.expand_dims(self.pz_means, axis=0)
         mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=0, keepdims=True)
         mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))
         # Covariances
