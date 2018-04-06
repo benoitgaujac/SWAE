@@ -146,8 +146,8 @@ class WAE(object):
         # final WAE objective
         if opts['MMD_gan']:
             self.wae_objective = self.loss_reconstruct \
-                                + self.MMD_lambda * tf.sqrt(self.MMD_penalty) \
-                                + self.RG_lambda * self.one_sided_err
+                                + self.MMD_lambda * (tf.sqrt(self.MMD_penalty) \
+                                + self.RG_lambda * self.one_sided_err)
 
             self.mmd_objective = tf.sqrt(self.MMD_penalty) \
                                 + self.RG_lambda * self.one_sided_err \
@@ -465,7 +465,7 @@ class WAE(object):
 
     def pretrain_encoder(self, data):
         opts = self.opts
-        steps_max = 2000
+        steps_max = 200
         batch_size = opts['e_pretrain_sample_size']
         for step in range(steps_max):
             train_size = data.num_points
