@@ -82,7 +82,7 @@ class WAE(object):
                                                 tf.exp(self.enc_sigmas),
                                                 opts['e_noise'],sample_size,'tensor')
             # select mixture components according to the encoded mixture weights
-            idx = tf.reshape(tf.multinomial(tf.log(self.enc_mixweight), 1),[-1])
+            idx = tf.reshape(tf.multinomial(self.enc_mixweight, 1),[-1])
             mix_idx = tf.stack([tf.range(sample_size),idx],axis=-1)
             self.encoded = tf.gather_nd(self.mixtures_encoded,mix_idx)
             self.encoded_means = tf.gather_nd(self.enc_mean,mix_idx)
@@ -98,6 +98,7 @@ class WAE(object):
         # --- Objectives, losses, penalties, vizu
         # Compute kernel embedings
         if opts['MMD_gan']:
+            ### MMD injective regu
             # Pz samples
             input_pz = tf.reshape(self.sample_mix_noise,[-1,opts['zdim']])
             f_e_pz = k_encoder(opts, inputs=input_pz,
@@ -119,12 +120,23 @@ class WAE(object):
             weighted_l2sq_qz = tf.multiply(l2sq_pz, self.enc_mixweight)
             MMD_regu_qz = tf.reduce_mean(weighted_l2sq_qz,axis=0)
             MMD_regu_qz = tf.reduce_sum(MMD_regu_qz)
-            # MMD GAN obj
+
             self.MMD_regu = MMD_regu_pz + MMD_regu_qz
+
+            ### MMD reducing feasible set
             sample_pz = tf.reshape(f_e_pz,[-1,opts['nmixtures'],opts['k_outdim']])
             sample_qz = tf.reshape(f_e_qz,[-1,opts['nmixtures'],opts['k_outdim']])
+            E_f_e_pz = tf.reduce_mean(sample_pz, axis=0)
+            E_f_e_pz = tf.reduce_sum(E_f_e_pz,axis=0) / opts['nmixtures']
+            E_f_e_qz = tf.multiply(sample_qz, tf.expand_dims(self.enc_mixweight,axis=-1))
+            E_f_e_qz = tf.reduce_mean(E_f_e_qz, axis=0)
+            E_f_e_qz = tf.reduce_sum(E_f_e_qz,axis=0)
+            one_sided_err = tf.reduce_mean(E_f_e_pz - E_f_e_qz)
+
+            self.one_sided_err = - tf.nn.relu(-one_sided_err)
         else:
-            self.MMD_regu = tf.zeros([0,])
+            self.MMD_regu = None
+            self.one_sided_err = None
             sample_pz = self.sample_mix_noise
             sample_qz = self.mixtures_encoded
         # Compute MMD
@@ -132,12 +144,17 @@ class WAE(object):
         # Compute reconstruction cost
         self.loss_reconstruct = self.reconstruction_loss()
         # final WAE objective
-        self.wae_objective = self.loss_reconstruct \
-                                + self.MMD_lambda * self.MMD_penalty
         if opts['MMD_gan']:
-            self.mmd_objective = self.MMD_penalty \
+            self.wae_objective = self.loss_reconstruct \
+                                + self.MMD_lambda * tf.sqrt(self.MMD_penalty) \
+                                + self.RG_lambda * self.one_sided_err
+
+            self.mmd_objective = tf.sqrt(self.MMD_penalty) \
+                                + self.RG_lambda * self.one_sided_err \
                                 - self.AE_lambda * self.MMD_regu
         else:
+            self.wae_objective = self.loss_reconstruct \
+                                + self.MMD_lambda * tf.sqrt(self.MMD_penalty)
             self.mmd_objective = None
         # Add pretraining
         if opts['e_pretrain']:
@@ -174,6 +191,7 @@ class WAE(object):
         self.is_training = is_training
         self.MMD_lambda = wae_lambda
         self.AE_lambda = opts['ae_lambda']
+        self.RG_lambda = opts['rg_lambda']
 
     def add_savers(self):
         opts = self.opts
@@ -447,7 +465,7 @@ class WAE(object):
 
     def pretrain_encoder(self, data):
         opts = self.opts
-        steps_max = 1000
+        steps_max = 2000
         batch_size = opts['e_pretrain_sample_size']
         for step in range(steps_max):
             train_size = data.num_points
@@ -638,7 +656,7 @@ class WAE(object):
                                     enc_test, enc_means_test,
                                     self.fixed_noise,
                                     sample_gen,
-                                    losses_rec, losses_match,
+                                    losses, losses_rec, losses_match,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
 
         # # Save the final model
@@ -656,7 +674,7 @@ def save_plots(opts, sample_train,sample_test,
                     enc_test, enc_means_test,
                     sample_prior,
                     sample_gen,
-                    losses_rec, losses_match,
+                    losses, losses_rec, losses_match,
                     filename):
     """ Generates and saves the plot of the following layout:
         img1 | img2 | img3
@@ -833,7 +851,7 @@ def save_plots(opts, sample_train,sample_test,
     y = np.log(np.abs(losses_match[::x_step]))
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
-    y = np.log(losses_rec[::x_step] + opts['lambda']*np.array(losses_match[::x_step]))
+    y = np.log(losses[::x_step])
     plt.plot(x, y, linewidth=2, color='black', label='log(wae loss)')
 
     plt.grid(axis='y')
