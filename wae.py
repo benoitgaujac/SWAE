@@ -156,6 +156,14 @@ class WAE(object):
             self.wae_objective = self.loss_reconstruct \
                                 + self.MMD_lambda * tf.sqrt(self.MMD_penalty)
             self.mmd_objective = None
+        # Compute entropy of mixture weights
+        if opts['entropy']:
+            mean_mixweight = tf.reduce_sum(self.enc_mixweight,axis=0)
+            h = tf.multiply(mean_mixweight,tf.log(mean_mixweight))
+            self.H = - tf.reduce_sum(h)
+            self.wae_objective = self.wae_objective - self.H_lambda * self.H
+        else:
+            self.H = None
         # Add pretraining
         if opts['e_pretrain']:
             self.loss_pretrain = self.pretrain_loss()
@@ -192,6 +200,7 @@ class WAE(object):
         self.MMD_lambda = wae_lambda
         self.AE_lambda = opts['ae_lambda']
         self.RG_lambda = opts['rg_lambda']
+        self.H_lambda = opts['h_lambda']
 
     def add_savers(self):
         opts = self.opts
@@ -465,7 +474,7 @@ class WAE(object):
 
     def pretrain_encoder(self, data):
         opts = self.opts
-        steps_max = 200
+        steps_max = 2000
         batch_size = opts['e_pretrain_sample_size']
         for step in range(steps_max):
             train_size = data.num_points
