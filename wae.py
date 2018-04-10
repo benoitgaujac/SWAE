@@ -43,6 +43,7 @@ class WAE(object):
         self.add_model_placeholders()
         self.add_training_placeholders()
         sample_size = tf.shape(self.sample_points,out_type=tf.int64)[0]
+
         self.init_prior()
 
         # --- Transformation ops
@@ -85,10 +86,18 @@ class WAE(object):
             mix_idx = tf.stack([tf.range(sample_size),idx],axis=-1)
             self.encoded = tf.gather_nd(self.mixtures_encoded,mix_idx)
             self.encoded_means = tf.gather_nd(self.enc_mean,mix_idx)
-        # Decode the points encoded above (i.e. reconstruct)
+        # Decode the all points encoded above (i.e. reconstruct)
+        noise = tf.reshape(self.mixtures_encoded,[-1,opts['zdim']])
         self.reconstructed, self.reconstructed_logits = \
-                        decoder(opts, noise=self.encoded,
+                        decoder(opts, noise=noise,
                                 is_training=self.is_training)
+        self.reconstructed = tf.reshape(self.reconstructed,
+                                        [-1,opts['nmixtures']]+self.data_shape)
+        self.reconstructed_logits = tf.reshape(self.reconstructed_logits,
+                                        [-1,opts['nmixtures']]+self.data_shape)
+        # Decode the point sampled from multinomial
+        self.one_recons, self.one_recons = decoder(opts, reuse=True, noise=self.encoded,
+                                                            is_training=self.is_training)
         # Decode the content of sample_noise
         self.decoded, self.decoded_logits = decoder(opts, reuse=True, noise=self.sample_noise,
                                                                 is_training=self.is_training)
@@ -443,20 +452,27 @@ class WAE(object):
 
     def reconstruction_loss(self):
         opts = self.opts
-        real = self.sample_points
+        real = tf.expand_dims(self.sample_points,axis=1)
         reconstr = self.reconstructed
         if opts['cost'] == 'l2':
             # c(x,y) = ||x - y||_2
-            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = .1 * tf.reduce_mean(tf.sqrt(1e-08 + loss))
+            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[2,3,4])
+            loss = tf.sqrt(1e-10 + loss)
+            loss = tf.multiply(loss, self.enc_mixweight)
+            loss = tf.reduce_mean(loss,axis=0)
+            loss = .1 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l2sq':
             # c(x,y) = ||x - y||_2^2
-            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = .05 * tf.reduce_mean(loss)
+            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[2,3,4])
+            loss = tf.multiply(loss, self.enc_mixweight)
+            loss = tf.reduce_mean(loss,axis=0)
+            loss = .05 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
-            loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[1, 2, 3])
-            loss = .1 * tf.reduce_mean(loss)
+            loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[2,3,4])
+            loss = tf.multiply(loss, self.enc_mixweight)
+            loss = tf.reduce_mean(loss,axis=0)
+            loss = .1 * tf.reduce_sum(loss)
         else:
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
@@ -478,20 +494,22 @@ class WAE(object):
         opt = self.optimizer(lr, self.lr_decay)
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+        #pdb.set_trace()
         self.swae_opt = opt.minimize(loss=self.wae_objective,
                                     var_list=encoder_vars + decoder_vars)
         # MMD optimizer
-        if opts['MMD_gan']:
-            k_encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_encoder')
-            k_decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_generator')
-            mmd_lr = opts['mmd_lr']
-            mmd_opt = self.optimizer(mmd_lr, self.lr_decay)
-            grads_and_vars = mmd_opt.compute_gradients(loss=-self.mmd_objective,
-                                    var_list=k_encoder_vars + k_decoder_vars)
-            clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
-            self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
-        else:
-            self.MMD_opt = None
+        if opts['penalty']=='mmd':
+            if opts['MMD_gan']:
+                k_encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_encoder')
+                k_decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_generator')
+                mmd_lr = opts['mmd_lr']
+                mmd_opt = self.optimizer(mmd_lr, self.lr_decay)
+                grads_and_vars = mmd_opt.compute_gradients(loss=-self.mmd_objective,
+                                        var_list=k_encoder_vars + k_decoder_vars)
+                clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
+                self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
+            else:
+                self.MMD_opt = None
         # Pretraining optimizer
         if opts['e_pretrain']:
             pre_opt = self.optimizer(lr)
@@ -651,7 +669,7 @@ class WAE(object):
                                 [self.loss_reconstruct,
                                  self.encoded,
                                  self.encoded_means,
-                                 self.reconstructed,
+                                 self.one_recons,
                                  self.enc_mixweight],
                                 feed_dict={self.sample_points: data.test_data[:self.num_pics],
                                                                     self.is_training: False})
@@ -659,7 +677,7 @@ class WAE(object):
                     # Auto-encoding training images
                     [loss_rec_train, rec_train, mix_train] = self.sess.run(
                                 [self.loss_reconstruct,
-                                 self.reconstructed,
+                                 self.one_recons,
                                  self.enc_mixweight],
                                 feed_dict={self.sample_points: data.data[:self.num_pics],
                                                                 self.is_training: False})
