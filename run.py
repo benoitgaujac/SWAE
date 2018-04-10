@@ -52,7 +52,7 @@ def main():
     if FLAGS.zdim:
         opts['zdim'] = FLAGS.zdim
     if FLAGS.z_test:
-        opts['z_test'] = FLAGS.z_test
+        opts['penalty'] = FLAGS.z_test
     if FLAGS.lambda_schedule:
         opts['lambda_schedule'] = FLAGS.lambda_schedule
     if FLAGS.work_dir:
