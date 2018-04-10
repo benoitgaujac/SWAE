@@ -76,7 +76,6 @@ class WAE(object):
                 self.enc_mixweight = enc_mixweight
                 self.enc_mean = enc_mean
                 self.enc_sigmas = enc_sigmas
-
             # Encoding all mixtures
             self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
                                                 tf.exp(self.enc_sigmas),
@@ -86,77 +85,22 @@ class WAE(object):
             mix_idx = tf.stack([tf.range(sample_size),idx],axis=-1)
             self.encoded = tf.gather_nd(self.mixtures_encoded,mix_idx)
             self.encoded_means = tf.gather_nd(self.enc_mean,mix_idx)
-
         # Decode the points encoded above (i.e. reconstruct)
         self.reconstructed, self.reconstructed_logits = \
                         decoder(opts, noise=self.encoded,
                                 is_training=self.is_training)
-
         # Decode the content of sample_noise
         self.decoded, self.decoded_logits = decoder(opts, reuse=True, noise=self.sample_noise,
                                                                 is_training=self.is_training)
-        # --- Objectives, losses, penalties, vizu
-        # Compute kernel embedings
-        if opts['MMD_gan']:
-            ### MMD injective regu
-            # Pz samples
-            input_pz = tf.reshape(self.sample_mix_noise,[-1,opts['zdim']])
-            f_e_pz = k_encoder(opts, inputs=input_pz,
-                                    is_training=self.is_training)
-            f_d_pz = k_decoder(opts, noise=f_e_pz, output_dim=opts['zdim'],
-                                    is_training=self.is_training)
-            recons_pz = tf.reshape(f_d_pz,[-1,opts['nmixtures'],opts['zdim']])
-            l2sq_pz = tf.reduce_sum(tf.square(self.sample_mix_noise - recons_pz),axis=-1)
-            MMD_regu_pz = tf.reduce_mean(l2sq_pz, axis=0)
-            MMD_regu_pz = tf.reduce_sum(MMD_regu_pz) / opts['nmixtures']
-            # Qz samples
-            input_qz = tf.reshape(self.mixtures_encoded,[-1,opts['zdim']])
-            f_e_qz = k_encoder(opts, inputs=input_qz,
-                            reuse=True,is_training=self.is_training)
-            f_d_qz = k_decoder(opts, noise=f_e_qz, output_dim=opts['zdim'],
-                            reuse=True,is_training=self.is_training)
-            recons_qz = tf.reshape(f_d_qz,[-1,opts['nmixtures'],opts['zdim']])
-            l2sq_qz = tf.reduce_sum(tf.square(self.mixtures_encoded - recons_qz),axis=-1)
-            weighted_l2sq_qz = tf.multiply(l2sq_pz, self.enc_mixweight)
-            MMD_regu_qz = tf.reduce_mean(weighted_l2sq_qz,axis=0)
-            MMD_regu_qz = tf.reduce_sum(MMD_regu_qz)
-
-            self.MMD_regu = MMD_regu_pz + MMD_regu_qz
-
-            ### MMD reducing feasible set
-            sample_pz = tf.reshape(f_e_pz,[-1,opts['nmixtures'],opts['k_outdim']])
-            sample_qz = tf.reshape(f_e_qz,[-1,opts['nmixtures'],opts['k_outdim']])
-            E_f_e_pz = tf.reduce_mean(sample_pz, axis=0)
-            E_f_e_pz = tf.reduce_sum(E_f_e_pz,axis=0) / opts['nmixtures']
-            E_f_e_qz = tf.multiply(sample_qz, tf.expand_dims(self.enc_mixweight,axis=-1))
-            E_f_e_qz = tf.reduce_mean(E_f_e_qz, axis=0)
-            E_f_e_qz = tf.reduce_sum(E_f_e_qz,axis=0)
-            one_sided_err = tf.reduce_mean(E_f_e_pz - E_f_e_qz)
-
-            self.one_sided_err = - tf.nn.relu(-one_sided_err)
-        else:
-            self.MMD_regu = None
-            self.one_sided_err = None
-            sample_pz = self.sample_mix_noise
-            sample_qz = self.mixtures_encoded
-        # Compute MMD
-        self.MMD_penalty = self.matching_penalty(sample_pz,sample_qz)
+        # --- Objectives, losses, penalties, pretraining
         # Compute reconstruction cost
         self.loss_reconstruct = self.reconstruction_loss()
-        # final WAE objective
-        if opts['MMD_gan']:
-            self.wae_objective = self.loss_reconstruct \
-                                + self.MMD_lambda * (tf.sqrt(self.MMD_penalty) \
-                                + self.RG_lambda * self.one_sided_err)
-
-            self.mmd_objective = tf.sqrt(self.MMD_penalty) \
-                                + self.RG_lambda * self.one_sided_err \
-                                - self.AE_lambda * self.MMD_regu
-        else:
-            self.wae_objective = self.loss_reconstruct \
-                                + self.MMD_lambda * tf.sqrt(self.MMD_penalty)
-            self.mmd_objective = None
-        # Compute entropy of mixture weights
+        # Compute matching penalty cost
+        self.penalty = self.matching_penalty(self.sample_mix_noise,self.mixtures_encoded,)
+        # Compute wae obj
+        self.wae_objective = self.loss_reconstruct \
+                            + self.lmbd * self.penalty
+        # Compute entropy of mixture weights if needed
         if opts['entropy']:
             mean_mixweight = tf.reduce_sum(self.enc_mixweight,axis=0)
             h = tf.multiply(mean_mixweight,tf.log(mean_mixweight))
@@ -197,9 +141,7 @@ class WAE(object):
 
         self.lr_decay = decay
         self.is_training = is_training
-        self.MMD_lambda = wae_lambda
-        self.AE_lambda = opts['ae_lambda']
-        self.RG_lambda = opts['rg_lambda']
+        self.lmbd = wae_lambda
         self.H_lambda = opts['h_lambda']
 
     def add_savers(self):
@@ -286,17 +228,74 @@ class WAE(object):
 
     def matching_penalty(self,samples_pz, samples_qz):
         opts = self.opts
-        assert samples_qz.get_shape().as_list()[1]==opts['nmixtures'], \
+        assert samples_qz.get_shape().as_list()[1:]==[opts['nmixtures'],opts['zdim']], \
                                                             'Wrong shape for encodings'
-        assert samples_pz.get_shape().as_list()[1]==opts['nmixtures'], \
+        assert samples_pz.get_shape().as_list()[1:]==[opts['nmixtures'],opts['zdim']], \
                                                 'Wrong shape for samples from prior'
-        if opts['z_test'] == 'mmd':
+        if opts['penalty'] == 'mmd':
             loss_match = self.mmd_penalty(samples_pz, samples_qz)
+        elif opts['penalty'] == 'kl':
+            loss_match = self.kl_penalty(samples_pz)
         else:
-            assert False, 'Unknown penalty %s' % opts['z_test']
+            assert False, 'Unknown penalty %s' % opts['penalty']
         return loss_match
 
     def mmd_penalty(self, sample_pz, sample_qz):
+        opts = self.opts
+        # Compute kernel embedings if MMD_gan
+        if opts['MMD_gan']:
+            ### MMD injective regu
+            # Pz samples
+            input_pz = tf.reshape(self.sample_mix_noise,[-1,opts['zdim']])
+            f_e_pz = k_encoder(opts, inputs=input_pz,
+                                    is_training=self.is_training)
+            f_d_pz = k_decoder(opts, noise=f_e_pz, output_dim=opts['zdim'],
+                                    is_training=self.is_training)
+            recons_pz = tf.reshape(f_d_pz,[-1,opts['nmixtures'],opts['zdim']])
+            l2sq_pz = tf.reduce_sum(tf.square(self.sample_mix_noise - recons_pz),axis=-1)
+            MMD_regu_pz = tf.reduce_mean(l2sq_pz, axis=0)
+            MMD_regu_pz = tf.reduce_sum(MMD_regu_pz) / opts['nmixtures']
+            # Qz samples
+            input_qz = tf.reshape(self.mixtures_encoded,[-1,opts['zdim']])
+            f_e_qz = k_encoder(opts, inputs=input_qz,
+                            reuse=True,is_training=self.is_training)
+            f_d_qz = k_decoder(opts, noise=f_e_qz, output_dim=opts['zdim'],
+                            reuse=True,is_training=self.is_training)
+            recons_qz = tf.reshape(f_d_qz,[-1,opts['nmixtures'],opts['zdim']])
+            l2sq_qz = tf.reduce_sum(tf.square(self.mixtures_encoded - recons_qz),axis=-1)
+            weighted_l2sq_qz = tf.multiply(l2sq_pz, self.enc_mixweight)
+            MMD_regu_qz = tf.reduce_mean(weighted_l2sq_qz,axis=0)
+            MMD_regu_qz = tf.reduce_sum(MMD_regu_qz)
+
+            MMD_regu = MMD_regu_pz + MMD_regu_qz
+            ### MMD reducing feasible set
+            sample_pz = tf.reshape(f_e_pz,[-1,opts['nmixtures'],opts['k_outdim']])
+            sample_qz = tf.reshape(f_e_qz,[-1,opts['nmixtures'],opts['k_outdim']])
+            E_f_e_pz = tf.reduce_mean(sample_pz, axis=0)
+            E_f_e_pz = tf.reduce_sum(E_f_e_pz,axis=0) / opts['nmixtures']
+            E_f_e_qz = tf.multiply(sample_qz, tf.expand_dims(self.enc_mixweight,axis=-1))
+            E_f_e_qz = tf.reduce_mean(E_f_e_qz, axis=0)
+            E_f_e_qz = tf.reduce_sum(E_f_e_qz,axis=0)
+            one_sided_err = tf.reduce_mean(E_f_e_pz - E_f_e_qz)
+            one_sided_err = - tf.nn.relu(-one_sided_err)
+        else:
+            sample_pz = self.sample_mix_noise
+            sample_qz = self.mixtures_encoded
+        # Compute MMD
+        MMD = self.mmd(sample_pz,sample_qz)
+        # MMD penalty and mmd_objective for MMD_GAN
+        if opts['MMD_gan']:
+            MMD_penalty = tf.sqrt(MMD) + opts['rg_lambda'] * one_sided_err
+            self.mmd_objective = tf.sqrt(MMD) \
+                                        + opts['rg_lambda'] * one_sided_err \
+                                        - opts['ae_lambda'] * MMD_regu
+        else:
+            MMD_penalty = tf.sqrt(MMD)
+            self.mmd_objective = None
+
+        return MMD_penalty
+
+    def mmd(self, sample_pz, sample_qz):
         opts = self.opts
         sigma2_p = opts['pz_scale'] ** 2
         kernel = opts['mmd_kernel']
@@ -390,6 +389,34 @@ class WAE(object):
         distances = norm_nk + norm_lm - 2. * dotprod
 
         return distances
+
+    def kl_penalty(self, sample_pz):
+        opts = self.opts
+        samples = tf.expand_dims(sample_pz,axis=-1)
+
+        # Pz term
+        logdet = opts['zdim'] * tf.log(2*pi) + tf.log(tf.reduce_prod(self.pz_covs))
+        square = tf.matmul(
+                        tf.transpose(samples - tf.expand_dims(self.pz_means,axis=-1),perm=[0,1,3,2]),
+                        tf.multiply(samples - tf.expand_dims(self.pz_means,axis=-1),
+                                    tf.expand_dims(self.pz_covs,axis=-1)))
+        square = tf.squeeze(square)
+        log_pz = (logdet - square) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        kl_pz = tf.reduce_mean(log_pz,axis=0)
+        kl_pz = tf.reduce_sum(kl_pz) / opts['nmixtures']
+        # Qz term
+        sigmas = tf.exp(tf.expand_dims(self.enc_sigmas,axis=-1))
+        logdet = opts['zdim'] * tf.log(2*pi) + tf.log(tf.reduce_prod(sigmas,axis=[2,3]))
+        square = tf.matmul(
+                        tf.transpose(samples - tf.expand_dims(self.enc_mean,axis=-1),perm=[0,1,3,2]),
+                        tf.multiply(samples - tf.expand_dims(self.enc_mean,axis=-1),
+                                    sigmas))
+        square = tf.squeeze(square)
+        log_qz = (logdet - square) / 2 + tf.log(self.enc_mixweight)
+        kl_qz = tf.reduce_mean(log_qz,axis=0)
+        kl_qz = tf.reduce_sum(kl_qz) / opts['nmixtures']
+
+        return kl_pz - kl_qz
 
     def pretrain_loss(self):
         opts = self.opts
@@ -537,7 +564,7 @@ class WAE(object):
 
             # Iterate over batches
             for it in range(batches_num):
-                if it % opts['mmd_every'] ==0:
+                if opts['penalty'] == 'mmd' and opts['MMD_gan'] and it % opts['mmd_every'] == 0:
                     # Maximize MMD
                     for Dit in range(opts['mmd_iter']):
                         # Sample batches of data points and Pz noise
@@ -553,7 +580,7 @@ class WAE(object):
                                            self.sample_noise: batch_noise,
                                            self.sample_mix_noise: batch_mix_noise,
                                            self.lr_decay: decay,
-                                           self.MMD_lambda: wae_lambda,
+                                           self.lmbd: wae_lambda,
                                            self.is_training: True})
                         mmd_losses.append(loss)
 
@@ -569,12 +596,12 @@ class WAE(object):
                         [self.swae_opt,
                          self.wae_objective,
                          self.loss_reconstruct,
-                         self.MMD_penalty],
+                         self.penalty],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_noise: batch_noise,
                                    self.sample_mix_noise: batch_mix_noise,
                                    self.lr_decay: decay,
-                                   self.MMD_lambda: wae_lambda,
+                                   self.lmbd: wae_lambda,
                                    self.is_training: True})
 
                 # Update learning rate if necessary
@@ -620,27 +647,27 @@ class WAE(object):
 
                     # Auto-encoding test images
                     [loss_rec_test, enc_test, enc_means_test, rec_test, mix_test] = self.sess.run(
-                            [self.loss_reconstruct,
-                             self.encoded,
-                             self.encoded_means,
-                             self.reconstructed,
-                             self.enc_mixweight],
-                            feed_dict={self.sample_points: data.test_data[:self.num_pics],
-                                                                self.is_training: False})
+                                [self.loss_reconstruct,
+                                 self.encoded,
+                                 self.encoded_means,
+                                 self.reconstructed,
+                                 self.enc_mixweight],
+                                feed_dict={self.sample_points: data.test_data[:self.num_pics],
+                                                                    self.is_training: False})
 
                     # Auto-encoding training images
                     [loss_rec_train, rec_train, mix_train] = self.sess.run(
-                            [self.loss_reconstruct,
-                             self.reconstructed,
-                             self.enc_mixweight],
-                            feed_dict={self.sample_points: data.data[:self.num_pics],
-                                                            self.is_training: False})
+                                [self.loss_reconstruct,
+                                 self.reconstructed,
+                                 self.enc_mixweight],
+                                feed_dict={self.sample_points: data.data[:self.num_pics],
+                                                                self.is_training: False})
 
                     # Random samples generated by the model
                     sample_gen = self.sess.run(
-                            self.decoded,
-                            feed_dict={self.sample_noise: self.fixed_noise,
-                                       self.is_training: False})
+                                self.decoded,
+                                feed_dict={self.sample_noise: self.fixed_noise,
+                                           self.is_training: False})
 
                     # Printing various loss values
                     debug_str = 'EPOCH: %d/%d, BATCH:%d/%d' % (
@@ -652,9 +679,9 @@ class WAE(object):
                     #             losses[-1], loss_rec_test,
                     #             losses_match[-1], mmd_losses[-1])
                     debug_str = 'WAE_LOSS=%.5f, RECON_LOSS_TEST=%.5f, ' \
-                                'MATCH_LOSS=%.5f, MDD_LOSS=%.5f' % (
+                                'MATCH_LOSS=%.5f' % (
                                 losses[-1], loss_rec_test,
-                                losses_match[-1],mmd_losses[-1])
+                                losses_match[-1])
                     logging.error(debug_str)
 
                     # Making plots
