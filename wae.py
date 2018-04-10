@@ -397,7 +397,7 @@ class WAE(object):
         # Pz term
         logdet = opts['zdim'] * tf.log(2*pi) + tf.log(tf.reduce_prod(self.pz_covs))
         sigmu = tf.divide(samples - tf.expand_dims(self.pz_means,axis=-1),
-                                    tf.expand_dims(self.pz_covs,axis=-1)))
+                                    tf.expand_dims(self.pz_covs,axis=-1))
         square = tf.matmul(
                         tf.transpose(samples - tf.expand_dims(self.pz_means,axis=-1),perm=[0,1,3,2]),
                         sigmu)
