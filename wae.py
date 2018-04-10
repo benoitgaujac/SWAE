@@ -401,7 +401,7 @@ class WAE(object):
                         tf.multiply(samples - tf.expand_dims(self.pz_means,axis=-1),
                                     tf.expand_dims(self.pz_covs,axis=-1)))
         square = tf.squeeze(square)
-        log_pz = (logdet - square) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        log_pz = - (logdet + square) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         kl_pz = tf.reduce_mean(log_pz,axis=0)
         kl_pz = tf.reduce_sum(kl_pz) / opts['nmixtures']
         # Qz term
@@ -412,7 +412,7 @@ class WAE(object):
                         tf.multiply(samples - tf.expand_dims(self.enc_mean,axis=-1),
                                     sigmas))
         square = tf.squeeze(square)
-        log_qz = (logdet - square) / 2 + tf.log(self.enc_mixweight)
+        log_qz = - (logdet + square) / 2 + tf.log(self.enc_mixweight)
         kl_qz = tf.reduce_mean(log_qz,axis=0)
         kl_qz = tf.reduce_sum(kl_qz) / opts['nmixtures']
 
