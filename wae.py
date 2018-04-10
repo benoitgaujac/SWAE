@@ -396,10 +396,11 @@ class WAE(object):
 
         # Pz term
         logdet = opts['zdim'] * tf.log(2*pi) + tf.log(tf.reduce_prod(self.pz_covs))
+        sigmu = tf.divide(samples - tf.expand_dims(self.pz_means,axis=-1),
+                                    tf.expand_dims(self.pz_covs,axis=-1)))
         square = tf.matmul(
                         tf.transpose(samples - tf.expand_dims(self.pz_means,axis=-1),perm=[0,1,3,2]),
-                        tf.divide(samples - tf.expand_dims(self.pz_means,axis=-1),
-                                    tf.expand_dims(self.pz_covs,axis=-1)))
+                        sigmu)
         square = tf.squeeze(square)
         log_pz = - (logdet + square) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         kl_pz = tf.reduce_mean(log_pz,axis=0)
@@ -407,10 +408,11 @@ class WAE(object):
         # Qz term
         sigmas = tf.exp(tf.expand_dims(self.enc_sigmas,axis=-1))
         logdet = opts['zdim'] * tf.log(2*pi) + tf.log(tf.reduce_prod(sigmas,axis=[2,3]))
+        sigmu = tf.divide(samples - tf.expand_dims(self.enc_mean,axis=-1),
+                    sigmas)
         square = tf.matmul(
                         tf.transpose(samples - tf.expand_dims(self.enc_mean,axis=-1),perm=[0,1,3,2]),
-                        tf.divide(samples - tf.expand_dims(self.enc_mean,axis=-1),
-                                    sigmas))
+                        sigmu)
         square = tf.squeeze(square)
         log_qz = - (logdet + square) / 2 + tf.log(self.enc_mixweight)
         kl_qz = tf.reduce_mean(log_qz,axis=0)
