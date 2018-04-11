@@ -532,7 +532,7 @@ class WAE(object):
 
     def train(self, data):
         opts = self.opts
-        logging.error('Training SWAE')
+        logging.error('Training SWAE, %s matching penalty' % opts['penalty'])
         losses, losses_rec, losses_match, losses_means  = [], [], [], []
         mmd_losses= []
         batches_num = int(data.num_points / opts['batch_size'])
