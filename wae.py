@@ -488,7 +488,6 @@ class WAE(object):
         opt = self.optimizer(lr, self.lr_decay)
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
-        #pdb.set_trace()
         self.swae_opt = opt.minimize(loss=self.wae_objective,
                                     var_list=encoder_vars + decoder_vars)
         # MMD optimizer
