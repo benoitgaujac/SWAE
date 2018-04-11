@@ -95,7 +95,8 @@ class WAE(object):
         self.reconstructed_logits = tf.reshape(self.reconstructed_logits,
                                         [-1,opts['nmixtures']]+self.data_shape)
         # Decode the point sampled from multinomial
-        self.one_recons = tf.gather_nd(self.reconstructed,mix_idx)
+        self.one_recons, self.one_recons_logits = decoder(opts, reuse=True, noise=self.encoded,
+                                                                is_training=self.is_training)
         # Decode the content of sample_noise
         self.decoded, self.decoded_logits = decoder(opts, reuse=True, noise=self.sample_noise,
                                                                 is_training=self.is_training)
@@ -460,7 +461,13 @@ class WAE(object):
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[2,3,4])
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .05 * tf.reduce_sum(loss)
+            loss = .1 * tf.reduce_sum(loss)
+        elif opts['cost'] == 'l2sq_wrong':
+            # c(x,y) = ||x - y||_2^2
+            real = self.sample_points
+            reconstr = self.one_recons
+            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
+            loss = 0.05 * tf.reduce_mean(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
             loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[2,3,4])
