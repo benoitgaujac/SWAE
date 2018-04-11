@@ -95,8 +95,7 @@ class WAE(object):
         self.reconstructed_logits = tf.reshape(self.reconstructed_logits,
                                         [-1,opts['nmixtures']]+self.data_shape)
         # Decode the point sampled from multinomial
-        self.one_recons, self.one_recons = decoder(opts, reuse=True, noise=self.encoded,
-                                                            is_training=self.is_training)
+        self.one_recons = tf.gather_nd(self.reconstructed,mix_idx)
         # Decode the content of sample_noise
         self.decoded, self.decoded_logits = decoder(opts, reuse=True, noise=self.sample_noise,
                                                                 is_training=self.is_training)
