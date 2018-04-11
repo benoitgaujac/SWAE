@@ -49,7 +49,7 @@ class WAE(object):
         # --- Transformation ops
         # Encode the content of sample_points placeholder
         if opts['e_noise'] in ('deterministic', 'implicit', 'add_noise'):
-            self.enc_mean, self.enc_sigmas, self.enc_mixweight = None, None, None
+            self.enc_mean, self.enc_logsigmas, self.enc_mixweight = None, None, None
             res = encoder(opts, inputs=self.sample_points,
                             is_training=self.is_training)
             if opts['e_noise'] == 'implicit':
@@ -63,23 +63,23 @@ class WAE(object):
                 self.enc_mixweight = enc_mixweight
                 eps = tf.zeros([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
                 self.enc_mean = self.pz_means + eps
-                self.enc_sigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
+                self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
             elif opts['e_means']=='mean':
                 enc_mean, _, enc_mixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
                 self.enc_mixweight = enc_mixweight
                 self.enc_mean = enc_mean
-                self.enc_sigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
+                self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
             elif opts['e_means']=='learnable':
-                enc_mean, enc_sigmas, enc_mixweight = encoder(opts, inputs=self.sample_points,
+                enc_mean, enc_logsigmas, enc_mixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
-                enc_sigmas = tf.clip_by_value(enc_sigmas, -5, 5)
+                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -10, 10)
                 self.enc_mixweight = enc_mixweight
                 self.enc_mean = enc_mean
-                self.enc_sigmas = enc_sigmas
+                self.enc_logsigmas = enc_logsigmas
             # Encoding all mixtures
             self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
-                                                tf.exp(self.enc_sigmas),
+                                                tf.exp(self.enc_logsigmas),
                                                 opts['e_noise'],sample_size,'tensor')
             # select mixture components according to the encoded mixture weights
             idx = tf.reshape(tf.multinomial(self.enc_mixweight, 1),[-1])
@@ -88,9 +88,8 @@ class WAE(object):
             self.encoded_means = tf.gather_nd(self.enc_mean,mix_idx)
         # Decode the all points encoded above (i.e. reconstruct)
         noise = tf.reshape(self.mixtures_encoded,[-1,opts['zdim']])
-        self.reconstructed, self.reconstructed_logits = \
-                        decoder(opts, noise=noise,
-                                is_training=self.is_training)
+        self.reconstructed, self.reconstructed_logits = decoder(opts, noise=noise,
+                                                    is_training=self.is_training)
         self.reconstructed = tf.reshape(self.reconstructed,
                                         [-1,opts['nmixtures']]+self.data_shape)
         self.reconstructed_logits = tf.reshape(self.reconstructed_logits,
@@ -161,7 +160,7 @@ class WAE(object):
         tf.add_to_collection('is_training_ph', self.is_training)
         if self.enc_mean is not None:
             tf.add_to_collection('encoder_mean', self.enc_mean)
-            tf.add_to_collection('encoder_var', self.enc_sigmas)
+            tf.add_to_collection('encoder_var', self.enc_logsigmas)
         if opts['e_noise'] == 'implicit':
             tf.add_to_collection('encoder_A', self.encoder_A)
         tf.add_to_collection('encoder', self.encoded)
@@ -205,8 +204,6 @@ class WAE(object):
                 noises = means + np.multiply(eps,np.sqrt(1e-8+cov))
             else:
                 assert False, 'Unknown latent model.'
-
-
         return noises
 
     def sample_pz(self, num=100, sampling='one_mixture'):
@@ -221,14 +218,12 @@ class WAE(object):
             if sampling == 'one_mixture':
                 mixture = np.random.randint(opts['nmixtures'],size=num)
                 noise = noises[np.arange(num),mixture]
-                #noise = tf.gather_nd(noises,tf.stack([tf.range(num,dtype=tf.int32),mixture],axis=-1))
             elif sampling == 'per_mixture':
                 samples_per_mixture = int(num / opts['nmixtures'])
                 class_i = np.repeat(np.arange(opts['nmixtures']),samples_per_mixture,axis=0)
                 mixture = np.zeros([num,],dtype='int32')
                 mixture[(num % opts['nmixtures']):] = class_i
                 noise = noises[np.arange(num),mixture]
-                #noise = tf.gather_nd(noises,tf.stack([tf.range(num,dtype=tf.int32),mixture],axis=-1))
             elif sampling == 'all_mixtures':
                 noise = noises
         else:
@@ -403,26 +398,26 @@ class WAE(object):
         opts = self.opts
         samples = tf.expand_dims(sample_pz,axis=-1)
         # Pz term
-        logdet = opts['zdim'] * tf.log(2*pi) + tf.log(tf.reduce_prod(self.pz_covs))
+        logdet = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
         sigmu = tf.divide(samples - tf.expand_dims(self.pz_means,axis=-1),
                                     tf.expand_dims(self.pz_covs,axis=-1))
-        square = tf.matmul(
+        musigmu = tf.matmul(
                         tf.transpose(samples - tf.expand_dims(self.pz_means,axis=-1),perm=[0,1,3,2]),
                         sigmu)
-        square = tf.squeeze(square)
-        log_pz = - (logdet + square) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        musigmu = tf.squeeze(musigmu)
+        log_pz = - (logdet + musigmu) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         kl_pz = tf.reduce_mean(log_pz,axis=0)
         kl_pz = tf.reduce_sum(kl_pz) / opts['nmixtures']
         # Qz term
-        sigmas = tf.exp(tf.expand_dims(self.enc_sigmas,axis=-1))
-        logdet = opts['zdim'] * tf.log(2*pi) + tf.log(tf.reduce_prod(sigmas,axis=[2,3]))
+        sigmas = tf.exp(tf.expand_dims(self.enc_logsigmas,axis=-1))
+        logdet = tf.log(tf.reduce_prod(sigmas,axis=[2,3]))# + opts['zdim'] * tf.log(2*pi)
         sigmu = tf.divide(samples - tf.expand_dims(self.enc_mean,axis=-1),
                     sigmas)
-        square = tf.matmul(
+        musigmu = tf.matmul(
                         tf.transpose(samples - tf.expand_dims(self.enc_mean,axis=-1),perm=[0,1,3,2]),
                         sigmu)
-        square = tf.squeeze(square)
-        log_qz = - (logdet + square) / 2 + tf.log(self.enc_mixweight)
+        musigmu = tf.squeeze(musigmu)
+        log_qz = - (logdet + musigmu) / 2 + tf.log(self.enc_mixweight)
         kl_qz = tf.reduce_mean(log_qz,axis=0)
         kl_qz = tf.reduce_sum(kl_qz) / opts['nmixtures']
 
@@ -466,7 +461,7 @@ class WAE(object):
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[2,3,4])
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .05 * tf.reduce_sum(loss)
+            loss = .1 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
             loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[2,3,4])
