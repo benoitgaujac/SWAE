@@ -460,7 +460,7 @@ class WAE(object):
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[2,3,4])
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .1 * tf.reduce_sum(loss)
+            loss = .05 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
             loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[2,3,4])
