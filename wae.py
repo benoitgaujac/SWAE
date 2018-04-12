@@ -335,12 +335,6 @@ class WAE(object):
             self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixweight))
             self.res1 += tf.exp( - distances_pz / 2. / sigma2_k) / (opts['nmixtures']*opts['nmixtures'])
             # Correcting for diagonal terms
-            # Correcting for diagonal terms
-            # self.res1_ddiag = tf.diag_part(tf.transpose(self.res1,perm=(0,1,3,2)))
-            # self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[0,3]))
-            # self.res1 = tf.reduce_sum(self.res1) / (nf * nf - 1) \
-            #         + tf.reduce_sum(self.res1_diag) / (nf * (nf * nf - nf)) \
-            #         - tf.reduce_sum(self.res1_ddiag) / (nf * nf - nf)
             self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[1,2]))
             self.res1 = (tf.reduce_sum(self.res1)\
                     - tf.reduce_sum(self.res1_diag)) / (nf * nf - nf)
@@ -363,11 +357,6 @@ class WAE(object):
                 res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixweight))
                 res1 += (C / (C + distances_pz)) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
-                # self.res1_ddiag = tf.diag_part(tf.transpose(self.res1,perm=(0,1,3,2)))
-                # self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[0,3]))
-                # self.res1 = tf.reduce_sum(self.res1) / (nf * nf - 1) \
-                #         + tf.reduce_sum(self.res1_diag) / (nf * (nf * nf - nf)) \
-                #         - tf.reduce_sum(self.res1_ddiag) / (nf * nf - nf)
                 res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
                 res1 = (tf.reduce_sum(res1)\
                         - tf.reduce_sum(res1_diag)) / (nf * nf - nf)
@@ -436,17 +425,18 @@ class WAE(object):
         mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=0, keepdims=True)
         mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))
         # Covariances
-        centered_pz = self.sample_mix_noise - mean_pz
-        cov_pz = tf.matmul(centered_pz, tf.transpose(centered_pz,perm=[0,2,1]),
-                            transpose_a=False)
-        cov_pz /= opts['e_pretrain_sample_size'] - 1.
-        centered_qz = self.mixtures_encoded - mean_qz
-        cov_qz = tf.matmul(centered_qz, tf.transpose(centered_qz,perm=[0,2,1]),
-                            transpose_a=False)
-        cov_qz /= opts['e_pretrain_sample_size'] - 1.
-        cov_loss = tf.reduce_sum(tf.square(cov_pz - cov_qz))
-
-        return mean_loss + cov_loss
+        # centered_pz = self.sample_mix_noise - mean_pz
+        # cov_pz = tf.matmul(centered_pz, tf.transpose(centered_pz,perm=[0,2,1]),
+        #                     transpose_a=False)
+        # cov_pz /= opts['e_pretrain_sample_size'] - 1.
+        # centered_qz = self.mixtures_encoded - mean_qz
+        # cov_qz = tf.matmul(centered_qz, tf.transpose(centered_qz,perm=[0,2,1]),
+        #                     transpose_a=False)
+        # cov_qz /= opts['e_pretrain_sample_size'] - 1.
+        # cov_loss = tf.reduce_sum(tf.square(cov_pz - cov_qz))
+        #
+        # return mean_loss + cov_loss
+        return mean_loss
 
     def reconstruction_loss(self):
         opts = self.opts
