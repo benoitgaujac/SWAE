@@ -315,9 +315,9 @@ class WAE(object):
         """
         norms_pz = tf.reduce_sum(tf.square(sample_pz), axis=-1, keepdims=True)
         norms_qz = tf.reduce_sum(tf.square(sample_qz), axis=-1, keepdims=True)
-        distances_pz = self.square_dist(sample_pz, norms_pz, sample_pz, norms_pz, opts['pz'])
-        distances_qz = self.square_dist(sample_qz, norms_qz, sample_qz, norms_qz, opts['e_noise'])
-        distances = self.square_dist(sample_qz, norms_qz, sample_pz, norms_pz, opts['e_noise'])
+        distances_pz = self.square_dist(sample_pz, norms_pz, sample_pz, norms_pz)
+        distances_qz = self.square_dist(sample_qz, norms_qz, sample_qz, norms_qz)
+        distances = self.square_dist(sample_qz, norms_qz, sample_pz, norms_pz)
 
         if kernel == 'RBF':
             # Median heuristic for the sigma^2 of Gaussian kernel
@@ -373,7 +373,7 @@ class WAE(object):
 
         return stat
 
-    def square_dist(self,sample_x, norms_x, sample_y, norms_y, distr):
+    def square_dist(self,sample_x, norms_x, sample_y, norms_y):
         # assert sample_x.get_shape().as_list() == sample_y.get_shape().as_list(), \
         #     'Prior samples need to have same shape as posterior samples'
         # assert len(sample_x.get_shape().as_list()) == 4, \
@@ -469,7 +469,7 @@ class WAE(object):
             loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .1 * tf.reduce_sum(loss)
+            loss = 1. * tf.reduce_sum(loss)
         else:
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
