@@ -82,18 +82,21 @@ class WAE(object):
                                                 tf.exp(self.enc_logsigmas),
                                                 opts['e_noise'],sample_size,'tensor')
             # select mixture components according to the encoded mixture weights
-            idx = tf.reshape(tf.multinomial(self.enc_mixweight, 1),[-1])
-            mix_idx = tf.stack([tf.range(sample_size),idx],axis=-1)
-            self.encoded = tf.gather_nd(self.mixtures_encoded,mix_idx)
+            idx = tf.reshape(tf.multinomial(tf.log(self.enc_mixweight), 1),[-1])
+            rng = tf.range(sample_size)
+            zero = tf.zeros([tf.cast(sample_size,dtype=tf.int32)],dtype=tf.int64)
+            mix_idx = tf.stack([rng,idx],axis=-1)
             self.encoded_means = tf.gather_nd(self.enc_mean,mix_idx)
+            mix_idx = tf.stack([rng,idx,zero],axis=-1)
+            self.encoded = tf.gather_nd(self.mixtures_encoded,mix_idx)
         # Decode the all points encoded above (i.e. reconstruct)
         noise = tf.reshape(self.mixtures_encoded,[-1,opts['zdim']])
         self.reconstructed, self.reconstructed_logits = decoder(opts, noise=noise,
                                                     is_training=self.is_training)
         self.reconstructed = tf.reshape(self.reconstructed,
-                                        [-1,opts['nmixtures']]+self.data_shape)
+                                        [-1,opts['nmixtures'],opts['nsamples']]+self.data_shape)
         self.reconstructed_logits = tf.reshape(self.reconstructed_logits,
-                                        [-1,opts['nmixtures']]+self.data_shape)
+                                        [-1,opts['nmixtures'],opts['nsamples']]+self.data_shape)
         # Decode the point sampled from multinomial
         self.one_recons, self.one_recons_logits = decoder(opts, reuse=True, noise=self.encoded,
                                                                 is_training=self.is_training)
@@ -135,7 +138,7 @@ class WAE(object):
         noise = tf.placeholder(
             tf.float32, [None] + [opts['zdim']], name='noise_ph')
         mix_noise = tf.placeholder(
-            tf.float32, [None] + [opts['nmixtures'],opts['zdim']], name='mix_noise_ph')
+            tf.float32, [None] + [opts['nmixtures'],opts['nsamples'],opts['zdim']], name='mix_noise_ph')
 
         self.sample_points = data
         self.sample_noise = noise
@@ -192,15 +195,19 @@ class WAE(object):
             assert False, 'Unknown latent model.'
 
     def sample_mixtures(self,means,cov,distr,num=100,tpe='numpy'):
+        opts = self.opts
         if tpe=='tensor':
             if distr == 'mixture':
-                eps = tf.random_normal([num, self.opts['nmixtures'],self.opts['zdim']],dtype=tf.float32)
+                means = tf.expand_dims(means,axis=2)
+                cov = tf.expand_dims(cov,axis=2)
+                eps = tf.random_normal([num,opts['nmixtures'],opts['nsamples'],opts['zdim']],dtype=tf.float32)
                 noises = means + tf.multiply(eps,tf.sqrt(1e-8+cov))
             else:
                 assert False, 'Unknown latent model.'
         elif tpe=='numpy':
             if distr == 'mixture':
-                eps = np.random.normal(0.,1.,(num, self.opts['nmixtures'],self.opts['zdim'])).astype(np.float32)
+                means = np.expand_dims(means,axis=1)
+                eps = np.random.normal(0.,1.,(num, opts['nmixtures'],opts['nsamples'],opts['zdim'])).astype(np.float32)
                 noises = means + np.multiply(eps,np.sqrt(1e-8+cov))
             else:
                 assert False, 'Unknown latent model.'
@@ -217,13 +224,13 @@ class WAE(object):
             noises = self.sample_mixtures(self.pz_means,self.pz_covs,distr,num)
             if sampling == 'one_mixture':
                 mixture = np.random.randint(opts['nmixtures'],size=num)
-                noise = noises[np.arange(num),mixture]
+                noise = noises[np.arange(num),mixture,0]
             elif sampling == 'per_mixture':
                 samples_per_mixture = int(num / opts['nmixtures'])
                 class_i = np.repeat(np.arange(opts['nmixtures']),samples_per_mixture,axis=0)
                 mixture = np.zeros([num,],dtype='int32')
                 mixture[(num % opts['nmixtures']):] = class_i
-                noise = noises[np.arange(num),mixture]
+                noise = noises[np.arange(num),mixture,0]
             elif sampling == 'all_mixtures':
                 noise = noises
         else:
@@ -232,12 +239,8 @@ class WAE(object):
 
     def matching_penalty(self,samples_pz, samples_qz):
         opts = self.opts
-        assert samples_qz.get_shape().as_list()[1:]==[opts['nmixtures'],opts['zdim']], \
-                                                            'Wrong shape for encodings'
-        assert samples_pz.get_shape().as_list()[1:]==[opts['nmixtures'],opts['zdim']], \
-                                                'Wrong shape for samples from prior'
         if opts['penalty'] == 'mmd':
-            loss_match = self.mmd_penalty(samples_pz, samples_qz)
+            loss_match = self.mmd_penalty(samples_pz[:,:,0], samples_qz[:,:,0])
         elif opts['penalty'] == 'kl':
             loss_match = self.kl_penalty(samples_pz)
         else:
@@ -246,27 +249,29 @@ class WAE(object):
 
     def mmd_penalty(self, sample_pz, sample_qz):
         opts = self.opts
+        #pdb.set_trace()
         # Compute kernel embedings if MMD_gan
         if opts['MMD_gan']:
+            assert False, 'To implement'
             ### MMD injective regu
             # Pz samples
-            input_pz = tf.reshape(self.sample_mix_noise,[-1,opts['zdim']])
+            input_pz = tf.reshape(sample_pz,[-1,opts['zdim']])
             f_e_pz = k_encoder(opts, inputs=input_pz,
                                     is_training=self.is_training)
             f_d_pz = k_decoder(opts, noise=f_e_pz, output_dim=opts['zdim'],
                                     is_training=self.is_training)
             recons_pz = tf.reshape(f_d_pz,[-1,opts['nmixtures'],opts['zdim']])
-            l2sq_pz = tf.reduce_sum(tf.square(self.sample_mix_noise - recons_pz),axis=-1)
+            l2sq_pz = tf.reduce_sum(tf.square(sample_pz - recons_pz),axis=-1)
             MMD_regu_pz = tf.reduce_mean(l2sq_pz, axis=0)
             MMD_regu_pz = tf.reduce_sum(MMD_regu_pz) / opts['nmixtures']
             # Qz samples
-            input_qz = tf.reshape(self.mixtures_encoded,[-1,opts['zdim']])
+            input_qz = tf.reshape(sample_qz,[-1,opts['zdim']])
             f_e_qz = k_encoder(opts, inputs=input_qz,
                             reuse=True,is_training=self.is_training)
             f_d_qz = k_decoder(opts, noise=f_e_qz, output_dim=opts['zdim'],
                             reuse=True,is_training=self.is_training)
             recons_qz = tf.reshape(f_d_qz,[-1,opts['nmixtures'],opts['zdim']])
-            l2sq_qz = tf.reduce_sum(tf.square(self.mixtures_encoded - recons_qz),axis=-1)
+            l2sq_qz = tf.reduce_sum(tf.square(sample_qz - recons_qz),axis=-1)
             weighted_l2sq_qz = tf.multiply(l2sq_pz, self.enc_mixweight)
             MMD_regu_qz = tf.reduce_mean(weighted_l2sq_qz,axis=0)
             MMD_regu_qz = tf.reduce_sum(MMD_regu_qz)
@@ -282,9 +287,6 @@ class WAE(object):
             E_f_e_qz = tf.reduce_sum(E_f_e_qz,axis=0)
             one_sided_err = tf.reduce_mean(E_f_e_pz - E_f_e_qz)
             one_sided_err = - tf.nn.relu(-one_sided_err)
-        else:
-            sample_pz = self.sample_mix_noise
-            sample_qz = self.mixtures_encoded
         # Compute MMD
         MMD = self.mmd(sample_pz,sample_qz)
         # MMD penalty and mmd_objective for MMD_GAN
@@ -312,7 +314,7 @@ class WAE(object):
         TODO : add case where qz is different from pz: pz=mixture, qz=gaussian
         """
         norms_pz = tf.reduce_sum(tf.square(sample_pz), axis=-1, keepdims=True)
-        norms_qz = tf.reduce_sum(tf.square(sample_qz), axis=1, keepdims=True)
+        norms_qz = tf.reduce_sum(tf.square(sample_qz), axis=-1, keepdims=True)
         distances_pz = self.square_dist(sample_pz, norms_pz, sample_pz, norms_pz, opts['pz'])
         distances_qz = self.square_dist(sample_qz, norms_qz, sample_qz, norms_qz, opts['e_noise'])
         distances = self.square_dist(sample_qz, norms_qz, sample_pz, norms_pz, opts['e_noise'])
@@ -383,10 +385,10 @@ class WAE(object):
         return stat
 
     def square_dist(self,sample_x, norms_x, sample_y, norms_y, distr):
-        assert sample_x.get_shape().as_list() == sample_x.get_shape().as_list(), \
-            'Prior samples need to have same shape as posterior samples'
-        assert len(sample_x.get_shape().as_list()) == 3, \
-            'Prior samples need to have shape [batch,nmixtures,zdim] for mixture model'
+        # assert sample_x.get_shape().as_list() == sample_y.get_shape().as_list(), \
+        #     'Prior samples need to have same shape as posterior samples'
+        # assert len(sample_x.get_shape().as_list()) == 4, \
+        #     'Prior samples need to have shape [batch,nmixtures,nsamples,zdim] for mixture model'
         dotprod = tf.tensordot(sample_x, tf.transpose(sample_y), [[-1],[0]])
         norm_nk = tf.tensordot(norms_x,tf.ones(tf.shape(tf.transpose(norms_x))),[[-1],[0]])
         norm_lm = tf.tensordot(tf.ones(tf.shape(norms_y)),tf.transpose(norms_y),[[-1],[0]])
@@ -398,28 +400,29 @@ class WAE(object):
         opts = self.opts
         samples = tf.expand_dims(sample_pz,axis=-1)
         # Pz term
+        pz_means = tf.expand_dims(tf.expand_dims(self.pz_means,axis=1),axis=-1)
+        pz_covs = tf.expand_dims(self.pz_covs,axis=-1)
         logdet = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
-        sigmu = tf.divide(samples - tf.expand_dims(self.pz_means,axis=-1),
-                                    tf.expand_dims(self.pz_covs,axis=-1))
+        sigmu = tf.divide(samples - pz_means,pz_covs)
         musigmu = tf.matmul(
-                        tf.transpose(samples - tf.expand_dims(self.pz_means,axis=-1),perm=[0,1,3,2]),
+                        tf.transpose(samples - pz_means,perm=[0,1,2,4,3]),
                         sigmu)
         musigmu = tf.squeeze(musigmu)
         log_pz = - (logdet + musigmu) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
-        kl_pz = tf.reduce_mean(log_pz,axis=0)
-        kl_pz = tf.reduce_sum(kl_pz) / opts['nmixtures']
+        kl_pz = tf.reduce_mean(log_pz)
+        #kl_pz = tf.reduce_sum(kl_pz) / opts['nmixtures']
         # Qz term
-        sigmas = tf.exp(tf.expand_dims(self.enc_logsigmas,axis=-1))
-        logdet = tf.log(tf.reduce_prod(sigmas,axis=[2,3]))# + opts['zdim'] * tf.log(2*pi)
-        sigmu = tf.divide(samples - tf.expand_dims(self.enc_mean,axis=-1),
-                    sigmas)
+        qz_means = tf.expand_dims(tf.expand_dims(self.enc_mean,axis=2),axis=-1)
+        qz_covs = tf.expand_dims(tf.expand_dims(tf.exp(self.enc_logsigmas),axis=2),axis=-1)
+        logdet = tf.log(tf.reduce_prod(qz_covs,axis=[3,4]))# + opts['zdim'] * tf.log(2*pi)
+        sigmu = tf.divide(samples - qz_means,qz_covs)
         musigmu = tf.matmul(
-                        tf.transpose(samples - tf.expand_dims(self.enc_mean,axis=-1),perm=[0,1,3,2]),
+                        tf.transpose(samples - qz_means,perm=[0,1,2,4,3]),
                         sigmu)
         musigmu = tf.squeeze(musigmu)
-        log_qz = - (logdet + musigmu) / 2 + tf.log(self.enc_mixweight)
-        kl_qz = tf.reduce_mean(log_qz,axis=0)
-        kl_qz = tf.reduce_sum(kl_qz) / opts['nmixtures']
+        log_qz = - (logdet + musigmu) / 2 + tf.log(tf.expand_dims(self.enc_mixweight,axis=-1))
+        kl_qz = tf.reduce_mean(log_qz)
+        #kl_qz = tf.reduce_sum(kl_qz) / opts['nmixtures']
 
         return kl_pz - kl_qz
 
@@ -447,30 +450,33 @@ class WAE(object):
 
     def reconstruction_loss(self):
         opts = self.opts
-        real = tf.expand_dims(self.sample_points,axis=1)
+        real = tf.expand_dims(tf.expand_dims(self.sample_points,axis=1),axis=1)
         reconstr = self.reconstructed
         if opts['cost'] == 'l2':
             # c(x,y) = ||x - y||_2
-            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[2,3,4])
+            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[3,4,5])
             loss = tf.sqrt(1e-10 + loss)
+            loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .1 * tf.reduce_sum(loss)
+            loss = 1. * tf.reduce_sum(loss)
         elif opts['cost'] == 'l2sq':
             # c(x,y) = ||x - y||_2^2
-            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[2,3,4])
+            loss = tf.reduce_sum(tf.square(real - reconstr), axis=[3,4,5])
+            loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .1 * tf.reduce_sum(loss)
+            loss = 1. * tf.reduce_sum(loss)
         elif opts['cost'] == 'l2sq_wrong':
             # c(x,y) = ||x - y||_2^2
             real = self.sample_points
             reconstr = self.one_recons
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = 0.05 * tf.reduce_mean(loss)
+            loss = 1. * tf.reduce_mean(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
-            loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[2,3,4])
+            loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[3,4,5])
+            loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
             loss = .1 * tf.reduce_sum(loss)
@@ -697,10 +703,10 @@ class WAE(object):
                     #             'MATCH_LOSS=%.5f, MMD_LOSS=%.5f,' % (
                     #             losses[-1], loss_rec_test,
                     #             losses_match[-1], mmd_losses[-1])
-                    debug_str = 'WAE_LOSS=%.5f, RECON_LOSS_TEST=%.5f, ' \
-                                'MATCH_LOSS=%.5f' % (
-                                losses[-1], loss_rec_test,
-                                losses_match[-1])
+                    debug_str = 'WAE_LOSS=%.5f, MATCH_LOSS=%.5f, ' \
+                                'RECON_LOSS=%.5f, RECON_LOSS_TEST=%.5f' % (
+                                losses[-1], losses_match[-1],
+                                losses_rec[-1], loss_rec_test)
                     logging.error(debug_str)
 
                     # Making plots
