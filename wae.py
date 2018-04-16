@@ -482,6 +482,9 @@ class WAE(object):
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
         ae_vars = encoder_vars + decoder_vars
+        grads_and_vars = opt.compute_gradients(loss=self.wae_objective,
+                                    var_list=ae_vars)
+        self.grad = [gv[0] for gv in grads_and_vars]
         self.swae_opt = opt.minimize(loss=self.wae_objective,
                                     var_list=ae_vars)
         # MMD optimizer
@@ -599,8 +602,9 @@ class WAE(object):
                 batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match, means, sigmas, mix, res1, res2] = self.sess.run(
+                [_, grad, loss, loss_rec, loss_match, means, sigmas, mix, res1, res2] = self.sess.run(
                         [self.swae_opt,
+                         self.grad,
                          self.wae_objective,
                          self.loss_reconstruct,
                          self.penalty,
@@ -628,6 +632,10 @@ class WAE(object):
                 print("")
                 logging.error('res1: %f' % res1)
                 logging.error('res2: %f' % res2)
+                print("")
+                max_l = [np.amax(t) for t in grad]
+                print(max_l)
+
 
                 # Update learning rate if necessary
                 if opts['lr_schedule'] == 'plateau':
