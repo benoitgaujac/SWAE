@@ -599,12 +599,12 @@ class WAE(object):
                 batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match, mix, res1, res2] = self.sess.run(
+                [_, loss, loss_rec, loss_match, mix, res1, res2, means, sigmas] = self.sess.run(
                         [self.swae_opt,
                          self.wae_objective,
                          self.loss_reconstruct,
                          self.penalty,
-                         self.enc_means,
+                         self.enc_mean,
                          self.enc_logsigmas,
                          self.debug_mix,
                          self.res1,
@@ -619,8 +619,13 @@ class WAE(object):
 
                 mix_print = np.amax(mix,axis=0)
                 print(mix_print)
+                mea_print = np.amax(means)
+                print(mea_print)
+                sig_print = np.amax(sigmas)
+                print(sig_print)
                 logging.error('res1: %f' % res1)
                 logging.error('res2: %f' % res2)
+
                 # Update learning rate if necessary
                 if opts['lr_schedule'] == 'plateau':
                     # First 30 epochs do nothing
