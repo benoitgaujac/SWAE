@@ -67,6 +67,7 @@ class WAE(object):
             elif opts['e_means']=='mean':
                 enc_mean, _, enc_logmixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
+                self.debug_mix = enc_logmixweight
                 self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
                 self.enc_mean = enc_mean
                 self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
