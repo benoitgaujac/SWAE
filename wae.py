@@ -78,7 +78,7 @@ class WAE(object):
                 enc_logmixweight = tf.clip_by_value(enc_logmixweight, -50, 50)
                 self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
                 self.enc_mean = enc_mean
-                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -5, 5)
+                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -10, 10)
                 self.enc_logsigmas = enc_logsigmas
             # Encoding all mixtures
             self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
@@ -112,7 +112,7 @@ class WAE(object):
         # Compute reconstruction cost
         self.loss_reconstruct = self.reconstruction_loss()
         # Compute matching penalty cost
-        self.penalty = self.matching_penalty(self.sample_mix_noise[:,:,0],self.mixtures_encoded[:,:,0])
+        self.penalty = self.matching_penalty(self.sample_mix_noise[:,:,-1],self.mixtures_encoded[:,:,-1])
         # Compute wae obj
         self.wae_objective = self.loss_reconstruct \
                             + self.lmbd * self.penalty
@@ -254,7 +254,6 @@ class WAE(object):
 
     def mmd_penalty(self, sample_pz, sample_qz):
         opts = self.opts
-        #pdb.set_trace()
         # Compute kernel embedings if MMD_gan
         if opts['MMD_gan']:
             assert False, 'To implement'
@@ -315,9 +314,6 @@ class WAE(object):
         nf = tf.cast(n, tf.float32)
         half_size = tf.cast((n * n - n) / 2,tf.int32)
 
-        """
-        TODO : add case where qz is different from pz: pz=mixture, qz=gaussian
-        """
         norms_pz = tf.reduce_sum(tf.square(sample_pz), axis=-1, keepdims=True)
         norms_qz = tf.reduce_sum(tf.square(sample_qz), axis=-1, keepdims=True)
         distances_pz = self.square_dist(sample_pz, norms_pz, sample_pz, norms_pz)
@@ -362,17 +358,16 @@ class WAE(object):
                 res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixweight))
                 res1 += (C / (C + distances_pz)) / (opts['nmixtures']*opts['nmixtures'])
                 # Correcting for diagonal terms
-                res1_diag = tf.diag_part(tf.reduce_sum(res1,axis=[1,2]))
-                res1 = (tf.reduce_sum(res1)\
-                        - tf.reduce_sum(res1_diag)) / (nf * nf - nf)
+                res1_diag = tf.trace(tf.reduce_sum(res1,axis=[1,2]))
+                res1 = (tf.reduce_sum(res1) - res1_diag) / (nf * nf - nf)
                 self.res1 += res1
                 # Cross term of the MMD
                 res2 = C / (C + distances)
                 res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixweight))
                 res2 = tf.transpose(res2) / opts['nmixtures']
-                res2 = tf.reduce_sum(res2) * 2. / (nf * nf)
+                res2 = tf.reduce_sum(res2) / (nf * nf)
                 self.res2 += res2
-                stat += res1 - res2
+                stat += res1 - 2. * res2
         else:
             raise ValueError('%s Unknown kernel' % kernel)
 
@@ -488,19 +483,16 @@ class WAE(object):
         self.swae_opt = opt.minimize(loss=self.wae_objective,
                                     var_list=ae_vars)
         # MMD optimizer
-        if opts['penalty']=='mmd':
-            if opts['MMD_gan']:
-                k_encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_encoder')
-                k_decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_generator')
-                gan_vars = k_encoder_vars + k_decoder_vars
-                mmd_lr = opts['mmd_lr']
-                mmd_opt = self.optimizer(mmd_lr, self.lr_decay)
-                grads_and_vars = mmd_opt.compute_gradients(loss=-self.mmd_objective,
-                                        var_list=gan_vars)
-                clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
-                self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
-            else:
-                self.MMD_opt = None
+        if opts['penalty']=='mmd' and opts['MMD_gan']:
+            k_encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_encoder')
+            k_decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_generator')
+            gan_vars = k_encoder_vars + k_decoder_vars
+            mmd_lr = opts['mmd_lr']
+            mmd_opt = self.optimizer(mmd_lr, self.lr_decay)
+            grads_and_vars = mmd_opt.compute_gradients(loss=-self.mmd_objective,
+                                    var_list=gan_vars)
+            clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
+            self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
         # Pretraining optimizer
         if opts['e_pretrain']:
             pre_opt = self.optimizer(lr)
@@ -535,7 +527,6 @@ class WAE(object):
         train_size = data.num_points
         self.num_pics = opts['plot_num_pics']
         self.fixed_noise = self.sample_pz(opts['plot_num_pics'],sampling = 'per_mixture')
-
         self.sess.run(self.init)
 
         if opts['e_pretrain']:
@@ -582,12 +573,10 @@ class WAE(object):
                                             opts['batch_size'],
                                             replace=False)
                         batch_images = data.data[data_ids].astype(np.float32)
-                        batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                         batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                         # Update encoder and decoder
                         [_, loss] = self.sess.run([self.MMD_opt,self.mmd_objective],
                                 feed_dict={self.sample_points: batch_images,
-                                           self.sample_noise: batch_noise,
                                            self.sample_mix_noise: batch_mix_noise,
                                            self.lr_decay: decay,
                                            self.lmbd: wae_lambda,
@@ -599,28 +588,33 @@ class WAE(object):
                                     opts['batch_size'],
                                     replace=False)
                 batch_images = data.data[data_ids].astype(np.float32)
-                batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, grad, loss, loss_rec, loss_match, means, sigmas, mix, res1, res2] = self.sess.run(
+                [_, loss, loss_rec, loss_match] = self.sess.run(
                         [self.swae_opt,
-                         self.grad,
                          self.wae_objective,
                          self.loss_reconstruct,
-                         self.penalty,
-                         self.enc_mean,
-                         self.enc_logsigmas,
-                         self.debug_mix,
-                         self.res1,
-                         self.res2],
+                         self.penalty],
                         feed_dict={self.sample_points: batch_images,
-                                   self.sample_noise: batch_noise,
                                    self.sample_mix_noise: batch_mix_noise,
                                    self.lr_decay: decay,
                                    self.lmbd: wae_lambda,
                                    self.is_training: True})
 
-
+                # [_, grad, loss, loss_rec, loss_match, means, sigmas, mix] = self.sess.run(
+                #         [self.swae_opt,
+                #          self.grad,
+                #          self.wae_objective,
+                #          self.loss_reconstruct,
+                #          self.penalty,
+                #          self.enc_mean,
+                #          self.enc_logsigmas,
+                #          self.debug_mix],
+                #         feed_dict={self.sample_points: batch_images,
+                #                    self.sample_mix_noise: batch_mix_noise,
+                #                    self.lr_decay: decay,
+                #                    self.lmbd: wae_lambda,
+                #                    self.is_training: True})
                 # mix_print = np.amax(mix,axis=0)
                 # print(mix_print)
                 # print("")
@@ -689,9 +683,8 @@ class WAE(object):
                                                                     self.is_training: False})
 
                     # Auto-encoding training images
-                    [loss_rec_train, rec_train, mix_train] = self.sess.run(
-                                [self.loss_reconstruct,
-                                 self.one_recons,
+                    [rec_train, mix_train] = self.sess.run(
+                                [self.one_recons,
                                  self.enc_mixweight],
                                 feed_dict={self.sample_points: data.data[:self.num_pics],
                                                                 self.is_training: False})
@@ -707,10 +700,6 @@ class WAE(object):
                                 epoch + 1, opts['epoch_num'],
                                 it + 1, batches_num)
                     logging.error(debug_str)
-                    # debug_str = 'WAE_LOSS=%.5f, RECON_LOSS_TEST=%.5f, ' \
-                    #             'MATCH_LOSS=%.5f, MMD_LOSS=%.5f,' % (
-                    #             losses[-1], loss_rec_test,
-                    #             losses_match[-1], mmd_losses[-1])
                     debug_str = 'LOSS=%.5f, MATCH=%.5f, ' \
                                 'RECONS=%.5f, RECONS_TEST=%.5f' % (
                                 losses[-1], losses_match[-1],
