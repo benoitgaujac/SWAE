@@ -82,7 +82,7 @@ class WAE(object):
                                                 tf.exp(self.enc_logsigmas),
                                                 opts['e_noise'],sample_size,'tensor')
             # select mixture components according to the encoded mixture weights
-            idx = tf.reshape(tf.multinomial(tf.log(self.enc_mixweight), 1),[-1])
+            idx = tf.reshape(tf.multinomial(self.enc_mixweight, 1),[-1])
             rng = tf.range(sample_size)
             zero = tf.zeros([tf.cast(sample_size,dtype=tf.int32)],dtype=tf.int64)
             mix_idx = tf.stack([rng,idx],axis=-1)
