@@ -99,8 +99,10 @@ class WAE(object):
         self.reconstructed_logits = tf.reshape(self.reconstructed_logits,
                                         [-1,opts['nmixtures'],opts['nsamples']]+self.data_shape)
         # Decode the point sampled from multinomial
-        self.one_recons, self.one_recons_logits = decoder(opts, reuse=True, noise=self.encoded,
-                                                                is_training=self.is_training)
+        self.one_recons = tf.gather_nd(self.reconstructed,mix_idx)
+        self.one_recons_logits = tf.gather_nd(self.reconstructed_logits,mix_idx)
+        # self.one_recons, self.one_recons_logits = decoder(opts, reuse=True, noise=self.encoded,
+        #                                                         is_training=False)
         # Decode the content of sample_noise
         self.decoded, self.decoded_logits = decoder(opts, reuse=True, noise=self.sample_noise,
                                                                 is_training=self.is_training)
@@ -593,12 +595,14 @@ class WAE(object):
                 batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match, mix] = self.sess.run(
+                [_, loss, loss_rec, loss_match, mix, res1, res2] = self.sess.run(
                         [self.swae_opt,
                          self.wae_objective,
                          self.loss_reconstruct,
                          self.penalty,
-                         self.debug_mix],
+                         self.debug_mix,
+                         self.res1,
+                         self.res2],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_noise: batch_noise,
                                    self.sample_mix_noise: batch_mix_noise,
@@ -609,6 +613,8 @@ class WAE(object):
 
                 mix_print = np.amax(mix,axis=0)
                 print(mix_print)
+                logging.error('res1: %f' res1)
+                logging.error('res2: %f' res2)
                 # Update learning rate if necessary
                 if opts['lr_schedule'] == 'plateau':
                     # First 30 epochs do nothing
