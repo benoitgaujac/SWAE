@@ -58,23 +58,24 @@ class WAE(object):
                 self.encoded = res
         elif opts['e_noise'] in ('gaussian', 'mixture'):
             if opts['e_means']=='fixed':
-                _, _, enc_mixweight = encoder(opts, inputs=self.sample_points,
+                _, _, enc_logmixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
-                self.enc_mixweight = enc_mixweight
+                self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
                 eps = tf.zeros([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
                 self.enc_mean = self.pz_means + eps
                 self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
             elif opts['e_means']=='mean':
-                enc_mean, _, enc_mixweight = encoder(opts, inputs=self.sample_points,
+                enc_mean, _, enc_logmixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
-                self.enc_mixweight = enc_mixweight
+                self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
                 self.enc_mean = enc_mean
                 self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
             elif opts['e_means']=='learnable':
-                enc_mean, enc_logsigmas, enc_mixweight = encoder(opts, inputs=self.sample_points,
+                enc_mean, enc_logsigmas, enc_logmixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
                 enc_logsigmas = tf.clip_by_value(enc_logsigmas, -5, 5)
-                self.enc_mixweight = enc_mixweight
+                self.debug_mix = enc_logmixweight
+                self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
                 self.enc_mean = enc_mean
                 self.enc_logsigmas = enc_logsigmas
             # Encoding all mixtures
@@ -82,7 +83,7 @@ class WAE(object):
                                                 tf.exp(self.enc_logsigmas),
                                                 opts['e_noise'],sample_size,'tensor')
             # select mixture components according to the encoded mixture weights
-            idx = tf.reshape(tf.multinomial(self.enc_mixweight, 1),[-1])
+            idx = tf.reshape(tf.multinomial(enc_logmixweight, 1),[-1])
             rng = tf.range(sample_size)
             zero = tf.zeros([tf.cast(sample_size,dtype=tf.int32)],dtype=tf.int64)
             mix_idx = tf.stack([rng,idx],axis=-1)
@@ -597,7 +598,7 @@ class WAE(object):
                          self.wae_objective,
                          self.loss_reconstruct,
                          self.penalty,
-                         self.enc_mixweight],
+                         self.debug_mix],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_noise: batch_noise,
                                    self.sample_mix_noise: batch_mix_noise,
