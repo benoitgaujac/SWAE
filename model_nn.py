@@ -74,7 +74,7 @@ def mixweight_encoder(opts, inputs, is_training=False, reuse=False):
         raise ValueError('%s Unknown encoder architecture for mixtures' % opts['e_arch'])
 
     logits = tf.reshape(tf.stack(mixweights,axis=1),[-1,opts['nmixtures']])
-    return tf.nn.softmax(logits,axis=-1)
+    return logits
 
 def mean_encoder(opts, inputs, is_training=False, reuse=False):
     if opts['e_arch_g'] == 'mlp':
