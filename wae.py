@@ -394,8 +394,8 @@ class WAE(object):
         log_pz = - (logdet + musigmu) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         kl_pz = tf.reduce_mean(log_pz)
         # Qz term
-        logdet = tf.log(tf.reduce_prod(self.enc_logsigmas,axis=-1))# + opts['zdim'] * tf.log(2*pi)
-        square = tf.divide(tf.square(sample_pz - self.enc_mean),self.enc_logsigmas)
+        logdet = tf.log(tf.reduce_prod(tf.exp(self.enc_logsigmas),axis=-1))# + opts['zdim'] * tf.log(2*pi)
+        square = tf.divide(tf.square(sample_pz - self.enc_mean),tf.exp(self.enc_logsigmas))
         musigmu = tf.reduce_sum(square,axis=-1)
         log_qz = - (logdet + musigmu) / 2 + tf.log(self.enc_mixweight)
         kl_qz = tf.reduce_mean(log_qz)
