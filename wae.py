@@ -74,10 +74,11 @@ class WAE(object):
             elif opts['e_means']=='learnable':
                 enc_mean, enc_logsigmas, enc_logmixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
-                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -5, 5)
                 self.debug_mix = enc_logmixweight
+                enc_logmixweight = tf.clip_by_value(enc_logmixweight, -50, 50)
                 self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
                 self.enc_mean = enc_mean
+                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -5, 5)
                 self.enc_logsigmas = enc_logsigmas
             # Encoding all mixtures
             self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
@@ -480,17 +481,19 @@ class WAE(object):
         opt = self.optimizer(lr, self.lr_decay)
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+        ae_vars = encoder_vars + decoder_vars
         self.swae_opt = opt.minimize(loss=self.wae_objective,
-                                    var_list=encoder_vars + decoder_vars)
+                                    var_list=ae_vars)
         # MMD optimizer
         if opts['penalty']=='mmd':
             if opts['MMD_gan']:
                 k_encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_encoder')
                 k_decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_generator')
+                gan_vars = k_encoder_vars + k_decoder_vars
                 mmd_lr = opts['mmd_lr']
                 mmd_opt = self.optimizer(mmd_lr, self.lr_decay)
                 grads_and_vars = mmd_opt.compute_gradients(loss=-self.mmd_objective,
-                                        var_list=k_encoder_vars + k_decoder_vars)
+                                        var_list=gan_vars)
                 clip_grads_and_vars = [(tf.clip_by_value(gv[0],-0.01,0.01), gv[1]) for gv in grads_and_vars]
                 self.MMD_opt = mmd_opt.apply_gradients(clip_grads_and_vars)
             else:
