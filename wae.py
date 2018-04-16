@@ -599,7 +599,7 @@ class WAE(object):
                 batch_noise = self.sample_pz(opts['batch_size'],sampling='one_mixture')
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match, mix, res1, res2, means, sigmas] = self.sess.run(
+                [_, loss, loss_rec, loss_match, means, sigmas, mix, res1, res2] = self.sess.run(
                         [self.swae_opt,
                          self.wae_objective,
                          self.loss_reconstruct,
