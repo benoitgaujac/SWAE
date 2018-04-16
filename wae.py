@@ -621,20 +621,20 @@ class WAE(object):
                                    self.is_training: True})
 
 
-                mix_print = np.amax(mix,axis=0)
-                print(mix_print)
-                print("")
-                mea_print = np.amax(means,axis=(0,1))
-                print(mea_print)
-                print("")
-                sig_print = np.amax(sigmas,axis=(0,1))
-                print(sig_print)
-                print("")
-                logging.error('res1: %f' % res1)
-                logging.error('res2: %f' % res2)
-                print("")
-                max_l = [np.amax(t) for t in grad]
-                print(max_l)
+                # mix_print = np.amax(mix,axis=0)
+                # print(mix_print)
+                # print("")
+                # mea_print = np.amax(means,axis=(0,1))
+                # print(mea_print)
+                # print("")
+                # sig_print = np.amax(sigmas,axis=(0,1))
+                # print(sig_print)
+                # print("")
+                # logging.error('res1: %f' % res1)
+                # logging.error('res2: %f' % res2)
+                # print("")
+                # max_l = [np.amax(t) for t in grad]
+                # print(max_l)
 
 
                 # Update learning rate if necessary
