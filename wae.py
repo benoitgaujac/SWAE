@@ -434,27 +434,27 @@ class WAE(object):
             loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .1 * tf.reduce_sum(loss)
+            loss = .2 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l2sq':
             # c(x,y) = ||x - y||_2^2
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[3,4,5])
             loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .1 * tf.reduce_sum(loss)
+            loss = .05 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l2sq_wrong':
             # c(x,y) = ||x - y||_2^2
             real = self.sample_points
             reconstr = self.one_recons
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = .1 * tf.reduce_mean(loss)
+            loss = .05 * tf.reduce_mean(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
             loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[3,4,5])
             loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = .1 * tf.reduce_sum(loss)
+            loss = .2 * tf.reduce_sum(loss)
         else:
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
