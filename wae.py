@@ -107,7 +107,7 @@ class WAE(object):
         # Compute reconstruction cost
         self.loss_reconstruct = self.reconstruction_loss()
         # Compute matching penalty cost
-        self.penalty = self.matching_penalty(self.sample_mix_noise,self.mixtures_encoded,)
+        self.penalty = self.matching_penalty(self.sample_mix_noise[:,:,0],self.mixtures_encoded[:,:,0])
         # Compute wae obj
         self.wae_objective = self.loss_reconstruct \
                             + self.lmbd * self.penalty
@@ -240,7 +240,7 @@ class WAE(object):
     def matching_penalty(self,samples_pz, samples_qz):
         opts = self.opts
         if opts['penalty'] == 'mmd':
-            loss_match = self.mmd_penalty(samples_pz[:,:,0], samples_qz[:,:,0])
+            loss_match = self.mmd_penalty(samples_pz, samples_qz)
         elif opts['penalty'] == 'kl':
             loss_match = self.kl_penalty(samples_pz)
         else:
@@ -387,31 +387,18 @@ class WAE(object):
 
     def kl_penalty(self, sample_pz):
         opts = self.opts
-        samples = tf.expand_dims(sample_pz,axis=-1)
         # Pz term
-        pz_means = tf.expand_dims(tf.expand_dims(self.pz_means,axis=1),axis=-1)
-        pz_covs = tf.expand_dims(self.pz_covs,axis=-1)
         logdet = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
-        sigmu = tf.divide(samples - pz_means,pz_covs)
-        musigmu = tf.matmul(
-                        tf.transpose(samples - pz_means,perm=[0,1,2,4,3]),
-                        sigmu)
-        musigmu = tf.squeeze(musigmu)
+        square = tf.divide(tf.square(sample_pz - self.pz_means),self.pz_covs)
+        musigmu = tf.reduce_sum(square,axis=-1)
         log_pz = - (logdet + musigmu) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         kl_pz = tf.reduce_mean(log_pz)
-        #kl_pz = tf.reduce_sum(kl_pz) / opts['nmixtures']
         # Qz term
-        qz_means = tf.expand_dims(tf.expand_dims(self.enc_mean,axis=2),axis=-1)
-        qz_covs = tf.expand_dims(tf.expand_dims(tf.exp(self.enc_logsigmas),axis=2),axis=-1)
-        logdet = tf.log(tf.reduce_prod(qz_covs,axis=[3,4]))# + opts['zdim'] * tf.log(2*pi)
-        sigmu = tf.divide(samples - qz_means,qz_covs)
-        musigmu = tf.matmul(
-                        tf.transpose(samples - qz_means,perm=[0,1,2,4,3]),
-                        sigmu)
-        musigmu = tf.squeeze(musigmu)
-        log_qz = - (logdet + musigmu) / 2 + tf.log(tf.expand_dims(self.enc_mixweight,axis=-1))
+        logdet = tf.log(tf.reduce_prod(self.enc_logsigmas,axis=-1))# + opts['zdim'] * tf.log(2*pi)
+        square = tf.divide(tf.square(sample_pz - self.enc_mean),self.enc_logsigmas)
+        musigmu = tf.reduce_sum(square,axis=-1)
+        log_qz = - (logdet + musigmu) / 2 + tf.log(self.enc_mixweight)
         kl_qz = tf.reduce_mean(log_qz)
-        #kl_qz = tf.reduce_sum(kl_qz) / opts['nmixtures']
 
         return kl_pz - kl_qz
 
@@ -420,23 +407,21 @@ class WAE(object):
         # Adding ops to pretrain the encoder so that mean and covariance
         # of Qz will try to match those of Pz
         # Means
-        #mean_pz = tf.reduce_mean(self.sample_mix_noise, axis=0, keepdims=True)
-        mean_pz = tf.expand_dims(self.pz_means, axis=0)
-        mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=0, keepdims=True)
+        mean_pz = self.pz_means
+        mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=[0,2])
         mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))
         # Covariances
-        # centered_pz = self.sample_mix_noise - mean_pz
-        # cov_pz = tf.matmul(centered_pz, tf.transpose(centered_pz,perm=[0,2,1]),
-        #                     transpose_a=False)
-        # cov_pz /= opts['e_pretrain_sample_size'] - 1.
-        # centered_qz = self.mixtures_encoded - mean_qz
-        # cov_qz = tf.matmul(centered_qz, tf.transpose(centered_qz,perm=[0,2,1]),
-        #                     transpose_a=False)
-        # cov_qz /= opts['e_pretrain_sample_size'] - 1.
-        # cov_loss = tf.reduce_sum(tf.square(cov_pz - cov_qz))
-        #
-        # return mean_loss + cov_loss
-        return mean_loss
+        centered_pz = self.sample_mix_noise - tf.expand_dims(mean_pz,axis=-2)
+        square = tf.reduce_sum(tf.square(centered_pz),axis=-1)
+        cov_pz = tf.reduce_mean(square,axis=[0,2])
+        #cov_pz /= opts['e_pretrain_sample_size'] - 1.
+        centered_qz = self.mixtures_encoded - tf.expand_dims(mean_qz,axis=-2)
+        square = tf.reduce_sum(tf.square(centered_qz),axis=-1)
+        cov_qz = tf.reduce_mean(square,axis=[0,2])
+        #cov_qz /= opts['e_pretrain_sample_size'] - 1.
+        cov_loss = tf.reduce_sum(tf.square(cov_pz - cov_qz))
+
+        return mean_loss + cov_loss
 
     def reconstruction_loss(self):
         opts = self.opts
@@ -449,27 +434,27 @@ class WAE(object):
             loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = 1. * tf.reduce_sum(loss)
+            loss = .1 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l2sq':
             # c(x,y) = ||x - y||_2^2
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[3,4,5])
             loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = 1. * tf.reduce_sum(loss)
+            loss = .1 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l2sq_wrong':
             # c(x,y) = ||x - y||_2^2
             real = self.sample_points
             reconstr = self.one_recons
             loss = tf.reduce_sum(tf.square(real - reconstr), axis=[1, 2, 3])
-            loss = 1. * tf.reduce_mean(loss)
+            loss = .1 * tf.reduce_mean(loss)
         elif opts['cost'] == 'l1':
             # c(x,y) = ||x - y||_1
             loss = tf.reduce_sum(tf.abs(real - reconstr), axis=[3,4,5])
             loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = 1. * tf.reduce_sum(loss)
+            loss = .1 * tf.reduce_sum(loss)
         else:
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
@@ -693,8 +678,8 @@ class WAE(object):
                     #             'MATCH_LOSS=%.5f, MMD_LOSS=%.5f,' % (
                     #             losses[-1], loss_rec_test,
                     #             losses_match[-1], mmd_losses[-1])
-                    debug_str = 'WAE_LOSS=%.5f, MATCH_LOSS=%.5f, ' \
-                                'RECON_LOSS=%.5f, RECON_LOSS_TEST=%.5f' % (
+                    debug_str = 'LOSS=%.5f, MATCH=%.5f, ' \
+                                'RECONS=%.5f, RECONS_TEST=%.5f' % (
                                 losses[-1], losses_match[-1],
                                 losses_rec[-1], loss_rec_test)
                     logging.error(debug_str)
