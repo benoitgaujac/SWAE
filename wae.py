@@ -73,7 +73,7 @@ class WAE(object):
             elif opts['e_means']=='learnable':
                 enc_mean, enc_logsigmas, enc_mixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
-                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -10, 10)
+                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -5, 5)
                 self.enc_mixweight = enc_mixweight
                 self.enc_mean = enc_mean
                 self.enc_logsigmas = enc_logsigmas
