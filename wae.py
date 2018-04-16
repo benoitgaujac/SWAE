@@ -619,10 +619,13 @@ class WAE(object):
 
                 mix_print = np.amax(mix,axis=0)
                 print(mix_print)
-                mea_print = np.amax(means)
+                print("")
+                mea_print = np.amax(means,axis=(0,1))
                 print(mea_print)
-                sig_print = np.amax(sigmas)
+                print("")
+                sig_print = np.amax(sigmas,axis=(0,1))
                 print(sig_print)
+                print("")
                 logging.error('res1: %f' % res1)
                 logging.error('res2: %f' % res2)
 
