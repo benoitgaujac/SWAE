@@ -637,6 +637,9 @@ class WAE(object):
                 print("max grad")
                 max_l = [np.amax(t) for t in grad]
                 print(max_l)
+                print("min grad")
+                min_l = [np.amin(t) for t in grad]
+                print(min_l)
 
 
                 # Update learning rate if necessary
