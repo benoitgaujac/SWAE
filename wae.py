@@ -601,14 +601,13 @@ class WAE(object):
                 #                    self.lmbd: wae_lambda,
                 #                    self.is_training: True})
 
-                [_, grad, loss, loss_rec, loss_match, means, sigmas, mix] = self.sess.run(
+                [_, grad, loss, loss_rec, loss_match, means, mix] = self.sess.run(
                         [self.swae_opt,
                          self.grad,
                          self.wae_objective,
                          self.loss_reconstruct,
                          self.penalty,
                          self.enc_mean,
-                         self.enc_logsigmas,
                          self.debug_mix],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_mix_noise: batch_mix_noise,
@@ -624,12 +623,12 @@ class WAE(object):
                 print("min means")
                 mea_print = np.amin(means,axis=(0,1))
                 print(mea_print)
-                print("max sig")
-                sig_print = np.amax(sigmas,axis=(0,1))
-                print(sig_print)
-                print("min sig")
-                sig_print = np.amin(sigmas,axis=(0,1))
-                print(sig_print)
+                # print("max sig")
+                # sig_print = np.amax(sigmas,axis=(0,1))
+                # print(sig_print)
+                # print("min sig")
+                # sig_print = np.amin(sigmas,axis=(0,1))
+                # print(sig_print)
                 # logging.error('res1: %f' % res1)
                 # logging.error('res2: %f' % res2)
                 print("max grad")
