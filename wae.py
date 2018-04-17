@@ -602,7 +602,6 @@ class WAE(object):
                 #                    self.lmbd: wae_lambda,
                 #                    self.is_training: True})
 
-                pdb.set_trace()
                 [_, grad, loss, loss_rec, loss_match, means, mix] = self.sess.run(
                         [self.swae_opt,
                          self.grad,
