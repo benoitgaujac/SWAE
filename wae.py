@@ -590,45 +590,51 @@ class WAE(object):
                 batch_images = data.data[data_ids].astype(np.float32)
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match] = self.sess.run(
-                        [self.swae_opt,
-                         self.wae_objective,
-                         self.loss_reconstruct,
-                         self.penalty],
-                        feed_dict={self.sample_points: batch_images,
-                                   self.sample_mix_noise: batch_mix_noise,
-                                   self.lr_decay: decay,
-                                   self.lmbd: wae_lambda,
-                                   self.is_training: True})
-
-                # [_, grad, loss, loss_rec, loss_match, means, sigmas, mix] = self.sess.run(
+                # [_, loss, loss_rec, loss_match] = self.sess.run(
                 #         [self.swae_opt,
-                #          self.grad,
                 #          self.wae_objective,
                 #          self.loss_reconstruct,
-                #          self.penalty,
-                #          self.enc_mean,
-                #          self.enc_logsigmas,
-                #          self.debug_mix],
+                #          self.penalty],
                 #         feed_dict={self.sample_points: batch_images,
                 #                    self.sample_mix_noise: batch_mix_noise,
                 #                    self.lr_decay: decay,
                 #                    self.lmbd: wae_lambda,
                 #                    self.is_training: True})
-                # mix_print = np.amax(mix,axis=0)
-                # print(mix_print)
-                # print("")
-                # mea_print = np.amax(means,axis=(0,1))
-                # print(mea_print)
-                # print("")
-                # sig_print = np.amax(sigmas,axis=(0,1))
-                # print(sig_print)
-                # print("")
+
+                [_, grad, loss, loss_rec, loss_match, means, sigmas, mix] = self.sess.run(
+                        [self.swae_opt,
+                         self.grad,
+                         self.wae_objective,
+                         self.loss_reconstruct,
+                         self.penalty,
+                         self.enc_mean,
+                         self.enc_logsigmas,
+                         self.debug_mix],
+                        feed_dict={self.sample_points: batch_images,
+                                   self.sample_mix_noise: batch_mix_noise,
+                                   self.lr_decay: decay,
+                                   self.lmbd: wae_lambda,
+                                   self.is_training: True})
+                print("max mixweights")
+                mix_print = np.amax(mix,axis=0)
+                print(mix_print)
+                print("max means")
+                mea_print = np.amax(means,axis=(0,1))
+                print(mea_print)
+                print("min means")
+                mea_print = np.amin(means,axis=(0,1))
+                print(mea_print)
+                print("max sig")
+                sig_print = np.amax(sigmas,axis=(0,1))
+                print(sig_print)
+                print("min sig")
+                sig_print = np.amin(sigmas,axis=(0,1))
+                print(sig_print)
                 # logging.error('res1: %f' % res1)
                 # logging.error('res2: %f' % res2)
-                # print("")
-                # max_l = [np.amax(t) for t in grad]
-                # print(max_l)
+                print("max grad")
+                max_l = [np.amax(t) for t in grad]
+                print(max_l)
 
 
                 # Update learning rate if necessary
