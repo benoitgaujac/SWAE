@@ -568,6 +568,7 @@ class WAE(object):
                 if opts['penalty'] == 'mmd' and opts['MMD_gan'] and it % opts['mmd_every'] == 0:
                     # Maximize MMD
                     for Dit in range(opts['mmd_iter']):
+                        pdb.set_trace()
                         # Sample batches of data points and Pz noise
                         data_ids = np.random.choice(train_size,
                                             opts['batch_size'],
@@ -601,6 +602,7 @@ class WAE(object):
                 #                    self.lmbd: wae_lambda,
                 #                    self.is_training: True})
 
+                pdb.set_trace()
                 [_, grad, loss, loss_rec, loss_match, means, mix] = self.sess.run(
                         [self.swae_opt,
                          self.grad,
