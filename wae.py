@@ -632,8 +632,8 @@ class WAE(object):
                 print("min sig")
                 sig_print = np.amin(sigmas,axis=(0,1))
                 print(sig_print)
-                logging.error('res1: %f' % res1)
-                logging.error('res2: %f' % res2)
+                # logging.error('res1: %f' % res1)
+                # logging.error('res2: %f' % res2)
                 print("max grad")
                 max_l = [np.amax(t) for t in grad]
                 print(max_l)
