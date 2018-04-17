@@ -602,9 +602,8 @@ class WAE(object):
                 #                    self.lmbd: wae_lambda,
                 #                    self.is_training: True})
 
-                [_, grad, loss, loss_rec, loss_match, means, mix] = self.sess.run(
+                [_, loss, loss_rec, loss_match, means, mix] = self.sess.run(
                         [self.swae_opt,
-                         self.grad,
                          self.wae_objective,
                          self.loss_reconstruct,
                          self.penalty,
@@ -632,9 +631,9 @@ class WAE(object):
                 # print(sig_print)
                 # logging.error('res1: %f' % res1)
                 # logging.error('res2: %f' % res2)
-                print("max grad")
-                max_l = [np.amax(t) for t in grad]
-                print(max_l)
+                # print("max grad")
+                # max_l = [np.amax(t) for t in grad]
+                # print(max_l)
 
 
                 # Update learning rate if necessary
