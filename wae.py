@@ -591,38 +591,39 @@ class WAE(object):
                 batch_images = data.data[data_ids].astype(np.float32)
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                # [_, loss, loss_rec, loss_match] = self.sess.run(
-                #         [self.swae_opt,
-                #          self.wae_objective,
-                #          self.loss_reconstruct,
-                #          self.penalty],
-                #         feed_dict={self.sample_points: batch_images,
-                #                    self.sample_mix_noise: batch_mix_noise,
-                #                    self.lr_decay: decay,
-                #                    self.lmbd: wae_lambda,
-                #                    self.is_training: True})
-
-                [_, loss, loss_rec, loss_match, means, mix] = self.sess.run(
+                [_, loss, loss_rec, loss_match] = self.sess.run(
                         [self.swae_opt,
                          self.wae_objective,
                          self.loss_reconstruct,
-                         self.penalty,
-                         self.enc_mean,
-                         self.debug_mix],
+                         self.penalty],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_mix_noise: batch_mix_noise,
                                    self.lr_decay: decay,
                                    self.lmbd: wae_lambda,
                                    self.is_training: True})
-                print("max mixweights")
-                mix_print = np.amax(mix,axis=0)
-                print(mix_print)
-                print("max means")
-                mea_print = np.amax(means,axis=(0,1))
-                print(mea_print)
-                print("min means")
-                mea_print = np.amin(means,axis=(0,1))
-                print(mea_print)
+
+                # Debug               
+                # [_, loss, loss_rec, loss_match, means, mix] = self.sess.run(
+                #         [self.swae_opt,
+                #          self.wae_objective,
+                #          self.loss_reconstruct,
+                #          self.penalty,
+                #          self.enc_mean,
+                #          self.debug_mix],
+                #         feed_dict={self.sample_points: batch_images,
+                #                    self.sample_mix_noise: batch_mix_noise,
+                #                    self.lr_decay: decay,
+                #                    self.lmbd: wae_lambda,
+                #                    self.is_training: True})
+                # print("max mixweights")
+                # mix_print = np.amax(mix,axis=0)
+                # print(mix_print)
+                # print("max means")
+                # mea_print = np.amax(means,axis=(0,1))
+                # print(mea_print)
+                # print("min means")
+                # mea_print = np.amin(means,axis=(0,1))
+                # print(mea_print)
                 # print("max sig")
                 # sig_print = np.amax(sigmas,axis=(0,1))
                 # print(sig_print)
