@@ -444,7 +444,7 @@ class WAE(object):
             loss = tf.reduce_mean(loss,axis=-1)
             loss = tf.multiply(loss, self.enc_mixweight)
             loss = tf.reduce_mean(loss,axis=0)
-            loss = 1. * tf.reduce_sum(loss)
+            loss = .2 * tf.reduce_sum(loss)
         elif opts['cost'] == 'l2sq_wrong':
             # c(x,y) = ||x - y||_2^2
             real = self.sample_points
