@@ -480,11 +480,16 @@ class WAE(object):
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
         ae_vars = encoder_vars + decoder_vars
-        grads_and_vars = opt.compute_gradients(loss=self.wae_objective,
-                                    var_list=ae_vars)
-        self.grad = [gv[0] for gv in grads_and_vars]
-        self.swae_opt = opt.minimize(loss=self.wae_objective,
-                                    var_list=ae_vars)
+        if opts['clip_grad']:
+            # Clipping gradient
+            grad, var = zip(*opt.compute_gradients(loss=self.wae_objective,
+                                                                var_list=ae_vars))
+            clip_grad, _ = tf.clip_by_global_norm(grad, opts['clip_norm'])
+            self.swae_opt = opt.apply_gradients(zip(clip_grad, var))
+        else:
+            # No clipping
+            self.swae_opt = opt.minimize(loss=self.wae_objective,
+                                        var_list=ae_vars)
         # MMD optimizer
         if opts['penalty']=='mmd' and opts['MMD_gan']:
             k_encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='kernel_encoder')
