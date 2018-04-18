@@ -75,10 +75,9 @@ class WAE(object):
                 enc_mean, enc_logsigmas, enc_logmixweight = encoder(opts, inputs=self.sample_points,
                                                                 is_training=self.is_training)
                 self.debug_mix = enc_logmixweight
-                #enc_logmixweight = tf.clip_by_value(enc_logmixweight, -50, 50)
                 self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
                 self.enc_mean = enc_mean
-                #enc_logsigmas = tf.clip_by_value(enc_logsigmas, -10, 10)
+                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -10, 10)
                 self.enc_logsigmas = enc_logsigmas
             # Encoding all mixtures
             self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
