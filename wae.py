@@ -77,7 +77,7 @@ class WAE(object):
                 self.debug_mix = enc_logmixweight
                 self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
                 self.enc_mean = enc_mean
-                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -10, 10)
+                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -50, 50)
                 self.enc_logsigmas = enc_logsigmas
             # Encoding all mixtures
             self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
@@ -102,8 +102,6 @@ class WAE(object):
         # Decode the point sampled from multinomial
         self.one_recons = tf.gather_nd(self.reconstructed,mix_idx)
         self.one_recons_logits = tf.gather_nd(self.reconstructed_logits,mix_idx)
-        # self.one_recons, self.one_recons_logits = decoder(opts, reuse=True, noise=self.encoded,
-        #                                                         is_training=False)
         # Decode the content of sample_noise
         self.decoded, self.decoded_logits = decoder(opts, reuse=True, noise=self.sample_noise,
                                                                 is_training=self.is_training)
@@ -299,7 +297,8 @@ class WAE(object):
                                         + opts['rg_lambda'] * one_sided_err \
                                         - opts['ae_lambda'] * MMD_regu
         else:
-            MMD_penalty = tf.sqrt(MMD)
+            #MMD_penalty = tf.sqrt(MMD)
+            MMD_penalty = MMD
             self.mmd_objective = None
 
         return MMD_penalty
