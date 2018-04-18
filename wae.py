@@ -388,19 +388,22 @@ class WAE(object):
     def kl_penalty(self, sample_pz):
         opts = self.opts
         # Pz term
-        logdet = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
-        square = tf.divide(tf.square(sample_pz - self.pz_means),self.pz_covs)
-        musigmu = tf.reduce_sum(square,axis=-1)
-        log_pz = - (logdet + musigmu) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        logdet_pz = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
+        square_pz = tf.divide(tf.square(sample_pz - self.pz_means),self.pz_covs)
+        musigmu_pz = tf.reduce_sum(square_pz,axis=-1)
+        log_pz = - (logdet_pz + musigmu_pz) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        log_pz = tf.reduce_mean(log_pz,axis=0)
         kl_pz = tf.reduce_mean(log_pz)
         # Qz term
-        logdet = tf.log(tf.reduce_prod(tf.exp(self.enc_logsigmas),axis=-1))# + opts['zdim'] * tf.log(2*pi)
-        square = tf.divide(tf.square(sample_pz - self.enc_mean),tf.exp(self.enc_logsigmas))
-        musigmu = tf.reduce_sum(square,axis=-1)
-        log_qz = - (logdet + musigmu) / 2 + tf.log(self.enc_mixweight)
+        logdet_qz = tf.log(tf.reduce_prod(tf.exp(self.enc_logsigmas),axis=-1))# + opts['zdim'] * tf.log(2*pi)
+        square_qz = tf.divide(tf.square(sample_pz - self.enc_mean),tf.exp(self.enc_logsigmas))
+        musigmu_qz = tf.reduce_sum(square_qz,axis=-1)
+        log_qz = - (logdet_qz + musigmu_qz) / 2 + tf.log(self.enc_mixweight)
+        log_qz = tf.reduce_mean(log_qz,axis=0)
         kl_qz = tf.reduce_mean(log_qz)
 
-        return kl_pz - kl_qz
+        #return kl_pz - kl_qz
+        return tf.reduce_mean(log_pz-log_qz)
 
     def pretrain_loss(self):
         opts = self.opts
