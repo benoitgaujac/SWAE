@@ -297,7 +297,7 @@ class WAE(object):
                                         + opts['rg_lambda'] * one_sided_err \
                                         - opts['ae_lambda'] * MMD_regu
         else:
-            if opts['sqrt_MMD']
+            if opts['sqrt_MMD']:
                 MMD_penalty = tf.sqrt(MMD+1e-8)
             else:
                 MMD_penalty = MMD
