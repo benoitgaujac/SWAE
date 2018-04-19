@@ -109,7 +109,7 @@ def mlp_encoder(num_units, num_layers, num_mixtures, output_dim, scpe, inputs, o
             if opts['batch_norm']:
                 layer_x = ops.batch_norm(opts, layer_x, is_training,
                                     reuse, scope=scpe+'_m{}_h{}_bn'.format(k,i))
-            layer_x = tf.nn.elu(layer_x)
+            layer_x = tf.nn.relu(layer_x)
         mean = ops.linear(opts, layer_x, output_dim, scope=scpe+'_m{}_mean_lin'.format(k))
         means.append(mean)
         if scpe == 'mean_encoder':
@@ -130,7 +130,7 @@ def dcgan_encoder(num_units, num_layers, num_mixtures, output_dim, scpe, inputs,
             if opts['batch_norm']:
                 layer_x = ops.batch_norm(opts, layer_x, is_training,
                                          reuse, scope=scpe+'_m{}_h{}_bn'.format(k,i))
-            layer_x = tf.nn.elu(layer_x)
+            layer_x = tf.nn.relu(layer_x)
         mean = ops.linear(opts, layer_x, output_dim, scope=scpe+'_m{}_mean_lin'.format(k))
         means.append(mean)
         if scpe == 'mean_encoder':
@@ -301,7 +301,7 @@ def began_encoder(num_units, num_layers, num_mixtures, output_dim, scpe, inputs,
                     scale = (ii - int((ii - 1) / 2))
                 layer_x = ops.conv2d(opts, layer_x, num_units * scale, d_h=1, d_w=1,
                                      scope=scpe+'_m{}_h{}_conv'.format(k,i))
-                layer_x = tf.nn.elu(layer_x)
+                layer_x = tf.nn.relu(layer_x)
             else:
                 if i != num_layers - 1:
                     layer_x = ops.downsample(layer_x, scope=scpe+'_m{}_h{}_maxpool'.format(k,i),
@@ -455,7 +455,7 @@ def began_decoder(opts, noise, is_training=False, reuse=False):
             # Don't change resolution
             layer_x = ops.conv2d(opts, layer_x, num_units,
                                  d_h=1, d_w=1, scope='h%d_conv' % i)
-            layer_x = tf.nn.elu(layer_x)
+            layer_x = tf.nn.relu(layer_x)
         else:
             if i != num_layers - 1:
                 # Upsampling by factor of 2 with NN

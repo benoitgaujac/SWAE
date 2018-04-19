@@ -36,7 +36,7 @@ def mlp_encoder(num_units, num_layers, output_dim, inputs, opts, is_training=Fal
         if opts['batch_norm']:
             layer_x = ops.batch_norm(opts, layer_x, is_training,
                                 reuse, scope='h{}_bn'.format(i))
-        layer_x = tf.nn.elu(layer_x)
+        layer_x = tf.nn.relu(layer_x)
     layer_x = ops.linear(opts, layer_x, output_dim, scope='out_lin')
 
     return layer_x
@@ -50,7 +50,7 @@ def dcgan_encoder(num_units, num_layers, output_dim, inputs, opts, is_training=F
         if opts['batch_norm']:
             layer_x = ops.batch_norm(opts, layer_x, is_training,
                                      reuse, scope='h{}_bn'.format(i))
-        layer_x = tf.nn.elu(layer_x)
+        layer_x = tf.nn.relu(layer_x)
     layer_x = ops.linear(opts, layer_x, output_dim, scope='out_lin')
 
     return layer_x
@@ -68,7 +68,7 @@ def began_encoder(num_units, num_layers, output_dim, inputs, opts, is_training=F
                 scale = (ii - int((ii - 1) / 2))
             layer_x = ops.conv2d(opts, layer_x, num_units * scale, d_h=1, d_w=1,
                                  scope='_h{}_conv'.format(i))
-            layer_x = tf.nn.elu(layer_x)
+            layer_x = tf.nn.relu(layer_x)
         else:
             if i != num_layers - 1:
                 layer_x = ops.downsample(layer_x, scope='h{}_maxpool'.format(i),
@@ -166,7 +166,7 @@ def began_decoder(opts, noise, is_training=False, reuse=False):
             # Don't change resolution
             layer_x = ops.conv2d(opts, layer_x, num_units,
                                  d_h=1, d_w=1, scope='h%d_conv' % i)
-            layer_x = tf.nn.elu(layer_x)
+            layer_x = tf.nn.relu(layer_x)
         else:
             if i != num_layers - 1:
                 # Upsampling by factor of 2 with NN
