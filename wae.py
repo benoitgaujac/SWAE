@@ -298,7 +298,8 @@ class WAE(object):
                                         - opts['ae_lambda'] * MMD_regu
         else:
             if opts['sqrt_MMD']:
-                MMD_penalty = tf.sqrt(MMD+1e-8)
+                #MMD_penalty = tf.sqrt(MMD+1e-8)
+                MMD_penalty = tf.exp(tf.log(MMD)/2.)
             else:
                 MMD_penalty = MMD
             self.mmd_objective = None
