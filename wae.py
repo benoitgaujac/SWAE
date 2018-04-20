@@ -109,7 +109,7 @@ class WAE(object):
         # Compute reconstruction cost
         self.loss_reconstruct = self.reconstruction_loss()
         # Compute matching penalty cost
-        self.penalty = self.matching_penalty(self.sample_mix_noise[:,:,-1],self.mixtures_encoded[:,:,-1])
+        self.penalty = self.matching_penalty(self.sample_mix_noise,self.mixtures_encoded)
         # Compute wae obj
         self.wae_objective = self.loss_reconstruct \
                             + self.lmbd * self.penalty
@@ -354,18 +354,27 @@ class WAE(object):
             for scale in [.1, .2, .5, 1., 2., 5.]:
                 C = Cbase * scale
                 # First 2 terms of the MMD
-                res1 = C / (C + distances_qz)
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixweight))
-                res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixweight))
-                res1 += (C / (C + distances_pz)) / (opts['nmixtures']*opts['nmixtures'])
+                res1_qz = C / (C + distances_qz)
+                res1_qz = tf.reduce_mean(res1_qz,axis=[2,3])
+                reshape_enc_mixweight = [-1]+self.enc_mixweight.get_shape().as_list()[1:]+[1,1]
+                reshaped_enc_mixweight = tf.reshape(self.enc_mixweight,reshape_enc_mixweight)
+                res1_qz = tf.multiply(res1_qz,reshaped_enc_mixweight)
+                res1_qz = tf.multiply(res1_qz,tf.transpose(self.enc_mixweight))
+                # res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixweight))
+                # res1 = tf.multiply(tf.transpose(res1),tf.transpose(self.enc_mixweight))
+                res1_pz = (C / (C + distances_pz))
+                res1_pz = tf.reduce_mean(res1_pz,axis=[2,3]) / (opts['nmixtures']*opts['nmixtures'])
+                res1 = res1_qz + res1_pz
                 # Correcting for diagonal terms
                 res1_diag = tf.trace(tf.reduce_sum(res1,axis=[1,2]))
                 res1 = (tf.reduce_sum(res1) - res1_diag) / (nf * nf - nf)
                 self.res1 += res1
                 # Cross term of the MMD
                 res2 = C / (C + distances)
-                res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixweight))
-                res2 = tf.transpose(res2) / opts['nmixtures']
+                res2 = tf.reduce_mean(res2,axis=[2,3])
+                res2 = tf.multiply(res2,reshaped_enc_mixweight) / opts['nmixtures']
+                # res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixweight))
+                # res2 = tf.transpose(res2) / opts['nmixtures']
                 res2 = tf.reduce_sum(res2) / (nf * nf)
                 self.res2 += res2
                 stat += res1 - 2. * res2
@@ -375,15 +384,12 @@ class WAE(object):
         return stat
 
     def square_dist(self,sample_x, norms_x, sample_y, norms_y):
-        # assert sample_x.get_shape().as_list() == sample_y.get_shape().as_list(), \
-        #     'Prior samples need to have same shape as posterior samples'
-        # assert len(sample_x.get_shape().as_list()) == 4, \
-        #     'Prior samples need to have shape [batch,nmixtures,nsamples,zdim] for mixture model'
         dotprod = tf.tensordot(sample_x, tf.transpose(sample_y), [[-1],[0]])
-        norm_nk = tf.tensordot(norms_x,tf.ones(tf.shape(tf.transpose(norms_x))),[[-1],[0]])
-        norm_lm = tf.tensordot(tf.ones(tf.shape(norms_y)),tf.transpose(norms_y),[[-1],[0]])
-        distances = norm_nk + norm_lm - 2. * dotprod
-
+        reshape_norms_x = [-1]+norms_x.get_shape().as_list()[1:]+[1,1]
+        distances = tf.reshape(norms_x, reshape_norms_x) + tf.transpose(norms_y) - 2. * dotprod
+        # norm_nk = tf.tensordot(norms_x,tf.ones(tf.shape(tf.transpose(norms_x))),[[-1],[0]])
+        # norm_lm = tf.tensordot(tf.ones(tf.shape(norms_y)),tf.transpose(norms_y),[[-1],[0]])
+        # distances = norm_nk + norm_lm - 2. * dotprod
         return distances
 
     def kl_penalty(self, sample_pz):
