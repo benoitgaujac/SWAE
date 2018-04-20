@@ -245,15 +245,17 @@ class WAE(object):
             loss_match = self.mmd_penalty(samples_pz, samples_qz)
         elif opts['penalty'] == 'kl':
             loss_match = self.kl_penalty(samples_pz)
+        elif opts['penalty'] == 'OT':
+            loss_match = self.OT_penalty(samples_pz)
         else:
             assert False, 'Unknown penalty %s' % opts['penalty']
         return loss_match
 
     def mmd_penalty(self, sample_pz, sample_qz):
         opts = self.opts
+        sample_shape = sample_pz.get_shape().as_list()[1:]
         # Compute kernel embedings if MMD_gan
         if opts['MMD_gan']:
-            assert False, 'To implement'
             ### MMD injective regu
             # Pz samples
             input_pz = tf.reshape(sample_pz,[-1,opts['zdim']])
@@ -261,29 +263,33 @@ class WAE(object):
                                     is_training=self.is_training)
             f_d_pz = k_decoder(opts, noise=f_e_pz, output_dim=opts['zdim'],
                                     is_training=self.is_training)
-            recons_pz = tf.reshape(f_d_pz,[-1,opts['nmixtures'],opts['zdim']])
+            recons_pz = tf.reshape(f_d_pz,[-1]+sample_shape)
             l2sq_pz = tf.reduce_sum(tf.square(sample_pz - recons_pz),axis=-1)
-            MMD_regu_pz = tf.reduce_mean(l2sq_pz, axis=0)
-            MMD_regu_pz = tf.reduce_sum(MMD_regu_pz) / opts['nmixtures']
+            l2sq_pz = tf.reduce_mean(l2sq_pz,axis=-1)
+            MMD_regu_pz = tf.reduce_mean(l2sq_pz / opts['nmixtures'] , axis=0)
+            MMD_regu_pz = tf.reduce_sum(MMD_regu_pz)
             # Qz samples
             input_qz = tf.reshape(sample_qz,[-1,opts['zdim']])
             f_e_qz = k_encoder(opts, inputs=input_qz,
                             reuse=True,is_training=self.is_training)
             f_d_qz = k_decoder(opts, noise=f_e_qz, output_dim=opts['zdim'],
                             reuse=True,is_training=self.is_training)
-            recons_qz = tf.reshape(f_d_qz,[-1,opts['nmixtures'],opts['zdim']])
+            recons_qz = tf.reshape(f_d_qz,[-1]+sample_shape)
             l2sq_qz = tf.reduce_sum(tf.square(sample_qz - recons_qz),axis=-1)
-            weighted_l2sq_qz = tf.multiply(l2sq_pz, self.enc_mixweight)
+            l2sq_qz = tf.reduce_mean(l2sq_qz,axis=-1)
+            weighted_l2sq_qz = tf.multiply(l2sq_qz, self.enc_mixweight)
             MMD_regu_qz = tf.reduce_mean(weighted_l2sq_qz,axis=0)
             MMD_regu_qz = tf.reduce_sum(MMD_regu_qz)
 
             MMD_regu = MMD_regu_pz + MMD_regu_qz
             ### MMD reducing feasible set
-            sample_pz = tf.reshape(f_e_pz,[-1,opts['nmixtures'],opts['k_outdim']])
-            sample_qz = tf.reshape(f_e_qz,[-1,opts['nmixtures'],opts['k_outdim']])
-            E_f_e_pz = tf.reduce_mean(sample_pz, axis=0)
-            E_f_e_pz = tf.reduce_sum(E_f_e_pz,axis=0) / opts['nmixtures']
-            E_f_e_qz = tf.multiply(sample_qz, tf.expand_dims(self.enc_mixweight,axis=-1))
+            sample_pz = tf.reshape(f_e_pz,[-1]+sample_shape[:-1]+[opts['k_outdim']])
+            E_f_e_pz = tf.reduce_mean(sample_pz, axis=2)
+            E_f_e_pz = tf.reduce_mean(E_f_e_pz/opts['nmixtures'], axis=0)
+            E_f_e_pz = tf.reduce_sum(E_f_e_pz,axis=0)
+            sample_qz = tf.reshape(f_e_qz,[-1]+sample_shape[:-1]+[opts['k_outdim']])
+            E_f_e_qz = tf.reduce_mean(sample_qz, axis=2)
+            E_f_e_qz = tf.multiply(E_f_e_qz, tf.expand_dims(self.enc_mixweight,axis=-1))
             E_f_e_qz = tf.reduce_mean(E_f_e_qz, axis=0)
             E_f_e_qz = tf.reduce_sum(E_f_e_qz,axis=0)
             one_sided_err = tf.reduce_mean(E_f_e_pz - E_f_e_qz)
@@ -292,8 +298,8 @@ class WAE(object):
         MMD = self.mmd(sample_pz,sample_qz)
         # MMD penalty and mmd_objective for MMD_GAN
         if opts['MMD_gan']:
-            MMD_penalty = tf.sqrt(MMD) + opts['rg_lambda'] * one_sided_err
-            self.mmd_objective = tf.sqrt(MMD) \
+            MMD_penalty = tf.sqrt(MMD+1e-8) + opts['rg_lambda'] * one_sided_err
+            self.mmd_objective = tf.sqrt(MMD+1e-8) \
                                         + opts['rg_lambda'] * one_sided_err \
                                         - opts['ae_lambda'] * MMD_regu
         else:
@@ -322,6 +328,7 @@ class WAE(object):
         distances = self.square_dist(sample_qz, norms_qz, sample_pz, norms_pz)
 
         if kernel == 'RBF':
+            assert False, 'To implement'
             # Median heuristic for the sigma^2 of Gaussian kernel
             sigma2_k = tf.nn.top_k(
                 tf.reshape(distances, [-1]), half_size).values[half_size - 1]
@@ -393,6 +400,7 @@ class WAE(object):
         return distances
 
     def kl_penalty(self, sample_pz):
+        assert False, 'To implement'
         opts = self.opts
         # Pz term
         logdet_pz = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
@@ -410,6 +418,9 @@ class WAE(object):
         kl_qz = tf.reduce_mean(log_qz)
 
         return tf.reduce_mean(log_pz-log_qz)
+
+    def OT_penalty(self, sample_pz, sample_qz):
+        assert False, 'To implement'
 
     def pretrain_loss(self):
         opts = self.opts
@@ -582,7 +593,6 @@ class WAE(object):
                 if opts['penalty'] == 'mmd' and opts['MMD_gan'] and it % opts['mmd_every'] == 0:
                     # Maximize MMD
                     for Dit in range(opts['mmd_iter']):
-                        pdb.set_trace()
                         # Sample batches of data points and Pz noise
                         data_ids = np.random.choice(train_size,
                                             opts['batch_size'],
@@ -896,7 +906,7 @@ def save_plots(opts, sample_train,sample_test,
                                 metric='correlation').fit_transform(np.concatenate((enc_test,enc_means_test,sample_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
-                c=label_test[:num_pics], s=40, label='Qz test',cmap='Accent')
+                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10,'jet'))
     plt.colorbar()
     plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
                 color='deepskyblue', s=10, marker='x',label='mean Qz test')
@@ -947,3 +957,15 @@ def save_plots(opts, sample_train,sample_test,
     fig.savefig(utils.o_gfile((opts['work_dir'], filename), 'wb'),
                 dpi=dpi, format='png')
     plt.close()
+
+def discrete_cmap(N, base_cmap=None):
+    """Create an N-bin discrete colormap from the specified input map"""
+
+    # Note that if base_cmap is a string or None, you can simply do
+    #    return plt.cm.get_cmap(base_cmap, N)
+    # The following works for string, None, or a colormap instance:
+
+    base = plt.cm.get_cmap(base_cmap)
+    color_list = base(np.linspace(0, 1, N))
+    cmap_name = base.name + str(N)
+    return base.from_list(cmap_name, color_list, N)
