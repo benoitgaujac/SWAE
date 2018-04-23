@@ -10,6 +10,8 @@ import utils
 parser = argparse.ArgumentParser()
 parser.add_argument("--exp", default='mnist',
                     help='dataset [mnist/celebA/dsprites]')
+parser.add_argument("--alg",
+                    help='algo to train [wae/vae]')
 parser.add_argument("--zdim",
                     help='dimensionality of the latent space',
                     type=int)
@@ -48,6 +50,9 @@ def main():
         opts = configs.config_grassli_small
     else:
         assert False, 'Unknown experiment configuration'
+
+    if FLAGS.alg:
+        opts['method'] = FLAGS.alg
 
     if FLAGS.zdim:
         opts['zdim'] = FLAGS.zdim

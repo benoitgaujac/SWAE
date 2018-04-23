@@ -48,49 +48,40 @@ class WAE(object):
 
         # --- Transformation ops
         # Encode the content of sample_points placeholder
-        if opts['e_noise'] in ('deterministic', 'implicit', 'add_noise'):
-            self.enc_mean, self.enc_logsigmas, self.enc_mixweight = None, None, None
-            res = encoder(opts, inputs=self.sample_points,
-                            is_training=self.is_training)
-            if opts['e_noise'] == 'implicit':
-                self.encoded, self.encoder_A = res
-            else:
-                self.encoded = res
-        elif opts['e_noise'] in ('gaussian', 'mixture'):
-            if opts['e_means']=='fixed':
-                _, _, enc_logmixweight = encoder(opts, inputs=self.sample_points,
-                                                                is_training=self.is_training)
-                self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
-                eps = tf.zeros([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
-                self.enc_mean = self.pz_means + eps
-                self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
-            elif opts['e_means']=='mean':
-                enc_mean, _, enc_logmixweight = encoder(opts, inputs=self.sample_points,
-                                                                is_training=self.is_training)
-                self.debug_mix = enc_logmixweight
-                self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
-                self.enc_mean = enc_mean
-                self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
-            elif opts['e_means']=='learnable':
-                enc_mean, enc_logsigmas, enc_logmixweight = encoder(opts, inputs=self.sample_points,
-                                                                is_training=self.is_training)
-                self.debug_mix = enc_logmixweight
-                self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
-                self.enc_mean = enc_mean
-                enc_logsigmas = tf.clip_by_value(enc_logsigmas, -50, 50)
-                self.enc_logsigmas = enc_logsigmas
-            # Encoding all mixtures
-            self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
-                                                tf.exp(self.enc_logsigmas),
-                                                opts['e_noise'],sample_size,'tensor')
-            # select mixture components according to the encoded mixture weights
-            idx = tf.reshape(tf.multinomial(enc_logmixweight, 1),[-1])
-            rng = tf.range(sample_size)
-            zero = tf.zeros([tf.cast(sample_size,dtype=tf.int32)],dtype=tf.int64)
-            mix_idx = tf.stack([rng,idx],axis=-1)
-            self.encoded_means = tf.gather_nd(self.enc_mean,mix_idx)
-            mix_idx = tf.stack([rng,idx,zero],axis=-1)
-            self.encoded = tf.gather_nd(self.mixtures_encoded,mix_idx)
+        if opts['e_means']=='fixed':
+            _, _, enc_logmixweight = encoder(opts, inputs=self.sample_points,
+                                                            is_training=self.is_training)
+            self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
+            eps = tf.zeros([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
+            self.enc_mean = self.pz_means + eps
+            self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
+        elif opts['e_means']=='mean':
+            enc_mean, _, enc_logmixweight = encoder(opts, inputs=self.sample_points,
+                                                            is_training=self.is_training)
+            self.debug_mix = enc_logmixweight
+            self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
+            self.enc_mean = enc_mean
+            self.enc_logsigmas = opts['init_e_std']*tf.ones([tf.cast(sample_size,dtype=tf.int32),opts['nmixtures'],opts['zdim']],dtype=tf.float32)
+        elif opts['e_means']=='learnable':
+            enc_mean, enc_logsigmas, enc_logmixweight = encoder(opts, inputs=self.sample_points,
+                                                            is_training=self.is_training)
+            self.debug_mix = enc_logmixweight
+            self.enc_mixweight = tf.nn.softmax(enc_logmixweight,axis=-1)
+            self.enc_mean = enc_mean
+            enc_logsigmas = tf.clip_by_value(enc_logsigmas, -50, 50)
+            self.enc_logsigmas = enc_logsigmas
+        # Encoding all mixtures
+        self.mixtures_encoded = self.sample_mixtures(self.enc_mean,
+                                            tf.exp(self.enc_logsigmas),
+                                            opts['e_noise'],sample_size,'tensor')
+        # select mixture components according to the encoded mixture weights
+        idx = tf.reshape(tf.multinomial(enc_logmixweight, 1),[-1])
+        rng = tf.range(sample_size)
+        zero = tf.zeros([tf.cast(sample_size,dtype=tf.int32)],dtype=tf.int64)
+        mix_idx = tf.stack([rng,idx],axis=-1)
+        self.encoded_means = tf.gather_nd(self.enc_mean,mix_idx)
+        mix_idx = tf.stack([rng,idx,zero],axis=-1)
+        self.encoded = tf.gather_nd(self.mixtures_encoded,mix_idx)
         # Decode the all points encoded above (i.e. reconstruct)
         noise = tf.reshape(self.mixtures_encoded,[-1,opts['zdim']])
         self.reconstructed, self.reconstructed_logits = decoder(opts, noise=noise,
@@ -111,14 +102,14 @@ class WAE(object):
         # Compute matching penalty cost
         self.penalty = self.matching_penalty(self.sample_mix_noise,self.mixtures_encoded)
         # Compute wae obj
-        self.wae_objective = self.loss_reconstruct \
-                            + self.lmbd * self.penalty
+        self.objective = self.loss_reconstruct \
+                        + self.lmbd * self.penalty
         # Compute entropy of mixture weights if needed
         if opts['entropy']:
             mean_mixweight = tf.reduce_sum(self.enc_mixweight,axis=0)
             h = tf.multiply(mean_mixweight,tf.log(mean_mixweight))
             self.H = - tf.reduce_sum(h)
-            self.wae_objective = self.wae_objective - self.H_lambda * self.H
+            self.objective = self.objective - self.H_lambda * self.H
         else:
             self.H = None
         # Add pretraining
@@ -150,11 +141,11 @@ class WAE(object):
         opts = self.opts
         decay = tf.placeholder(tf.float32, name='rate_decay_ph')
         is_training = tf.placeholder(tf.bool, name='is_training_ph')
-        wae_lambda = tf.placeholder(tf.float32, name='lambda_ph')
+        lmbda = tf.placeholder(tf.float32, name='lambda')
 
         self.lr_decay = decay
         self.is_training = is_training
-        self.lmbd = wae_lambda
+        self.lmbd = lmbda
         self.H_lambda = opts['h_lambda']
 
     def add_savers(self):
@@ -240,6 +231,14 @@ class WAE(object):
         return opts['pz_scale'] * noise
 
     def matching_penalty(self,samples_pz, samples_qz):
+        opts = self.opts
+        if opts['method']=='wae':
+            loss_match = self.wae_matching_penalty(samples_pz, samples_qz)
+        elif opts['method']=='vae':
+            loss_match = self.vae_matching_penalty(samples_qz)
+        return loss_match
+
+    def wae_matching_penalty(self,samples_pz, samples_qz):
         opts = self.opts
         if opts['penalty'] == 'mmd':
             loss_match = self.mmd_penalty(samples_pz, samples_qz)
@@ -422,28 +421,40 @@ class WAE(object):
     def OT_penalty(self, sample_pz, sample_qz):
         assert False, 'To implement'
 
-    def pretrain_loss(self):
+    def vae_matching_penalty(self,samples_qz):
         opts = self.opts
-        # Adding ops to pretrain the encoder so that mean and covariance
-        # of Qz will try to match those of Pz
-        # Means
-        mean_pz = self.pz_means
-        mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=[0,2])
-        mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))
-        # Covariances
-        centered_pz = self.sample_mix_noise - tf.expand_dims(mean_pz,axis=-2)
-        square = tf.reduce_sum(tf.square(centered_pz),axis=-1)
-        cov_pz = tf.reduce_mean(square,axis=[0,2])
-        #cov_pz /= opts['e_pretrain_sample_size'] - 1.
-        centered_qz = self.mixtures_encoded - tf.expand_dims(mean_qz,axis=-2)
-        square = tf.reduce_sum(tf.square(centered_qz),axis=-1)
-        cov_qz = tf.reduce_mean(square,axis=[0,2])
-        #cov_qz /= opts['e_pretrain_sample_size'] - 1.
-        cov_loss = tf.reduce_sum(tf.square(cov_pz - cov_qz))
+        # Pz term
+        mu_pz = tf.expand_dims(self.pz_means,axis=1)
+        logdet_pz = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
+        square_pz = tf.divide(tf.square(samples_qz - mu_pz),self.pz_covs)
+        square_pz = tf.reduce_sum(square_pz,axis=-1)
+        log_pz = - (logdet_pz + square_pz) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        # Qz term
+        mu_pz = tf.expand_dims(self.enc_mean,axis=2)
+        sigma_pz = tf.expand_dims(tf.exp(self.enc_logsigmas),axis=2)
+        weights = tf.expand_dims(self.enc_mixweight,axis=2)
+        logdet_qz = tf.log(tf.reduce_prod(sigma_pz,axis=-1))# + opts['zdim'] * tf.log(2*pi)
+        square_qz = tf.divide(tf.square(samples_qz - mu_pz),sigma_pz)
+        square_pz = tf.reduce_sum(square_qz,axis=-1)
+        log_qz = - (logdet_qz + square_pz) / 2 + tf.log(weights)
 
-        return mean_loss + cov_loss
+        kl = tf.reduce_mean(log_qz-log_pz,axis=-1)
+        kl = tf.multiply(kl,self.enc_mixweight)
+        loss_match = -tf.reduce_sum(kl)
+        loss_match = tf.reduce_mean(loss_match)
+
+        return loss_match
 
     def reconstruction_loss(self):
+        opts = self.opts
+        if opts['method']=='wae':
+            loss = self.wae_recons_loss()
+        elif opts['method']=='vae':
+            loss = self.vae_recons_loss()
+
+        return loss
+
+    def wae_recons_loss(self):
         opts = self.opts
         real = tf.expand_dims(tf.expand_dims(self.sample_points,axis=1),axis=1)
         reconstr = self.reconstructed
@@ -479,6 +490,15 @@ class WAE(object):
             assert False, 'Unknown cost function %s' % opts['cost']
         return loss
 
+    def vae_recons_loss(self):
+        opts = self.opts
+        real = tf.expand_dims(tf.expand_dims(self.sample_points,axis=1),axis=1)
+        logit = self.reconstructed_logits
+        l = real*tf.log(logit) + (1-real)*tf.log(1-logit)
+        loss = tf.reduce_mean(l,axis=[2,3,4,5,])
+        loss = tf.reduce_sum(tf.multiply(loss,self.enc_mixweight))
+        return -loss
+
     def optimizer(self, lr, decay=1.):
         opts = self.opts
         lr *= decay
@@ -499,13 +519,13 @@ class WAE(object):
         ae_vars = encoder_vars + decoder_vars
         if opts['clip_grad']:
             # Clipping gradient
-            grad, var = zip(*opt.compute_gradients(loss=self.wae_objective,
-                                                                var_list=ae_vars))
+            grad, var = zip(*opt.compute_gradients(loss=self.objective,
+                                                    var_list=ae_vars))
             clip_grad, _ = tf.clip_by_global_norm(grad, opts['clip_norm'])
             self.swae_opt = opt.apply_gradients(zip(clip_grad, var))
         else:
             # No clipping
-            self.swae_opt = opt.minimize(loss=self.wae_objective,
+            self.swae_opt = opt.minimize(loss=self.objective,
                                         var_list=ae_vars)
         # MMD optimizer
         if opts['penalty']=='mmd' and opts['MMD_gan']:
@@ -526,6 +546,27 @@ class WAE(object):
         else:
             self.pretrain_opt = None
 
+    def pretrain_loss(self):
+        opts = self.opts
+        # Adding ops to pretrain the encoder so that mean and covariance
+        # of Qz will try to match those of Pz
+        # Means
+        mean_pz = self.pz_means
+        mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=[0,2])
+        mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))
+        # Covariances
+        centered_pz = self.sample_mix_noise - tf.expand_dims(mean_pz,axis=-2)
+        square = tf.reduce_sum(tf.square(centered_pz),axis=-1)
+        cov_pz = tf.reduce_mean(square,axis=[0,2])
+        #cov_pz /= opts['e_pretrain_sample_size'] - 1.
+        centered_qz = self.mixtures_encoded - tf.expand_dims(mean_qz,axis=-2)
+        square = tf.reduce_sum(tf.square(centered_qz),axis=-1)
+        cov_qz = tf.reduce_mean(square,axis=[0,2])
+        #cov_qz /= opts['e_pretrain_sample_size'] - 1.
+        cov_loss = tf.reduce_sum(tf.square(cov_pz - cov_qz))
+
+        return mean_loss + cov_loss
+
     def pretrain_encoder(self, data):
         opts = self.opts
         steps_max = 1500
@@ -545,7 +586,11 @@ class WAE(object):
 
     def train(self, data):
         opts = self.opts
-        logging.error('Training SWAE, Matching penalty: %s' % opts['penalty'])
+        logging.error('Training %s, Matching penalty: %s' % (opts['method'],opts['penalty']))
+
+        utils.create_dir(opts['method'])
+        work_dir = os.path.join(opts['method'],opts['work_dir'])
+
         losses, losses_rec, losses_match, losses_means  = [], [], [], []
         mmd_losses= []
         batches_num = int(data.num_points / opts['batch_size'])
@@ -583,7 +628,7 @@ class WAE(object):
 
             # Save the model
             if epoch > 0 and epoch % opts['save_every_epoch'] == 0:
-                self.saver.save(self.sess, os.path.join(opts['work_dir'],
+                self.saver.save(self.sess, os.path.join(work_dir,
                                                             'checkpoints',
                                                             'trained-wae'),
                                 global_step=counter)
@@ -617,7 +662,7 @@ class WAE(object):
                 # Update encoder and decoder
                 [_, loss, loss_rec, loss_match] = self.sess.run(
                         [self.swae_opt,
-                         self.wae_objective,
+                         self.objective,
                          self.loss_reconstruct,
                          self.penalty],
                         feed_dict={self.sample_points: batch_images,
@@ -755,7 +800,7 @@ class WAE(object):
         # Save the final model
         if epoch > 0:
             self.saver.save(self.sess,
-                             os.path.join(opts['work_dir'],
+                             os.path.join(work_dir,
                                           'checkpoints',
                                           'trained-wae-final'),
                              global_step=counter)
@@ -828,7 +873,6 @@ def save_plots(opts, sample_train,sample_test,
 
     ### Sample plots
     for sample in [sample_gen, sample_train]:
-
         assert len(sample) == num_pics
         pics = []
         for idx in range(num_pics):
@@ -836,7 +880,6 @@ def save_plots(opts, sample_train,sample_test,
                 pics.append(1. - sample[idx, :, :, :])
             else:
                 pics.append(sample[idx, :, :, :])
-
         # Figuring out a layout
         pics = np.array(pics)
         image = np.concatenate(np.split(pics, num_cols), axis=2)
@@ -953,8 +996,8 @@ def save_plots(opts, sample_train,sample_test,
                                 size=20, transform=ax.transAxes)
 
     # Saving
-    utils.create_dir(opts['work_dir'])
-    fig.savefig(utils.o_gfile((opts['work_dir'], filename), 'wb'),
+    utils.create_dir(work_dir)
+    fig.savefig(utils.o_gfile((work_dir, filename), 'wb'),
                 dpi=dpi, format='png')
     plt.close()
 

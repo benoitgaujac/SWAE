@@ -50,7 +50,6 @@ def encoder(opts, inputs, reuse=False, is_training=False):
 
         return res[0], res[1], mixweights
 
-
 def mixweight_encoder(opts, inputs, is_training=False, reuse=False):
     if opts['e_arch_d'] == 'mlp':
         # Encoder uses only fully connected layers with ReLus
