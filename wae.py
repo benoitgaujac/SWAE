@@ -426,7 +426,7 @@ class WAE(object):
 
         kl_g = 1 + 2*tf.log(tf.exp(self.enc_logsigmas))\
                     - tf.square(self.enc_mean)\
-                    - tf.square(tf.exp(self.enc_logsigmas))\
+                    - tf.square(tf.exp(self.enc_logsigmas))
         kl_g = tf.reduce_sum(kl_g,axis=-1)
         kl_d = tf.log(self.enc_mixweight) + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         loss_match = tf.multiply(kl_g + kl_d,self.enc_mixweight)
