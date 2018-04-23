@@ -752,13 +752,13 @@ class WAE(object):
                                     losses, losses_rec, losses_match,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
 
-        # # Save the final model
-        # if epoch > 0:
-        #     self.saver.save(self.sess,
-        #                      os.path.join(opts['work_dir'],
-        #                                   'checkpoints',
-        #                                   'trained-wae-final'),
-        #                      global_step=counter)
+        # Save the final model
+        if epoch > 0:
+            self.saver.save(self.sess,
+                             os.path.join(opts['work_dir'],
+                                          'checkpoints',
+                                          'trained-wae-final'),
+                             global_step=counter)
 
 def save_plots(opts, sample_train,sample_test,
                     label_test,
