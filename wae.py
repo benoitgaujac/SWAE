@@ -423,27 +423,36 @@ class WAE(object):
 
     def vae_matching_penalty(self,samples_qz):
         opts = self.opts
-        # Pz term
-        mu_pz = tf.expand_dims(self.pz_means,axis=1)
-        logdet_pz = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
-        square_pz = tf.divide(tf.square(samples_qz - mu_pz),self.pz_covs)
-        square_pz = tf.reduce_sum(square_pz,axis=-1)
-        log_pz = - (logdet_pz + square_pz) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
-        # Qz term
-        mu_pz = tf.expand_dims(self.enc_mean,axis=2)
-        sigma_pz = tf.expand_dims(tf.exp(self.enc_logsigmas),axis=2)
-        weights = tf.expand_dims(self.enc_mixweight,axis=2)
-        logdet_qz = tf.log(tf.reduce_prod(sigma_pz,axis=-1))# + opts['zdim'] * tf.log(2*pi)
-        square_qz = tf.divide(tf.square(samples_qz - mu_pz),sigma_pz)
-        square_pz = tf.reduce_sum(square_qz,axis=-1)
-        log_qz = - (logdet_qz + square_pz) / 2 + tf.log(weights)
 
-        kl = tf.reduce_mean(log_qz-log_pz,axis=-1)
-        kl = tf.multiply(kl,self.enc_mixweight)
-        loss_match = -tf.reduce_sum(kl)
+        kl_g = 1 + 2*tf.log(tf.exp(self.enc_logsigmas))\
+                    - tf.square(self.enc_mean)\
+                    - tf.square(tf.exp(self.enc_logsigmas))\
+        kl_g = tf.reduce_sum(kl_g,axis=-1)
+        kl_d = tf.log(self.enc_mixweight) + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        loss_match = tf.multiply(kl_g + kl_d,self.enc_mixweight)
+        loss_match = tf.reduce_sum(loss_match,axis=-1)
         loss_match = tf.reduce_mean(loss_match)
+        # # Pz term
+        # mu_pz = tf.expand_dims(self.pz_means,axis=1)
+        # logdet_pz = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
+        # square_pz = tf.divide(tf.square(samples_qz - mu_pz),self.pz_covs)
+        # square_pz = tf.reduce_sum(square_pz,axis=-1)
+        # log_pz = - (logdet_pz + square_pz) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        # # Qz term
+        # mu_pz = tf.expand_dims(self.enc_mean,axis=2)
+        # sigma_pz = tf.expand_dims(tf.exp(self.enc_logsigmas),axis=2)
+        # weights = tf.expand_dims(self.enc_mixweight,axis=2)
+        # logdet_qz = tf.log(tf.reduce_prod(sigma_pz,axis=-1))# + opts['zdim'] * tf.log(2*pi)
+        # square_qz = tf.divide(tf.square(samples_qz - mu_pz),sigma_pz)
+        # square_pz = tf.reduce_sum(square_qz,axis=-1)
+        # log_qz = - (logdet_qz + square_pz) / 2 + tf.log(weights)
+        #
+        # kl = tf.reduce_mean(log_qz-log_pz,axis=-1)
+        # kl = tf.multiply(kl,self.enc_mixweight)
+        # loss_match = -tf.reduce_sum(kl)
+        # loss_match = tf.reduce_mean(loss_match)
 
-        return loss_match
+        return -loss_match
 
     def reconstruction_loss(self):
         opts = self.opts
