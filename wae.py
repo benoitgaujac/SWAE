@@ -589,7 +589,7 @@ class WAE(object):
         if opts['method']=='wae':
             logging.error('Training WAE, Matching penalty: %s' % (opts['penalty']))
         elif opts['method']=='vae':
-            logging.error('Training VAE')            
+            logging.error('Training VAE')
 
         utils.create_dir(opts['method'])
         work_dir = os.path.join(opts['method'],opts['work_dir'])
@@ -798,6 +798,7 @@ class WAE(object):
                                     self.fixed_noise,
                                     sample_gen,
                                     losses, losses_rec, losses_match,
+                                    work_dir,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
 
         # Save the final model
@@ -816,6 +817,7 @@ def save_plots(opts, sample_train,sample_test,
                     sample_prior,
                     sample_gen,
                     losses, losses_rec, losses_match,
+                    work_dir,
                     filename):
     """ Generates and saves the plot of the following layout:
         img1 | img2 | img3
