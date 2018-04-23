@@ -493,7 +493,7 @@ class WAE(object):
     def vae_recons_loss(self):
         opts = self.opts
         real = tf.expand_dims(tf.expand_dims(self.sample_points,axis=1),axis=1)
-        logit = self.reconstructed_logits
+        logit = self.reconstructed
         l = real*tf.log(logit) + (1-real)*tf.log(1-logit)
         loss = tf.reduce_mean(l,axis=[2,3,4,5,])
         loss = tf.reduce_sum(tf.multiply(loss,self.enc_mixweight))
