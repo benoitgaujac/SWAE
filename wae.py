@@ -586,7 +586,10 @@ class WAE(object):
 
     def train(self, data):
         opts = self.opts
-        logging.error('Training %s, Matching penalty: %s' % (opts['method'],opts['penalty']))
+        if opts['method']=='wae':
+            logging.error('Training WAE, Matching penalty: %s' % (opts['penalty']))
+        elif opts['method']=='vae':
+            logging.error('Training VAE')            
 
         utils.create_dir(opts['method'])
         work_dir = os.path.join(opts['method'],opts['work_dir'])
