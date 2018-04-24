@@ -424,12 +424,12 @@ class WAE(object):
     def vae_matching_penalty(self,samples_qz):
         opts = self.opts
         # Continuous KL
-        kl_g = 1 + 2*tf.log(tf.exp(self.enc_logsigmas))\
-                    - tf.square(self.enc_mean)\
+        kl_g = 1 + 2 * self.enc_logsigmas \
+                    - tf.square(self.enc_mean) \
                     - tf.square(tf.exp(self.enc_logsigmas))
-        kl_g = tf.reduce_sum(kl_g,axis=-1)
+        kl_g = 0.5 * tf.reduce_sum(kl_g,axis=-1)
         # Discrete KL
-        kl_d = tf.log(self.enc_mixweight)\
+        kl_d = tf.log(self.enc_mixweight) \
                     + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         # Weighted KL and loss
         loss_match = tf.multiply(kl_d - kl_g,self.enc_mixweight)
@@ -487,7 +487,8 @@ class WAE(object):
         opts = self.opts
         real = tf.expand_dims(tf.expand_dims(self.sample_points,axis=1),axis=1)
         logit = self.reconstructed
-        l = real*tf.log(logit) + (1-real)*tf.log(1-logit)
+        eps = 1e-10
+        l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
         loss = tf.reduce_mean(l,axis=[2,3,4,5,])
         loss = tf.reduce_sum(tf.multiply(loss,self.enc_mixweight))
         return -loss
