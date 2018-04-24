@@ -699,7 +699,6 @@ class WAE(object):
                 # min_l = [np.amin(t) for t in grad]
                 # print(min_l)
 
-
                 # Update learning rate if necessary
                 if opts['lr_schedule'] == 'plateau':
                     # First 30 epochs do nothing
@@ -724,13 +723,12 @@ class WAE(object):
 
                 # Update regularizer if necessary
                 if opts['lambda_schedule'] == 'adaptive':
-                    if wait_lambda >= 999 and len(losses_rec) > 0:
+                    if wait_lambda >= 2999 and len(losses_rec) > 0:
                         last_rec = losses_rec[-1]
                         last_match = losses_match[-1]
                         wae_lambda = 0.5 * wae_lambda + \
                                      0.5 * last_rec / abs(last_match)
-                        if opts['verbose']:
-                            logging.error('Lambda updated to %f' % wae_lambda)
+                        logging.error('Lambda updated to %f' % wae_lambda)
                         wait_lambda = 0
                     else:
                         wait_lambda += 1
