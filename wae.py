@@ -423,34 +423,18 @@ class WAE(object):
 
     def vae_matching_penalty(self,samples_qz):
         opts = self.opts
-
+        # Continuous KL
         kl_g = 1 + 2*tf.log(tf.exp(self.enc_logsigmas))\
                     - tf.square(self.enc_mean)\
                     - tf.square(tf.exp(self.enc_logsigmas))
         kl_g = tf.reduce_sum(kl_g,axis=-1)
-        kl_d = tf.log(self.enc_mixweight) + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        # Discrete KL
+        kl_d = tf.log(self.enc_mixweight)\
+                    + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+        # Weighted KL and loss
         loss_match = tf.multiply(kl_d - kl_g,self.enc_mixweight)
         loss_match = tf.reduce_sum(loss_match,axis=-1)
         loss_match = tf.reduce_mean(loss_match)
-        # # Pz term
-        # mu_pz = tf.expand_dims(self.pz_means,axis=1)
-        # logdet_pz = tf.log(tf.reduce_prod(self.pz_covs))# + opts['zdim'] * tf.log(2*pi)
-        # square_pz = tf.divide(tf.square(samples_qz - mu_pz),self.pz_covs)
-        # square_pz = tf.reduce_sum(square_pz,axis=-1)
-        # log_pz = - (logdet_pz + square_pz) / 2 - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
-        # # Qz term
-        # mu_pz = tf.expand_dims(self.enc_mean,axis=2)
-        # sigma_pz = tf.expand_dims(tf.exp(self.enc_logsigmas),axis=2)
-        # weights = tf.expand_dims(self.enc_mixweight,axis=2)
-        # logdet_qz = tf.log(tf.reduce_prod(sigma_pz,axis=-1))# + opts['zdim'] * tf.log(2*pi)
-        # square_qz = tf.divide(tf.square(samples_qz - mu_pz),sigma_pz)
-        # square_pz = tf.reduce_sum(square_qz,axis=-1)
-        # log_qz = - (logdet_qz + square_pz) / 2 + tf.log(weights)
-        #
-        # kl = tf.reduce_mean(log_qz-log_pz,axis=-1)
-        # kl = tf.multiply(kl,self.enc_mixweight)
-        # loss_match = -tf.reduce_sum(kl)
-        # loss_match = tf.reduce_mean(loss_match)
 
         return loss_match
 
@@ -559,22 +543,14 @@ class WAE(object):
         opts = self.opts
         # Adding ops to pretrain the encoder so that mean and covariance
         # of Qz will try to match those of Pz
-        # Means
-        mean_pz = self.pz_means
-        mean_qz = tf.reduce_mean(self.mixtures_encoded, axis=[0,2])
-        mean_loss = tf.reduce_sum(tf.square(mean_pz - mean_qz))
+        qz_means = tf.reduce_mean(self.encoded_means, axis=0)
+        qz_covs = tf.reduce_mean(tf.exp(self.enc_logsigmas), axis=0)
+        # Mean loss
+        mean_loss = tf.reduce_sum(tf.square(self.pz_means - qz_means),axis=-1)
         # Covariances
-        centered_pz = self.sample_mix_noise - tf.expand_dims(mean_pz,axis=-2)
-        square = tf.reduce_sum(tf.square(centered_pz),axis=-1)
-        cov_pz = tf.reduce_mean(square,axis=[0,2])
-        #cov_pz /= opts['e_pretrain_sample_size'] - 1.
-        centered_qz = self.mixtures_encoded - tf.expand_dims(mean_qz,axis=-2)
-        square = tf.reduce_sum(tf.square(centered_qz),axis=-1)
-        cov_qz = tf.reduce_mean(square,axis=[0,2])
-        #cov_qz /= opts['e_pretrain_sample_size'] - 1.
-        cov_loss = tf.reduce_sum(tf.square(cov_pz - cov_qz))
+        cov_loss = tf.reduce_sum(tf.square(self.pz_covs - qz_covs),axis=-1)
 
-        return mean_loss + cov_loss
+        return tf.reduce_mean(mean_loss + cov_loss)
 
     def pretrain_encoder(self, data):
         opts = self.opts
@@ -792,8 +768,8 @@ class WAE(object):
                                 epoch + 1, opts['epoch_num'],
                                 it + 1, batches_num)
                     logging.error(debug_str)
-                    debug_str = 'LOSS=%.5f, MATCH=%.5f, ' \
-                                'RECONS=%.5f, RECONS_TEST=%.5f' % (
+                    debug_str = 'LOSS=%.3f, MATCH=%.3f, ' \
+                                'RECONS=%.3f, RECONS_TEST=%.3f' % (
                                 losses[-1], losses_match[-1],
                                 losses_rec[-1], loss_rec_test)
                     logging.error(debug_str)
