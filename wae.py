@@ -551,7 +551,7 @@ class WAE(object):
         # Covariances
         cov_loss = tf.reduce_sum(tf.square(self.pz_covs - qz_covs),axis=-1)
 
-        return tf.reduce_mean(mean_loss + cov_loss)
+        return tf.reduce_sum(mean_loss + cov_loss)
 
     def pretrain_encoder(self, data):
         opts = self.opts
