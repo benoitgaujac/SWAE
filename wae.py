@@ -723,7 +723,7 @@ class WAE(object):
 
                 # Update regularizer if necessary
                 if opts['lambda_schedule'] == 'adaptive':
-                    if wait_lambda >= 2999 and len(losses_rec) > 0:
+                    if wait_lambda >= 1999 and len(losses_rec) > 0:
                         last_rec = losses_rec[-1]
                         last_match = losses_match[-1]
                         wae_lambda = 0.5 * wae_lambda + \
