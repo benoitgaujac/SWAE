@@ -171,7 +171,7 @@ class WAE(object):
             self.pz_covs = None
         elif distr == 'mixture':
             if opts['zdim']==2:
-                means = tf.random_uniform((opts['nmixtures'], opts['zdim']),minval=-1,maxval=1,dtype=tf.float32)
+                means = tf.random_uniform(low=-1.,high=1.,(opts['nmixtures'], opts['zdim'])).astype(np.float32)
                 # means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
                 # for k in range(0,opts['nmixtures']):
                 #     means[k] = sqrt(2.0)*np.array([cos(k * 2*pi/opts['nmixtures']),sin(k * 2*pi/opts['nmixtures'])]).astype(np.float32)
