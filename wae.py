@@ -424,9 +424,9 @@ class WAE(object):
     def vae_matching_penalty(self,samples_qz):
         opts = self.opts
         # Continuous KL
-        kl_g = 1 + 2 * self.enc_logsigmas \
+        kl_g = 1 + self.enc_logsigmas \
                     - tf.square(self.enc_mean) \
-                    - tf.square(tf.exp(self.enc_logsigmas))
+                    - tf.exp(self.enc_logsigmas)
         kl_g = 0.5 * tf.reduce_sum(kl_g,axis=-1)
         # Discrete KL
         kl_d = tf.log(self.enc_mixweight) \
