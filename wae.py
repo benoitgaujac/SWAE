@@ -452,7 +452,7 @@ class WAE(object):
         # loss_match = -tf.reduce_sum(kl)
         # loss_match = tf.reduce_mean(loss_match)
 
-        return -loss_match
+        return loss_match
 
     def reconstruction_loss(self):
         opts = self.opts
