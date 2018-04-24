@@ -544,14 +544,18 @@ class WAE(object):
         opts = self.opts
         # Adding ops to pretrain the encoder so that mean and covariance
         # of Qz will try to match those of Pz
-        qz_means = tf.reduce_mean(self.encoded_means, axis=0)
-        qz_covs = tf.reduce_mean(tf.exp(self.enc_logsigmas), axis=0)
+        # qz_means = tf.reduce_mean(self.encoded_means, axis=0)
+        # qz_covs = tf.reduce_mean(tf.exp(self.enc_logsigmas), axis=0)
+        qz_means = tf.reduce_mean(self.mixtures_encoded, axis=[0,2], keepdims=True)
+        pz_means = tf.reduce_mean(self.sample_mix_noise, axis=[0,2], keepdims=True)
         # Mean loss
-        mean_loss = tf.reduce_sum(tf.square(self.pz_means - qz_means),axis=-1)
+        mean_loss = tf.reduce_mean(tf.square(qz_means - pz_means))
         # Covariances
-        cov_loss = tf.reduce_sum(tf.square(self.pz_covs - qz_covs),axis=-1)
+        qz_covs = tf.reduce_sum(tf.square(self.mixtures_encoded-qz_means),axis=[0,2])
+        pz_covs = tf.reduce_sum(tf.square(self.sample_mix_noise-pz_means),axis=[0,2])
+        cov_loss = tf.reduce_mean(tf.square(qz_covs - pz_covs))
 
-        return tf.reduce_sum(mean_loss + cov_loss)
+        return mean_loss + cov_loss
 
     def pretrain_encoder(self, data):
         opts = self.opts
