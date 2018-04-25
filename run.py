@@ -72,8 +72,10 @@ def main():
     if opts['verbose']:
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-    utils.create_dir(opts['work_dir'])
-    utils.create_dir(os.path.join(opts['work_dir'],
+    utils.create_dir(opts['method'])
+    work_dir = os.path.join(opts['method'],opts['work_dir'])
+    utils.create_dir(work_dir)
+    utils.create_dir(os.path.join(work_dir,
                      'checkpoints'))
     # Dumping all the configs to the text file
     with utils.o_gfile((opts['work_dir'], 'params.txt'), 'w') as text:
