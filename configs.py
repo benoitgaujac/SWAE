@@ -75,12 +75,12 @@ config_mnist['lr'] = 0.001
 config_mnist['lr_adv'] = 0.0005
 config_mnist['lr_schedule'] = 'manual' #manual, plateau, or a number
 config_mnist['mmd_lr'] = 0.0003
-config_mnist['batch_size'] = 128
-config_mnist['nsamples'] = 2
+config_mnist['clip_grad'] = True
+config_mnist['clip_norm'] = 10.
+config_mnist['batch_size'] = 100
+config_mnist['nsamples'] = 3
 config_mnist['train_dataset_size'] = 512
 config_mnist['epoch_num'] = 100
-config_mnist['mmd_iter'] = 5
-config_mnist['mmd_every'] = 1
 config_mnist['init_std'] = 0.0099999
 config_mnist['init_bias'] = 0.0
 config_mnist['batch_norm'] = True
@@ -88,11 +88,14 @@ config_mnist['batch_norm_eps'] = 1e-05
 config_mnist['batch_norm_decay'] = 0.9
 config_mnist['conv_filters_dim'] = 3
 
+config_mnist['method'] = 'vae' #vae, wae
+
 config_mnist['e_pretrain'] = True
 config_mnist['e_pretrain_sample_size'] = 200
-config_mnist['e_noise'] = 'mixture' # deterministic, implicit, add_noise, gaussian, mixture
-config_mnist['e_means'] = 'learnable'
+config_mnist['e_noise'] = 'mixture'
+config_mnist['e_means'] = 'learnable' #fixed, mean, learnable
 config_mnist['init_e_std'] = -2.0
+
 config_mnist['e_num_filters_g'] = 8
 config_mnist['e_num_layers_g'] = 1
 config_mnist['e_arch_g'] = 'mlp' # mlp, dcgan, ali, began
@@ -119,11 +122,14 @@ config_mnist['pz_scale'] = 1.0
 
 config_mnist['cost'] = 'l2sq' #l2, l2sq, l1, l2sq_wrong
 config_mnist['penalty'] = 'mmd'# mmd, kl
+config_mnist['sqrt_MMD'] = False #use true MMD estimator or square estimator
 config_mnist['lambda'] = 10.
 config_mnist['lambda_schedule'] = 'constant'
 
 config_mnist['mmd_kernel'] = 'IMQ' # RBF, IMQ
 config_mnist['MMD_gan'] = False
+config_mnist['mmd_iter'] = 5
+config_mnist['mmd_every'] = 1
 config_mnist['ae_lambda'] = 10.
 config_mnist['rg_lambda'] = 16.
 config_mnist['entropy'] = False
