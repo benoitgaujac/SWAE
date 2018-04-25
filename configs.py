@@ -59,7 +59,11 @@ config_mnist = {}
 config_mnist['dataset'] = 'mnist'
 config_mnist['verbose'] = False
 config_mnist['save_every_epoch'] = 1001
+<<<<<<< HEAD
 config_mnist['print_every'] = 100
+=======
+config_mnist['print_every'] = 500
+>>>>>>> a05c312325652b561ae8afac8e8f35d0ecb6d9ba
 config_mnist['work_dir'] = 'results_mnist'
 config_mnist['plot_num_pics'] = 100
 config_mnist['plot_num_cols'] = 10
@@ -80,7 +84,7 @@ config_mnist['clip_norm'] = 50.
 config_mnist['batch_size'] = 128
 config_mnist['nsamples'] = 6
 config_mnist['train_dataset_size'] = -1
-config_mnist['epoch_num'] = 50
+config_mnist['epoch_num'] = 30
 config_mnist['init_std'] = 0.0099999
 config_mnist['init_bias'] = 0.0
 config_mnist['batch_norm'] = True
