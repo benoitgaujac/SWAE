@@ -78,7 +78,7 @@ def main():
     utils.create_dir(os.path.join(work_dir,
                      'checkpoints'))
     # Dumping all the configs to the text file
-    with utils.o_gfile((opts['work_dir'], 'params.txt'), 'w') as text:
+    with utils.o_gfile((work_dir, 'params.txt'), 'w') as text:
         text.write('Parameters:\n')
         for key in opts:
             text.write('%s : %s\n' % (key, opts[key]))
