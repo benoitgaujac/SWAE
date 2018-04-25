@@ -27,7 +27,7 @@ config_celebA['init_bias'] = 0.0
 config_celebA['batch_norm'] = False
 config_celebA['batch_norm_eps'] = 1e-05
 config_celebA['batch_norm_decay'] = 0.9
-config_celebA['conv_filters_dim'] = 5
+config_celebA['conv_filters_dim'] = 3
 
 config_celebA['e_pretrain'] = True
 config_celebA['e_pretrain_sample_size'] = 256
@@ -59,7 +59,7 @@ config_mnist = {}
 config_mnist['dataset'] = 'mnist'
 config_mnist['verbose'] = False
 config_mnist['save_every_epoch'] = 1001
-config_mnist['print_every'] = 20
+config_mnist['print_every'] = 100
 config_mnist['work_dir'] = 'results_mnist'
 config_mnist['plot_num_pics'] = 100
 config_mnist['plot_num_cols'] = 10
@@ -71,37 +71,40 @@ config_mnist['data_source_url'] = 'http://yann.lecun.com/exdb/mnist/'
 
 config_mnist['optimizer'] = 'adam' # adam, sgd
 config_mnist['adam_beta1'] = 0.5
-config_mnist['lr'] = 0.001
-config_mnist['lr_adv'] = 0.0005
+config_mnist['lr'] = 0.0008
+config_mnist['lr_adv'] = 0.0008
 config_mnist['lr_schedule'] = 'manual' #manual, plateau, or a number
 config_mnist['mmd_lr'] = 0.0003
+config_mnist['clip_grad'] = False
+config_mnist['clip_norm'] = 50.
 config_mnist['batch_size'] = 128
-config_mnist['nsamples'] = 2
-config_mnist['train_dataset_size'] = 512
-config_mnist['epoch_num'] = 100
-config_mnist['mmd_iter'] = 5
-config_mnist['mmd_every'] = 1
+config_mnist['nsamples'] = 6
+config_mnist['train_dataset_size'] = -1
+config_mnist['epoch_num'] = 50
 config_mnist['init_std'] = 0.0099999
 config_mnist['init_bias'] = 0.0
 config_mnist['batch_norm'] = True
 config_mnist['batch_norm_eps'] = 1e-05
 config_mnist['batch_norm_decay'] = 0.9
-config_mnist['conv_filters_dim'] = 3
+config_mnist['conv_filters_dim'] = 5
+
+config_mnist['method'] = 'wae' #vae, wae
 
 config_mnist['e_pretrain'] = True
-config_mnist['e_pretrain_sample_size'] = 200
+config_mnist['e_pretrain_sample_size'] = 500
 config_mnist['e_noise'] = 'mixture' # deterministic, implicit, add_noise, gaussian, mixture
 config_mnist['e_means'] = 'learnable'
 config_mnist['init_e_std'] = -2.0
-config_mnist['e_num_filters_g'] = 8
-config_mnist['e_num_layers_g'] = 1
+
+config_mnist['e_num_filters_g'] = 16
+config_mnist['e_num_layers_g'] = 2
 config_mnist['e_arch_g'] = 'mlp' # mlp, dcgan, ali, began
-config_mnist['e_num_filters_d'] = 32
-config_mnist['e_num_layers_d'] = 2
-config_mnist['e_arch_d'] = 'mlp' # mlp, dcgan, ali, began
-config_mnist['g_num_filters'] = 32
-config_mnist['g_num_layers'] = 2
-config_mnist['g_arch'] = 'mlp' # mlp, dcgan, dcgan_mod, ali, began
+config_mnist['e_num_filters_d'] = 128
+config_mnist['e_num_layers_d'] = 3
+config_mnist['e_arch_d'] = 'dcgan' # mlp, dcgan, ali, began
+config_mnist['g_num_filters'] = 64
+config_mnist['g_num_layers'] = 3
+config_mnist['g_arch'] = 'dcgan' # mlp, dcgan, dcgan_mod, ali, began
 
 config_mnist['k_e_num_filters'] = 32
 config_mnist['k_e_num_layers'] = 2
@@ -111,23 +114,26 @@ config_mnist['k_g_num_layers'] = 2
 config_mnist['k_g_arch'] = 'mlp' # mlp, dcgan, dcgan_mod, ali, began
 config_mnist['k_outdim'] = 16
 
-config_mnist['zdim'] = 8
+config_mnist['zdim'] = 16
 config_mnist['pz'] = 'mixture' # uniform, gaussian, sphere, mixture
 config_mnist['nmixtures'] = 10
-config_mnist['sigma_prior'] = 0.1
-config_mnist['pz_scale'] = 1.0
+config_mnist['sigma_prior'] = 0.5
+config_mnist['pz_scale'] = 2.
 
 config_mnist['cost'] = 'l2sq' #l2, l2sq, l1, l2sq_wrong
 config_mnist['penalty'] = 'mmd'# mmd, kl
-config_mnist['lambda'] = 10.
+config_mnist['sqrt_MMD'] = False #use true MMD estimator or square estimator
+config_mnist['lambda'] = 200.
 config_mnist['lambda_schedule'] = 'constant'
 
 config_mnist['mmd_kernel'] = 'IMQ' # RBF, IMQ
 config_mnist['MMD_gan'] = False
+config_mnist['mmd_iter'] = 5
+config_mnist['mmd_every'] = 1
 config_mnist['ae_lambda'] = 10.
 config_mnist['rg_lambda'] = 16.
 config_mnist['entropy'] = False
-config_mnist['h_lambda'] = .1
+config_mnist['h_lambda'] = 1e-4
 
 # Toy MNIST experiment
 config_mnist_small = copy.deepcopy(config_mnist)
