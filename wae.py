@@ -241,7 +241,7 @@ class WAE(object):
 
     def matching_penalty(self,samples_pz, samples_qz):
         opts = self.opts
-        if opts['method']=='wae':
+        if opts['method']=='swae':
             loss_match = self.wae_matching_penalty(samples_pz, samples_qz)
         elif opts['method']=='vae':
             loss_match = self.vae_matching_penalty(samples_qz)
@@ -449,7 +449,7 @@ class WAE(object):
 
     def reconstruction_loss(self):
         opts = self.opts
-        if opts['method']=='wae':
+        if opts['method']=='swae':
             loss = self.wae_recons_loss()
         elif opts['method']=='vae':
             loss = self.vae_recons_loss()
@@ -585,7 +585,7 @@ class WAE(object):
 
     def train(self, data):
         opts = self.opts
-        if opts['method']=='wae':
+        if opts['method']=='swae':
             logging.error('Training WAE, Matching penalty: %s' % (opts['penalty']))
         elif opts['method']=='vae':
             logging.error('Training VAE')
