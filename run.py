@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--exp", default='mnist',
                     help='dataset [mnist/celebA/dsprites]')
 parser.add_argument("--alg",
-                    help='algo to train [wae/vae]')
+                    help='algo to train [swae/vae]')
 parser.add_argument("--zdim",
                     help='dimensionality of the latent space',
                     type=int)
