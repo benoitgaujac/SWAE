@@ -175,16 +175,24 @@ class WAE(object):
                 # means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
                 # for k in range(0,opts['nmixtures']):
                 #     means[k] = sqrt(2.0)*np.array([cos(k * 2*pi/opts['nmixtures']),sin(k * 2*pi/opts['nmixtures'])]).astype(np.float32)
+                self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim']),dtype='float32')
             else:
-                assert 2*opts['zdim']>=opts['nmixtures'], 'Too many mixtures in the latents.'
-                means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
-                for k in range(opts['nmixtures']):
-                    if k % 2 == 0:
-                        means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
-                    else:
-                        means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
+                if opts['zdim']+1>=opts['nmixtures']:
+                    means = np.zeros([opts['nmixtures'], opts['zdim']],dtype='float32')
+                    for k in range(opts['nmixtures']):
+                        if k<opts['zdim']:
+                            means[k,k] = 1
+                        else:
+                            means[-1] = - 1. / (1. + sqrt(opts['nmixtures']+1)) \
+                                            * np.ones((opts['zdim'],),dtype='float32')
+                        # if k % 2 == 0:
+                        #     means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
+                        # else:
+                        #     means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
+                    self.pz_covs = 1. / 8. * np.ones((opts['zdim'],),dtype='float32')
+                else:
+                    assert False, 'Too many mixtures for the latents dim.'
             self.pz_means = opts['pz_scale']*means
-            self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim'])).astype(np.float32)
         else:
             assert False, 'Unknown latent model.'
 
@@ -215,7 +223,7 @@ class WAE(object):
             noise = np.random.uniform(
                 self.pz_means[0], self.pz_means[1], [num, opts['zdim']]).astype(np.float32)
         elif distr == 'mixture':
-            noises = self.sample_mixtures(self.pz_means,self.pz_covs,distr,num)
+            noises = self.sample_mixtures(self.pz_means,np.sqrt(self.pz_covs),distr,num)
             if sampling == 'one_mixture':
                 mixture = np.random.randint(opts['nmixtures'],size=num)
                 noise = noises[np.arange(num),mixture,0]
