@@ -223,7 +223,7 @@ class WAE(object):
             noise = np.random.uniform(
                 self.pz_means[0], self.pz_means[1], [num, opts['zdim']]).astype(np.float32)
         elif distr == 'mixture':
-            noises = self.sample_mixtures(self.pz_means,np.sqrt(self.pz_covs),distr,num)
+            noises = self.sample_mixtures(self.pz_means,self.pz_covs,distr,num)
             if sampling == 'one_mixture':
                 mixture = np.random.randint(opts['nmixtures'],size=num)
                 noise = noises[np.arange(num),mixture,0]
@@ -366,7 +366,7 @@ class WAE(object):
             Cbase = 2 * opts['zdim'] * sigma2_p
             stat = 0.
             self.res1, self.res2 = 0.0, 0.0
-            for scale in [.1, .2, .5, 1., 2., 5.]:
+            for scale in [.1, .2, .5, 1., 2., 5., 10.]:
                 C = Cbase * scale
                 # First 2 terms of the MMD
                 res1_qz = C / (C + distances_qz)
