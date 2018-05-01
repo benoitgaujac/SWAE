@@ -146,10 +146,7 @@ class WAE(object):
 
         self.lr_decay = decay
         self.is_training = is_training
-        if opts['method']=='swae':
-            self.lmbd = lmbda
-        else:
-            self.lmbd = 1.
+        self.lmbd = lmbda
         self.H_lambda = opts['h_lambda']
 
     def add_savers(self):
@@ -648,7 +645,11 @@ class WAE(object):
         self.start_time = time.time()
         counter = 0
         decay = 1.
-        wae_lambda = opts['lambda']
+        if opts['method']=='swae':
+            wae_lambda = opts['lambda']
+        else:
+            wae_lambda = 1
+            opts['lambda_schedule'] = 'constant'
         wait = 0
         wait_lambda = 0
 
