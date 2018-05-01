@@ -146,7 +146,10 @@ class WAE(object):
 
         self.lr_decay = decay
         self.is_training = is_training
-        self.lmbd = lmbda
+        if opts['method']=='swae':
+            self.lmbd = lmbda
+        else:
+            self.lmbd = 1.
         self.H_lambda = opts['h_lambda']
 
     def add_savers(self):
