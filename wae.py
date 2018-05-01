@@ -22,6 +22,7 @@ from datahandler import datashapes
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import scipy.stats as scistats
 import umap
 
 import pdb
@@ -161,6 +162,7 @@ class WAE(object):
             tf.add_to_collection('encoder_A', self.encoder_A)
         tf.add_to_collection('encoder', self.encoded)
         tf.add_to_collection('decoder', self.decoded)
+        tf.add_to_collection('lambda', self.lmbd)
         self.saver = saver
 
     def init_prior(self):
@@ -189,7 +191,7 @@ class WAE(object):
                         #     means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
                         # else:
                         #     means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
-                    self.pz_covs = 1. / 18. * np.ones((opts['zdim'],),dtype='float32')
+                    self.pz_covs = 1. / 8. * np.ones((opts['zdim'],),dtype='float32')
                 else:
                     assert False, 'Too many mixtures for the latents dim.'
             self.pz_means = opts['pz_scale']*means
@@ -239,12 +241,45 @@ class WAE(object):
             assert False, 'Unknown latent model.'
         return opts['pz_scale'] * noise
 
+    def generate_linespace(self, n, mode, anchors):
+        opts = self.opts
+        nanchors = np.shape(anchors)[0]
+        dim_to_interpolate = min(opts['nmixtures'],opts['zdim'])
+        if mode=='transformation':
+            assert False, 'To Do'
+        elif mode=='points_interpolation':
+            assert np.shape(anchors)[0]%2==0, 'Need an ode number of anchors points'
+            axs = [[np.linspace(anchors[2*k,d],anchors[2*k+1,d],n) for d in range(dim_to_interpolate)] for k in range(int(nanchors/2))]
+            linespce = []
+            for i in range(len(axs)):
+                crd = np.stack([np.asarray(axs[i][j]) for j in range(dim_to_interpolate)],axis=0).T
+                coord = np.zeros((crd.shape[0],opts['zdim']))
+                coord[:,:crd.shape[1]] = crd
+                linespce.append(coord)
+            linespace = np.asarray(linespce)
+        elif mode=='priors_interpolation':
+            axs = [[np.linspace(anchors[0,d],anchors[k,d],n) for d in range(dim_to_interpolate)] for k in range(1,nanchors)]
+            linespce = []
+            for i in range(len(axs)):
+                crd = np.stack([np.asarray(axs[i][j]) for j in range(dim_to_interpolate)],axis=0).T
+                coord = np.zeros((crd.shape[0],opts['zdim']))
+                coord[:,:crd.shape[1]] = crd
+                linespce.append(coord)
+            linespace = np.asarray(linespce)
+        else:
+            assert False, 'Unknown mode %s for vizualisation' % opts['mode']
+
+        return linespace
+
     def matching_penalty(self,samples_pz, samples_qz):
         opts = self.opts
         if opts['method']=='swae':
             loss_match = self.wae_matching_penalty(samples_pz, samples_qz)
         elif opts['method']=='vae':
             loss_match = self.vae_matching_penalty(samples_qz)
+        else:
+            assert False, 'Unknown algo %s' % opts['method']
+
         return loss_match
 
     def wae_matching_penalty(self,samples_pz, samples_qz):
@@ -673,44 +708,6 @@ class WAE(object):
                                    self.lmbd: wae_lambda,
                                    self.is_training: True})
 
-                # Debug
-                # [_, grad, loss, loss_rec, loss_match, means, sigmas, mix] = self.sess.run(
-                #         [self.swae_opt,
-                #          self.grad,
-                #          self.wae_objective,
-                #          self.loss_reconstruct,
-                #          self.penalty,
-                #          self.enc_mean,
-                #          self.enc_logsigmas,
-                #          self.debug_mix],
-                #         feed_dict={self.sample_points: batch_images,
-                #                    self.sample_mix_noise: batch_mix_noise,
-                #                    self.lr_decay: decay,
-                #                    self.lmbd: wae_lambda,
-                #                    self.is_training: True})
-                # print("max mixweights")
-                # mix_print = np.amax(mix,axis=0)
-                # print(mix_print)
-                # print("max means")
-                # mea_print = np.amax(means,axis=(0,1))
-                # print(mea_print)
-                # print("min means")
-                # mea_print = np.amin(means,axis=(0,1))
-                # print(mea_print)
-                # print("max sig")
-                # sig_print = np.amax(sigmas,axis=(0,1))
-                # print(sig_print)
-                # print("min sig")
-                # sig_print = np.amin(sigmas,axis=(0,1))
-                # print(sig_print)
-                # # logging.error('res1: %f' % res1)
-                # # logging.error('res2: %f' % res2)
-                # print("max grad")
-                # max_l = [np.amax(t) for t in grad]
-                # print(max_l)
-                # print("min grad")
-                # min_l = [np.amin(t) for t in grad]
-                # print(min_l)
 
                 # Update learning rate if necessary
                 if opts['lr_schedule'] == 'plateau':
@@ -788,7 +785,7 @@ class WAE(object):
 
                     # Making plots
                     save_plots(opts, data.data[:self.num_pics], data.test_data[:self.num_pics],
-                                    data.test_labels,
+                                    data.test_labels[:self.num_pics],
                                     rec_train[:self.num_pics], rec_test[:self.num_pics],
                                     mix_test,
                                     enc_test, enc_means_test,
@@ -805,6 +802,93 @@ class WAE(object):
                                           'checkpoints',
                                           'trained-wae-final'),
                              global_step=counter)
+
+    def vizu(self, data, MODEL_DIR, WEIGHTS_FILE):
+        opts = self.opts
+        if opts['method']=='swae':
+            logging.error('SWAE with %s matching penalty' % (opts['penalty']))
+        elif opts['method']=='vae':
+            logging.error('VAE')
+
+        num_pics = 400
+        step_inter = 20
+        num_anchors = 10
+        imshape = datashapes[opts['dataset']]
+
+        # Load trained weights
+        MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
+        if not tf.gfile.IsDirectory(MODEL_PATH):
+            raise Exception("model doesn't exist")
+        WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
+        if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+            raise Exception("weights file doesn't exist")
+        self.saver.restore(self.sess, WEIGHTS_PATH)
+
+        # Auto-encoding training images
+        logging.error('Encoding and decoding train images..')
+        rec_train = self.sess.run(
+                    self.one_recons,
+                    feed_dict={self.sample_points: data.data[:num_pics],
+                                                    self.is_training: False})
+
+        # Auto-encoding test images
+        logging.error('Encoding and decoding test images..')
+        [enc_test, enc_means_test, rec_test, mix_test] = self.sess.run(
+                    [self.encoded,
+                     self.encoded_means,
+                     self.one_recons,
+                     self.enc_mixweight],
+                    feed_dict={self.sample_points: data.test_data[:num_pics],
+                                                        self.is_training: False})
+
+        # Encode anchors points and interpolate
+        logging.error('Encoding anchors points and interpolating..')
+        anchors_ids = np.random.choice(1000,2*num_anchors,replace=False)
+        anchors = data.test_data[anchors_ids]
+        enc_anchors = self.sess.run(
+                    self.encoded,
+                    feed_dict={self.sample_points: anchors,
+                                                        self.is_training: False})
+        encod_interpolation = self.generate_linespace(step_inter,'points_interpolation',anchors=enc_anchors)
+        noise = encod_interpolation.reshape(-1,opts['zdim'])
+        decoded = self.sess.run(
+                    self.decoded,
+                    feed_dict={self.sample_noise: noise,
+                               self.is_training: False})
+        decod_inteprolation = decoded.reshape([-1,step_inter]+imshape)
+        start_anchors = anchors[::2]
+        end_anchors = anchors[1::2]
+        decod_inteprolation = np.concatenate((start_anchors[:,np.newaxis],np.concatenate((decod_inteprolation,end_anchors[:,np.newaxis]), axis=1)),axis=1)
+
+        # Random samples generated by the model
+        prior_noise = self.sample_pz(200,sampling = 'per_mixture')
+        logging.error('Decoding random samples..')
+        sample_gen = self.sess.run(
+                    self.decoded,
+                    feed_dict={self.sample_noise: prior_noise,
+                               self.is_training: False})
+
+        # Encode prior means and interpolate
+        logging.error('Generating latent linespace and decoding..')
+        prior_interpolation = self.generate_linespace(step_inter,'priors_interpolation',anchors=self.pz_means)
+        noise = prior_interpolation.reshape(-1,opts['zdim'])
+        decoded = self.sess.run(
+                    self.decoded,
+                    feed_dict={self.sample_noise: noise,
+                               self.is_training: False})
+        mean_interpolation = decoded.reshape([-1,step_inter]+imshape)
+
+        # Making plots
+        logging.error('Saving images..')
+        save_plots_vizu(opts, data.data[:num_pics],
+                        rec_train,
+                        data.test_data[:num_pics],data.test_labels[:num_pics],
+                        enc_test, enc_means_test, rec_test, mix_test,
+                        data.test_data[:num_anchors],
+                        decod_inteprolation,
+                        prior_noise, sample_gen,
+                        mean_interpolation,
+                        MODEL_PATH)
 
 def save_plots(opts, sample_train,sample_test,
                     label_test,
@@ -928,18 +1012,24 @@ def save_plots(opts, sample_train,sample_test,
         ax.axes.set_aspect(1)
 
     ### Then the mean mixtures plots
-    test_probs_labels = []
-    #n = np.shape(mix_test)[0]
+    mean_probs = []
+    num_pics = np.shape(mix_test)[0]
     for i in range(10):
-        te_prob = [mix_test[k] for k in range(num_pics) if label_test[k]==i]
-        te_prob = np.mean(np.stack(te_prob,axis=0),axis=0)
-        test_probs_labels.append(te_prob)
-    test_probs_labels = np.stack(test_probs_labels,axis=0)
+        prob = [mix_test[k] for k in range(num_pics) if label_test[k]==i]
+        prob = np.mean(np.stack(prob,axis=0),axis=0)
+        mean_probs.append(prob)
+    mean_probs = np.stack(mean_probs,axis=0)
+    # entropy
+    entropies = calculate_row_entropy(mean_probs)
+    relab_mask = relabelling_mask(mean_probs, entropies)
+    mean_probs = mean_probs[relab_mask]
     ax = plt.subplot(gs[1, 0])
     plt.imshow(test_probs_labels,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
     #plt.colorbar()
-    plt.text(0.47, 1., 'Test means probs',
+    plt.text(0.47, 1., 'Test average probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
+    plt.yticks(np.arange(10),relab_mask)
+    plt.xticks(np.arange(10))
 
     ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])
@@ -976,7 +1066,6 @@ def save_plots(opts, sample_train,sample_test,
     plt.text(0.47, 1., 'UMAP latents', ha="center", va="bottom",
                                 size=20, transform=ax.transAxes)
 
-
     ###The loss curves
     ax = plt.subplot(gs[1, 2])
     total_num = len(losses_rec)
@@ -1003,14 +1092,241 @@ def save_plots(opts, sample_train,sample_test,
                 dpi=dpi, format='png')
     plt.close()
 
+def save_plots_vizu(opts, data_train,
+                recon_train,
+                data_test, label_test,
+                enc_test, enc_means_test, recon_test, mix_test,
+                anchors, decod_inteprolation,
+                sample_prior, sample_gen,
+                mean_interpolation,
+                work_dir):
+    """ Generates and saves the following plots:
+        img1    -   train reconstruction
+        img2    -   test reconstruction
+        img3    -   samples
+        img4    -   test interpolation
+        img5    -   prior interpolation
+        img6    -   discrete latents
+        img7    -   UMAP
+    """
+
+    if not tf.gfile.IsDirectory(work_dir):
+        raise Exception("working directory doesnt exist")
+    save_dir = os.path.join(work_dir,'figures')
+    utils.create_dir(save_dir)
+
+    greyscale = np.shape(mean_interpolation)[-1] == 1
+
+    if opts['input_normalize_sym']:
+        data_train = data_train / 2. + 0.5
+        rec_train = rec_train / 2. + 0.5
+        data_test = data_test / 2. + 0.5
+        anchors = anchors / 2. + 0.5
+        decod_inteprolation = decod_inteprolation / 2. + 0.5
+        sample_gen = sample_gen / 2. + 0.5
+        mean_interpolation = mean_interpolation / 2. + 0.5
+
+    images = []
+
+    ### Reconstruction plots
+    for pair in [(data_train, recon_train),
+                 (data_test, recon_test)]:
+        # Arrange pics and reconstructions in a proper way
+        sample, recon = pair
+        num_pics = np.shape(sample)[0]
+        num_cols = 20
+        assert len(sample) == len(recon)
+        pics = []
+        merged = np.vstack([recon, sample])
+        r_ptr = 0
+        w_ptr = 0
+        for _ in range(int(num_pics / 2)):
+            merged[w_ptr] = sample[r_ptr]
+            merged[w_ptr + 1] = recon[r_ptr]
+            r_ptr += 1
+            w_ptr += 2
+        for idx in range(num_pics):
+            if greyscale:
+                pics.append(1. - merged[idx, :, :, :])
+            else:
+                pics.append(merged[idx, :, :, :])
+        # Figuring out a layout
+        pics = np.array(pics)
+        image = np.concatenate(np.split(pics, num_cols), axis=2)
+        image = np.concatenate(image, axis=0)
+        images.append(image)
+
+    ### Sample plots
+    pics = []
+    num_cols = 10
+    num_pics = np.shape(sample_gen)[0]
+    for idx in range(num_pics):
+        if greyscale:
+            pics.append(1. - sample_gen[idx, :, :, :])
+        else:
+            pics.append(sample_gen[idx, :, :, :])
+    # Figuring out a layout
+    pics = np.array(pics)
+    image = np.concatenate(np.split(pics, num_cols), axis=2)
+    image = np.concatenate(image, axis=0)
+    images.append(image)
+
+    ### Interpolation plots
+    white_pix = 4
+    for sample in [decod_inteprolation, mean_interpolation]:
+        num_pics = np.shape(sample)[0]
+        num_cols = np.shape(sample)[1]
+        pics = []
+        for idx in range(num_pics):
+            if greyscale:
+                pic = 1. - sample[idx, :, :, :, :]
+                pic = np.concatenate(np.split(pic, num_cols),axis=2)
+                white = np.zeros((white_pix,)+np.shape(pic)[2:])
+                pic = np.concatenate((white,pic[0]),axis=0)
+                pics.append(pic)
+            else:
+                pic = sample[idx, :, :, :, :]
+                pic = np.concatenate(np.split(pic, num_cols),axis=1)
+                white = np.zeros((white_pix,)+np.shape(pic)[1:])
+                pic = np.concatenate(white,pic)
+                pics.append(pic)
+        # Figuring out a layout
+        image = np.concatenate(pics, axis=0)
+        images.append(image)
+
+    img1, img2, img3, img4, img5 = images
+
+    # Settings for pyplot fig
+    dpi = 100
+    height_pic = img1.shape[0]
+    width_pic = img1.shape[1]
+    fig_height = height_pic / float(dpi)
+    fig_width = width_pic / float(dpi)
+    for img, title, filename in zip([img1, img2, img3, img4, img5],
+                         ['Train reconstruction',
+                         'Test reconstruction',
+                         'Generated samples',
+                         'Points interpolation',
+                         'Priors interpolation'],
+                         ['train_recon',
+                         'test_recon',
+                         'gen_sample',
+                         'point_inter',
+                         'prior_inter']):
+        #fig = plt.figure(figsize=(fig_width, fig_height))
+        fig = plt.figure()
+        if greyscale:
+            image = img[:, :, 0]
+            # in Greys higher values correspond to darker colors
+            plt.imshow(image, cmap='Greys',
+                            interpolation='none', vmin=0., vmax=1.)
+        else:
+            plt.imshow(img, interpolation='none', vmin=0., vmax=1.)
+        plt.title(title)
+        # Removing axes, ticks, labels
+        plt.axis('off')
+        # Saving
+        filename = filename + '.png'
+        fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
+                    dpi=dpi, format='png')
+        plt.close()
+
+    ###UMAP visualization of the embedings
+    num_pics = np.shape(enc_test)[0]
+    if opts['zdim']==2:
+        embedding = np.concatenate((enc_test,enc_means_test,sample_prior),axis=0)
+    else:
+        embedding = umap.UMAP(n_neighbors=5,
+                                min_dist=0.3,
+                                metric='correlation').fit_transform(np.concatenate((enc_test,enc_means_test,sample_prior),axis=0))
+    fig = plt.figure(figsize=(fig_width, fig_height))
+    #plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
+    #            c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='hsv'))
+    plt.scatter(embedding[:200, 0], embedding[:200, 1],
+                c=label_test[:200], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='hsv'))
+    plt.colorbar()
+    #plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
+    #            color='deepskyblue', s=10, marker='x',label='mean Qz test')
+    plt.scatter(embedding[num_pics:num_pics+200, 0], embedding[num_pics:num_pics+200, 1],
+                color='deepskyblue', s=10, marker='x',label='mean Qz test')
+    plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
+                            color='navy', s=2, marker='*',label='Pz')
+    xmin = np.amin(embedding[:,0])
+    xmax = np.amax(embedding[:,0])
+    magnify = 0.1
+    width = abs(xmax - xmin)
+    xmin = xmin - width * magnify
+    xmax = xmax + width * magnify
+    ymin = np.amin(embedding[:,1])
+    ymax = np.amax(embedding[:,1])
+    width = abs(ymin - ymax)
+    ymin = ymin - width * magnify
+    ymax = ymax + width * magnify
+    plt.xlim(xmin, xmax)
+    plt.ylim(ymin, ymax)
+    plt.tick_params(axis='both',
+                    which='both',
+                    bottom='off',
+                    top='off',
+                    labelbottom='off',
+                    right='off',
+                    left='off',
+                    labelleft='off')
+    plt.legend(loc='upper left')
+    plt.title('UMAP latents')
+    # Saving
+    filename = 'umap.png'
+    fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
+                dpi=dpi, format='png')
+    plt.close()
+
+    ### Then the mean mixtures plots
+    mean_probs = []
+    num_pics = np.shape(mix_test)[0]
+    for i in range(10):
+        prob = [mix_test[k] for k in range(num_pics) if label_test[k]==i]
+        prob = np.mean(np.stack(prob,axis=0),axis=0)
+        mean_probs.append(prob)
+    mean_probs = np.stack(mean_probs,axis=0)
+    # entropy
+    entropies = calculate_row_entropy(mean_probs)
+    relab_mask = relabelling_mask(mean_probs, entropies)
+    mean_probs = mean_probs[relab_mask]
+    fig = plt.figure(figsize=(fig_width, fig_height))
+    plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
+    plt.title('Average probs')
+    plt.yticks(np.arange(10),relab_mask)
+    plt.xticks(np.arange(10))
+    # Saving
+    filename = 'probs.png'
+    fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
+                dpi=dpi, format='png')
+    plt.close()
+
 def discrete_cmap(N, base_cmap=None):
     """Create an N-bin discrete colormap from the specified input map"""
-
     # Note that if base_cmap is a string or None, you can simply do
     #    return plt.cm.get_cmap(base_cmap, N)
     # The following works for string, None, or a colormap instance:
-
     base = plt.cm.get_cmap(base_cmap)
     color_list = base(np.linspace(0, 1, N))
     cmap_name = base.name + str(N)
     return base.from_list(cmap_name, color_list, N)
+
+def calculate_row_entropy(mean_probs):
+    entropies = []
+    for i in range(np.shape(mean_probs)[0]):
+        entropies.append(scistats.entropy(mean_probs[i]))
+    entropies = np.asarray(entropies)
+    return entropies
+
+def relabelling_mask(mean_probs, entropies):
+    max_entropy_state = np.ones(len(entropies))/len(entropies)
+    max_entropy = scistats.entropy(max_entropy_state)
+    mask = np.arange(10)
+    while np.min(entropies) < max_entropy:
+        digit_idx = np.argmin(entropies)
+        k_val = np.argmax(mean_probs[digit_idx])
+        mask[k_val] = digit_idx
+        entropies[digit_idx] = max_entropy
+    return mask

@@ -8,17 +8,22 @@ from datahandler import DataHandler
 import utils
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--mode", default='vizu',
+                    help='mode to run [train/vizu]')
 parser.add_argument("--exp", default='mnist',
                     help='dataset [mnist/celebA/dsprites]')
 parser.add_argument("--alg",
                     help='algo to train [swae/vae]')
+parser.add_argument("--work_dir")
+parser.add_argument("--weights_file")
+
+
 parser.add_argument("--zdim",
                     help='dimensionality of the latent space',
                     type=int)
 parser.add_argument("--z_test",
                     help='method of choice for verifying Pz=Qz [mmd/gan]')
 parser.add_argument("--wae_lambda", help='WAE regularizer', type=int)
-parser.add_argument("--work_dir")
 parser.add_argument("--stop_grad", help='Stop gradient for debug')
 parser.add_argument("--lambda_schedule",
                     help='constant or adaptive')
@@ -91,6 +96,10 @@ def main():
     # Training WAE
 
     wae = WAE(opts)
-    wae.train(data)
+    if FLAGS.mode=="train":
+        wae.train(data)
+    elif FLAGS.mode=="vizu":
+        logging.error('Visualization')
+        wae.vizu(data, opts['work_dir'], FLAGS.weights_file)
 
 main()
