@@ -1013,7 +1013,6 @@ def save_plots(opts, sample_train,sample_test,
 
     ### Then the mean mixtures plots
     mean_probs = []
-    num_pics = np.shape(mix_test)[0]
     for i in range(10):
         prob = [mix_test[k] for k in range(num_pics) if label_test[k]==i]
         prob = np.mean(np.stack(prob,axis=0),axis=0)
@@ -1025,8 +1024,7 @@ def save_plots(opts, sample_train,sample_test,
     mean_probs = mean_probs[relab_mask]
     ax = plt.subplot(gs[1, 0])
     plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
-    #plt.colorbar()
-    plt.text(0.47, 1., 'Test average probs',
+    plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
     plt.yticks(np.arange(10),relab_mask)
     plt.xticks(np.arange(10))
