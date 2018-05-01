@@ -1024,7 +1024,7 @@ def save_plots(opts, sample_train,sample_test,
     relab_mask = relabelling_mask(mean_probs, entropies)
     mean_probs = mean_probs[relab_mask]
     ax = plt.subplot(gs[1, 0])
-    plt.imshow(test_probs_labels,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
+    plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
     #plt.colorbar()
     plt.text(0.47, 1., 'Test average probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
