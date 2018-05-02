@@ -22,6 +22,7 @@ from datahandler import datashapes
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.colors
 import scipy.stats as scistats
 import umap
 
@@ -187,10 +188,6 @@ class WAE(object):
                         else:
                             means[-1] = - 1. / (1. + sqrt(opts['nmixtures']+1)) \
                                             * np.ones((opts['zdim'],),dtype='float32')
-                        # if k % 2 == 0:
-                        #     means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
-                        # else:
-                        #     means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
                     self.pz_covs = opts['sigma_prior'] * np.ones((opts['zdim'],),dtype='float32')
                 else:
                     assert False, 'Too many mixtures for the latents dim.'
@@ -1043,7 +1040,7 @@ def save_plots(opts, sample_train,sample_test,
                                 metric='correlation').fit_transform(np.concatenate((enc_test,enc_means_test,sample_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
-                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='hsv'))
+                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
     plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
                 color='deepskyblue', s=10, marker='x',label='mean Qz test')
@@ -1217,8 +1214,8 @@ def save_plots_vizu(opts, data_train,
         width_pic = img.shape[1]
         # fig_height = height_pic / float(dpi)
         # fig_width = width_pic / float(dpi)
-        fig_height = height_pic / 50
-        fig_width = width_pic / 50
+        fig_height = height_pic / 10
+        fig_width = width_pic / 10
         fig = plt.figure(figsize=(fig_width, fig_height))
         #fig = plt.figure()
         if greyscale:
@@ -1228,13 +1225,16 @@ def save_plots_vizu(opts, data_train,
                             interpolation='none', vmin=0., vmax=1.)
         else:
             plt.imshow(img, interpolation='none', vmin=0., vmax=1.)
-        plt.title(title)
+        #plt.title(title)
         # Removing axes, ticks, labels
         plt.axis('off')
+        # # placing subplot
+        plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0,
+                hspace = 0, wspace = 0)
         # Saving
         filename = filename + '.png'
-        fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
-                    dpi=dpi, format='png')
+        plt.savefig(utils.o_gfile((save_dir, filename), 'wb'),
+                    dpi=dpi, format='png', box_inches='tight', pad_inches=0.0)
         # fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
         #             format='png')
         plt.close()
@@ -1254,16 +1254,14 @@ def save_plots_vizu(opts, data_train,
     fig_width = width_pic / float(dpi)
     fig = plt.figure(figsize=(fig_width, fig_height))
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
-               c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='hsv'))
-    # plt.scatter(embedding[:200, 0], embedding[:200, 1],
-    #             c=label_test[:200], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='hsv'))
+               c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
     plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
-               color='deepskyblue', s=10, marker='x',label='mean Qz test')
+               color='aqua', s=3, alpha=0.5, marker='x',label='mean Qz test')
     # plt.scatter(embedding[num_pics:num_pics+200, 0], embedding[num_pics:num_pics+200, 1],
     #             color='deepskyblue', s=10, marker='x',label='mean Qz test')
     plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
-                            color='navy', s=2, marker='*',label='Pz')
+                            color='navy', s=3, alpha=0.5, marker='*',label='Pz')
     xmin = np.amin(embedding[:,0])
     xmax = np.amax(embedding[:,0])
     magnify = 0.1
@@ -1290,7 +1288,7 @@ def save_plots_vizu(opts, data_train,
     # Saving
     filename = 'umap.png'
     fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
-                dpi=dpi, format='png')
+                dpi=dpi, format='png', bbox_inches='tight')
     plt.close()
 
     ### Then the mean mixtures plots
@@ -1313,7 +1311,7 @@ def save_plots_vizu(opts, data_train,
     # Saving
     filename = 'probs.png'
     fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
-                dpi=dpi, format='png')
+                dpi=dpi, format='png', bbox_inches='tight')
     plt.close()
 
 def discrete_cmap(N, base_cmap=None):
@@ -1324,7 +1322,7 @@ def discrete_cmap(N, base_cmap=None):
     base = plt.cm.get_cmap(base_cmap)
     color_list = base(np.linspace(0, 1, N))
     cmap_name = base.name + str(N)
-    return base.from_list(cmap_name, color_list, N)
+    return matplotlib.colors.LinearSegmentedColormap.from_list(cmap_name, color_list, N)
 
 def calculate_row_entropy(mean_probs):
     entropies = []
