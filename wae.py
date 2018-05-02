@@ -869,7 +869,7 @@ class WAE(object):
         logging.error('Decoding random samples..')
         sample_gen = self.sess.run(
                     self.decoded,
-                    feed_dict={self.sample_noise: prior_noise[:200],
+                    feed_dict={self.sample_noise: prior_noise,
                                self.is_training: False})
 
         # Encode prior means and interpolate
@@ -1162,6 +1162,8 @@ def save_plots_vizu(opts, data_train,
     pics = []
     num_cols = 10
     num_pics = np.shape(sample_gen)[0]
+    size_pics = np.shape(sample_gen)[1]
+    num_to_keep = 20
     for idx in range(num_pics):
         if greyscale:
             pics.append(1. - sample_gen[idx, :, :, :])
@@ -1171,7 +1173,7 @@ def save_plots_vizu(opts, data_train,
     pics = np.array(pics)
     image = np.concatenate(np.split(pics, num_cols), axis=2)
     image = np.concatenate(image, axis=0)
-    images.append(image)
+    images.append(image[:num_to_keep*size_pics])
 
     ### Interpolation plots
     white_pix = 4
@@ -1233,6 +1235,8 @@ def save_plots_vizu(opts, data_train,
         filename = filename + '.png'
         fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
                     dpi=dpi, format='png')
+        # fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
+        #             format='png')
         plt.close()
 
     ###UMAP visualization of the embedings
