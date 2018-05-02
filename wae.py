@@ -174,11 +174,10 @@ class WAE(object):
             self.pz_covs = None
         elif distr == 'mixture':
             if opts['zdim']==2:
-                means = np.random.uniform(-1.,1.,(opts['nmixtures'], opts['zdim'])).astype(np.float32)
-                # means = np.zeros([opts['nmixtures'], opts['zdim']]).astype(np.float32)
-                # for k in range(0,opts['nmixtures']):
-                #     means[k] = sqrt(2.0)*np.array([cos(k * 2*pi/opts['nmixtures']),sin(k * 2*pi/opts['nmixtures'])]).astype(np.float32)
-                self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim']),dtype='float32')
+                if opts['dataset']=='mnist' and opts['nmixtures']==10:
+                    means = set_2d_priors(opts['nmixtures'])
+                else:
+                    means = np.random.uniform(-1.,1.,(opts['nmixtures'], opts['zdim'])).astype(np.float32)
             else:
                 if opts['zdim']+1>=opts['nmixtures']:
                     means = np.zeros([opts['nmixtures'], opts['zdim']],dtype='float32')
@@ -188,10 +187,10 @@ class WAE(object):
                         else:
                             means[-1] = - 1. / (1. + sqrt(opts['nmixtures']+1)) \
                                             * np.ones((opts['zdim'],),dtype='float32')
-                    self.pz_covs = opts['sigma_prior'] * np.ones((opts['zdim'],),dtype='float32')
                 else:
                     assert False, 'Too many mixtures for the latents dim.'
             self.pz_means = opts['pz_scale']*means
+            self.pz_covs = opts['sigma_prior']*np.ones((opts['zdim']),dtype='float32')
         else:
             assert False, 'Unknown latent model.'
 
@@ -1348,3 +1347,20 @@ def relabelling_mask(mean_probs, entropies):
         mask[k_val] = digit_idx
         entropies[digit_idx] = max_entropy
     return mask
+
+def set_2d_priors(nmixtures):
+    assert nmixtures==10, 'Too many mixtures to initialize prior'
+    means = np.zeros([10, 2]).astype(np.float32)
+    angles = []
+    for i in range(3):
+        angle = np.array([sin(i*pi/3.), cos(i*pi/3.)])
+        angles.append(angle)
+    for k in range(1,4):
+        means[k] = k / 3. * angles[0]
+    for k in range(1,4):
+        means[k+3] = k / 3. * angles[1]
+    for k in range(1,3):
+        means[k+2*3] = k / 3. * angles[2] + np.array([.0, 1.])
+    means[9] = [sqrt(3)/6., .5]
+
+    return means
