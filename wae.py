@@ -191,7 +191,7 @@ class WAE(object):
                         #     means[k,int(k/2)] = sqrt(2.0)*max(opts['sigma_prior'],1.)
                         # else:
                         #     means[k,int(k/2)] = -sqrt(2.0)*max(opts['sigma_prior'],1.)
-                    self.pz_covs = 1. / 8. * np.ones((opts['zdim'],),dtype='float32')
+                    self.pz_covs = opts['sigma_prior'] * np.ones((opts['zdim'],),dtype='float32')
                 else:
                     assert False, 'Too many mixtures for the latents dim.'
             self.pz_means = opts['pz_scale']*means
