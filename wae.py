@@ -242,7 +242,10 @@ class WAE(object):
         nanchors = np.shape(anchors)[0]
         dim_to_interpolate = min(opts['nmixtures'],opts['zdim'])
         if mode=='transformation':
-            assert False, 'To Do'
+            assert np.shape(anchors)[1]==0, 'Zdim needs to be 2 to plot transformation'
+            ymin, xmin = np.amin(anchors,axis=0)
+            ymax, xmax = np.amax(anchors,axis=0)
+
         elif mode=='points_interpolation':
             assert np.shape(anchors)[0]%2==0, 'Need an ode number of anchors points'
             axs = [[np.linspace(anchors[2*k,d],anchors[2*k+1,d],n) for d in range(dim_to_interpolate)] for k in range(int(nanchors/2))]
@@ -870,7 +873,10 @@ class WAE(object):
 
         # Encode prior means and interpolate
         logging.error('Generating latent linespace and decoding..')
-        prior_interpolation = self.generate_linespace(step_inter,'priors_interpolation',anchors=self.pz_means)
+        if opts['zdim']==2:
+            prior_interpolation = self.generate_linespace(step_inter,'transformation',anchors=self.pz_means)
+        else:
+            prior_interpolation = self.generate_linespace(step_inter,'priors_interpolation',anchors=self.pz_means)
         noise = prior_interpolation.reshape(-1,opts['zdim'])
         decoded = self.sess.run(
                     self.decoded,
@@ -1123,9 +1129,6 @@ def save_plots_vizu(opts, data_train,
         decod_inteprolation = decod_inteprolation / 2. + 0.5
         sample_gen = sample_gen / 2. + 0.5
         mean_interpolation = mean_interpolation / 2. + 0.5
-
-
-
 
     images = []
 
@@ -1396,5 +1399,7 @@ def set_2d_priors(nmixtures):
     for k in range(1,3):
         means[k+2*3] = k / 3. * angles[2] + np.array([.0, 1.])
     means[9] = [sqrt(3)/6., .5]
+
+    means -= means[9]
 
     return means
