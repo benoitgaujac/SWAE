@@ -245,7 +245,9 @@ class WAE(object):
             assert np.shape(anchors)[1]==0, 'Zdim needs to be 2 to plot transformation'
             ymin, xmin = np.amin(anchors,axis=0)
             ymax, xmax = np.amax(anchors,axis=0)
-
+            x = np.linspace(1.1*xmin,1.1*xmax,n)
+            y = np.linspace(1.1*ymin,1.1*ymax,n)
+            linespce = np.stack(np.meshgrid(y,x)).T
         elif mode=='points_interpolation':
             assert np.shape(anchors)[0]%2==0, 'Need an ode number of anchors points'
             axs = [[np.linspace(anchors[2*k,d],anchors[2*k+1,d],n) for d in range(dim_to_interpolate)] for k in range(int(nanchors/2))]
@@ -466,19 +468,24 @@ class WAE(object):
 
     def vae_matching_penalty(self,samples_qz):
         opts = self.opts
-        # Continuous KL
+        # Continuous KL (actually -KL)
         kl_g = 1 + self.enc_logsigmas \
                     - tf.square(self.enc_mean) \
                     - tf.exp(self.enc_logsigmas)
         kl_g = 0.5 * tf.reduce_sum(kl_g,axis=-1)
-        # Discrete KL
-        kl_d = tf.log(self.enc_mixweight) \
-                    + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
-        # Weighted KL and loss
-        loss_match = tf.multiply(kl_d - kl_g,self.enc_mixweight)
-        loss_match = tf.reduce_sum(loss_match,axis=-1)
-        loss_match = tf.reduce_mean(loss_match)
+        kl_g = tf.multiply(kl_g,self.enc_mixweight)
+        kl_g = tf.reduce_sum(kl_g,axis=-1)
+        kl_g = tf.reduce_mean(kl_g)
+        self.kl_g = kl_g
+        # Discrete KL (actually -KL)
+        kl_d = - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32)) \
+                    - tf.log(self.enc_mixweight)
+        kl_d = tf.multiply(kl_d,self.enc_mixweight)
+        kl_d = tf.reduce_sum(kl_d,axis=-1)
+        kl_d = tf.reduce_mean(kl_d)
+        self.kl_d = kl_d
 
+        loss_match = kl_g + kl_d
         return loss_match
 
     def reconstruction_loss(self):
@@ -1160,28 +1167,51 @@ def save_plots_vizu(opts, data_train,
         image = np.concatenate(image, axis=0)
         images.append(image)
 
-    ### Interpolation plots
+    ### Points Interpolation plots
     white_pix = 4
-    for sample in [decod_inteprolation, mean_interpolation]:
-        num_pics = np.shape(sample)[0]
-        num_cols = np.shape(sample)[1]
-        pics = []
-        for idx in range(num_pics):
-            if greyscale:
-                pic = 1. - sample[idx, :, :, :, :]
-                pic = np.concatenate(np.split(pic, num_cols),axis=2)
+    num_pics = np.shape(decod_inteprolation)[0]
+    num_cols = np.shape(decod_inteprolation)[1]
+    pics = []
+    for idx in range(num_pics):
+        if greyscale:
+            pic = 1. - decod_inteprolation[idx, :, :, :, :]
+            pic = np.concatenate(np.split(pic, num_cols),axis=2)
+            white = np.zeros((white_pix,)+np.shape(pic)[2:])
+            pic = np.concatenate((white,pic[0]),axis=0)
+            pics.append(pic)
+        else:
+            pic = decod_inteprolation[idx, :, :, :, :]
+            pic = np.concatenate(np.split(pic, num_cols),axis=1)
+            white = np.zeros((white_pix,)+np.shape(pic)[1:])
+            pic = np.concatenate(white,pic)
+            pics.append(pic)
+    image = np.concatenate(pics, axis=0)
+    images.append(image)
+
+    ### Prior Interpolation plots
+    white_pix = 4
+    num_pics = np.shape(mean_interpolation)[0]
+    num_cols = np.shape(mean_interpolation)[1]
+    pics = []
+    for idx in range(num_pics):
+        if greyscale:
+            pic = 1. - mean_interpolation[idx, :, :, :, :]
+            pic = np.concatenate(np.split(pic, num_cols),axis=2)
+            if opts['zdim']!=2:
                 white = np.zeros((white_pix,)+np.shape(pic)[2:])
                 pic = np.concatenate((white,pic[0]),axis=0)
-                pics.append(pic)
-            else:
-                pic = sample[idx, :, :, :, :]
-                pic = np.concatenate(np.split(pic, num_cols),axis=1)
+            pics.append(pic)
+        else:
+            pic = mean_interpolation[idx, :, :, :, :]
+            pic = np.concatenate(np.split(pic, num_cols),axis=1)
+            if opts['zdim']!=2:
                 white = np.zeros((white_pix,)+np.shape(pic)[1:])
                 pic = np.concatenate(white,pic)
-                pics.append(pic)
-        # Figuring out a layout
-        image = np.concatenate(pics, axis=0)
-        images.append(image)
+            pics.append(pic)
+    # Figuring out a layout
+    image = np.concatenate(pics, axis=0)
+    images.append(image)
+
 
     img1, img2, img3, img4 = images
 
