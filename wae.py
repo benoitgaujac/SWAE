@@ -743,9 +743,9 @@ class WAE(object):
                 losses.append(loss)
                 losses_rec.append(loss_rec)
                 losses_match.append(loss_match)
-                if kl_g not None:
+                if kl_g is not None:
                     kl_gau.append(kl_g)
-                if kl_d not None:
+                if kl_d is not None:
                     kl_dis.append(kl_d)
                 if opts['verbose']:
                     logging.error('Matching penalty after %d steps: %f' % (
