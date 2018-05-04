@@ -354,6 +354,10 @@ class WAE(object):
                 MMD_penalty = MMD
             self.mmd_objective = None
 
+        # for plotting purposes
+        self.kl_g = None
+        self.kl_d = None
+
         return MMD_penalty
 
     def mmd(self, sample_pz, sample_qz):
@@ -486,7 +490,7 @@ class WAE(object):
         self.kl_d = kl_d
 
         loss_match = kl_g + kl_d
-        return loss_match
+        return - loss_match
 
     def reconstruction_loss(self):
         opts = self.opts
@@ -634,7 +638,7 @@ class WAE(object):
         utils.create_dir(opts['method'])
         work_dir = os.path.join(opts['method'],opts['work_dir'])
 
-        losses, losses_rec, losses_match, losses_means  = [], [], [], []
+        losses, losses_rec, losses_match, kl_gau, kl_dis  = [], [], [], [], []
         mmd_losses= []
         batches_num = int(data.num_points / opts['batch_size'])
         train_size = data.num_points
@@ -707,11 +711,13 @@ class WAE(object):
                 batch_images = data.data[data_ids].astype(np.float32)
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match] = self.sess.run(
+                [_, loss, loss_rec, loss_match, kl_g, kl_d] = self.sess.run(
                         [self.swae_opt,
                          self.objective,
                          self.loss_reconstruct,
-                         self.penalty],
+                         self.penalty,
+                         self.kl_g,
+                         self.kl_d],
                         feed_dict={self.sample_points: batch_images,
                                    self.sample_mix_noise: batch_mix_noise,
                                    self.lr_decay: decay,
@@ -737,6 +743,10 @@ class WAE(object):
                 losses.append(loss)
                 losses_rec.append(loss_rec)
                 losses_match.append(loss_match)
+                if kl_g not None:
+                    kl_gau.append(kl_g)
+                if kl_d not None:
+                    kl_dis.append(kl_d)
                 if opts['verbose']:
                     logging.error('Matching penalty after %d steps: %f' % (
                         counter, losses_match[-1]))
@@ -802,6 +812,7 @@ class WAE(object):
                                     self.fixed_noise,
                                     sample_gen,
                                     losses, losses_rec, losses_match,
+                                    kl_gau, kl_dis,
                                     work_dir,
                                     'res_e%04d_mb%05d.png' % (epoch, it))
 
@@ -911,6 +922,7 @@ def save_plots(opts, sample_train,sample_test,
                     sample_prior,
                     sample_gen,
                     losses, losses_rec, losses_match,
+                    kl_gau, kl_dis,
                     work_dir,
                     filename):
     """ Generates and saves the plot of the following layout:
