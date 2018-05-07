@@ -1143,7 +1143,7 @@ def save_plots(opts, sample_train,sample_test,
         np.savez(os.path.join(save_path,filename_loss),
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
-                    loss_match=opts['lambda']*np.array(losses_match[::x_step]),
+                    loss_match=np.array(losses_match[::x_step]),
                     kl_cont=np.array(kl_gau[::x_step]),
                     kl_disc=np.array(kl_dis[::x_step]))
     else:
