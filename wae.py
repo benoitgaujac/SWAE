@@ -480,14 +480,14 @@ class WAE(object):
         kl_g = tf.multiply(kl_g,self.enc_mixweight)
         kl_g = tf.reduce_sum(kl_g,axis=-1)
         kl_g = tf.reduce_mean(kl_g)
-        self.kl_g = kl_g
+        self.kl_g = -kl_g
         # Discrete KL (actually -KL)
         kl_d = - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32)) \
                     - tf.log(self.enc_mixweight)
         kl_d = tf.multiply(kl_d,self.enc_mixweight)
         kl_d = tf.reduce_sum(kl_d,axis=-1)
         kl_d = tf.reduce_mean(kl_d)
-        self.kl_d = kl_d
+        self.kl_d = -kl_d
 
         loss_match = kl_g + kl_d
         return - loss_match
@@ -767,7 +767,9 @@ class WAE(object):
                 counter += 1
 
                 # Print debug info
-                if counter<41 or counter % opts['print_every'] == 0:
+                cond1 = counter < 51 and counter % 2==0
+                cond2 = counter % opts['print_every'] == 0
+                if cond1 or cond2:
                     now = time.time()
 
                     # Auto-encoding test images
@@ -1108,11 +1110,11 @@ def save_plots(opts, sample_train,sample_test,
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
     if len(kl_gau)>0:
-        y = np.log(np.abs(kl_gau[::x_step]))
+        y = np.log(kl_gau[::x_step])
         plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(cont KL)')
 
     if len(kl_dis)>0:
-        y = np.log(np.abs(kl_dis[::x_step]))
+        y = np.log(kl_dis[::x_step])
         plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(disc KL)')
 
 
@@ -1153,7 +1155,6 @@ def save_plots(opts, sample_train,sample_test,
     # Means
     filename_means = 'means_' + filename[:-4] + '.npy'
     np.save(os.path.join(save_path,filename_means),enc_mean_all)
-
 
 def save_plots_vizu(opts, data_train,
                 rec_train,
