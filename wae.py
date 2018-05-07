@@ -767,7 +767,7 @@ class WAE(object):
                 counter += 1
 
                 # Print debug info
-                if counter % opts['print_every'] == 0 or counter==1:
+                if counter<41 or counter % opts['print_every'] == 0:
                     now = time.time()
 
                     # Auto-encoding test images
