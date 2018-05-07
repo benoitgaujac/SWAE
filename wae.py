@@ -770,8 +770,9 @@ class WAE(object):
                     now = time.time()
 
                     # Auto-encoding test images
-                    [loss_rec_test, enc_test, enc_means_test, rec_test, mix_test] = self.sess.run(
+                    [loss_rec_test, enc_mean_all, encoded, enc_mean, rec_test, prob] = self.sess.run(
                                 [self.loss_reconstruct,
+                                 self.enc_mean,
                                  self.encoded,
                                  self.encoded_means,
                                  self.one_recons,
@@ -807,8 +808,8 @@ class WAE(object):
                     save_plots(opts, data.data[:self.num_pics], data.test_data[:self.num_pics],
                                     data.test_labels[:self.num_pics],
                                     rec_train[:self.num_pics], rec_test[:self.num_pics],
-                                    mix_test,
-                                    enc_test, enc_means_test,
+                                    prob,
+                                    enc_mean_all, encoded, enc_mean,
                                     self.fixed_noise,
                                     sample_gen,
                                     losses, losses_rec, losses_match,
@@ -854,7 +855,7 @@ class WAE(object):
 
         # Auto-encoding test images
         logging.error('Encoding and decoding test images..')
-        [enc_test, enc_means_test, rec_test, mix_test] = self.sess.run(
+        [encoded, enc_mean, rec_test, prob] = self.sess.run(
                     [self.encoded,
                      self.encoded_means,
                      self.one_recons,
@@ -900,25 +901,25 @@ class WAE(object):
                     self.decoded,
                     feed_dict={self.sample_noise: noise,
                                self.is_training: False})
-        mean_interpolation = decoded.reshape([-1,step_inter]+imshape)
+        prior_decod_interpolation = decoded.reshape([-1,step_inter]+imshape)
 
         # Making plots
         logging.error('Saving images..')
         save_plots_vizu(opts, data.data[:num_pics],
                         rec_train,
                         data.test_data[:num_pics],data.test_labels[:num_pics],
-                        enc_test, enc_means_test, rec_test, mix_test,
+                        encoded, enc_mean, rec_test, prob,
                         data.test_data[:num_anchors],
                         decod_inteprolation,
                         prior_noise, sample_gen,
-                        mean_interpolation,
+                        prior_decod_interpolation,
                         MODEL_PATH)
 
 def save_plots(opts, sample_train,sample_test,
                     label_test,
-                    recon_train, recon_test,
-                    mix_test,
-                    enc_test, enc_means_test,
+                    rec_train, rec_test,
+                    prob,
+                    enc_mean_all, encoded, enc_mean,
                     sample_prior,
                     sample_gen,
                     losses, losses_rec, losses_match,
@@ -946,15 +947,15 @@ def save_plots(opts, sample_train,sample_test,
     if opts['input_normalize_sym']:
         sample_train = sample_train / 2. + 0.5
         sample_test = sample_test / 2. + 0.5
-        recon_train = recon_train / 2. + 0.5
-        recon_test = recon_test / 2. + 0.5
+        rec_train = rec_train / 2. + 0.5
+        rec_test = rec_test / 2. + 0.5
         sample_gen = sample_gen / 2. + 0.5
 
     images = []
 
     ### Reconstruction plots
-    for pair in [(sample_train, recon_train),
-                 (sample_test, recon_test)]:
+    for pair in [(sample_train, rec_train),
+                 (sample_test, rec_test)]:
 
         # Arrange pics and reconstructions in a proper way
         sample, recon = pair
@@ -1039,7 +1040,7 @@ def save_plots(opts, sample_train,sample_test,
     ### Then the mean mixtures plots
     mean_probs = []
     for i in range(10):
-        prob = [mix_test[k] for k in range(num_pics) if label_test[k]==i]
+        prob = [prob[k] for k in range(num_pics) if label_test[k]==i]
         prob = np.mean(np.stack(prob,axis=0),axis=0)
         mean_probs.append(prob)
     mean_probs = np.stack(mean_probs,axis=0)
@@ -1057,11 +1058,11 @@ def save_plots(opts, sample_train,sample_test,
     ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])
     if opts['zdim']==2:
-        embedding = np.concatenate((enc_test,enc_means_test,sample_prior),axis=0)
+        embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                metric='correlation').fit_transform(np.concatenate((enc_test,enc_means_test,sample_prior),axis=0))
+                                metric='correlation').fit_transform(np.concatenate((encoded,enc_mean,sample_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
                 c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
@@ -1089,7 +1090,7 @@ def save_plots(opts, sample_train,sample_test,
     plt.text(0.47, 1., 'UMAP latents', ha="center", va="bottom",
                                 size=20, transform=ax.transAxes)
 
-    ###The loss curves
+    ### The loss curves
     ax = plt.subplot(gs[1, 2])
     total_num = len(losses_rec)
     x_step = max(int(total_num / 100), 1)
@@ -1098,30 +1099,69 @@ def save_plots(opts, sample_train,sample_test,
     y = np.log(losses_rec[::x_step])
     plt.plot(x, y, linewidth=2, color='red', label='log(rec loss)')
 
-    y = np.log(np.abs(losses_match[::x_step]))
+    y = np.log(losses[::x_step])
+    plt.plot(x, y, linewidth=3, color='black', label='log(wae loss)')
+
+    y = np.log(opts['lambda']*np.abs(losses_match[::x_step]))
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
-    y = np.log(losses[::x_step])
-    plt.plot(x, y, linewidth=2, color='black', label='log(wae loss)')
+    if len(kl_gau)>0:
+        y = np.log(kl_gau[::x_step])
+        plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(cont KL)')
+
+    if len(kl_dis)>0:
+        y = np.log(kl_dis[::x_step])
+        plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(disc KL)')
+
 
     plt.grid(axis='y')
     plt.legend(loc='lower left')
     plt.text(0.47, 1., 'Loss curves', ha="center", va="bottom",
                                 size=20, transform=ax.transAxes)
 
-    # Saving
+    ### Saving plots and data
+    # Plot
     utils.create_dir(work_dir)
     fig.savefig(utils.o_gfile((work_dir, filename), 'wb'),
                 dpi=dpi, format='png')
     plt.close()
 
+    # data
+    save_dir = 'data_for_plots'
+    save_path = os.path.join(work_dir,save_dir)
+    utils.create_dir(save_path)
+    # Losses
+    filename_loss = 'loss' + filename[:-4] + '.npy'
+    if len(kl_gau)>0:
+        np.savez(os.path.join(save_path,filename_loss),
+                    loss=np.array(losses[::x_step]),
+                    loss_rec=np.array(losses_rec[::x_step]),
+                    loss_match=np.array(opts['lambda']*losses_match[::x_step]),
+                    kl_cont=np.array(kl_gau[::x_step]),
+                    kl_disc=np.array(kl_dis[::x_step]))
+    else:
+        np.savez(os.path.join(save_path,filename_loss),
+                    loss=np.array(losses[::x_step]),
+                    loss_rec=np.array(losses_rec[::x_step]),
+                    loss_match=np.array(opts['lambda']*losses_match[::x_step]))
+    # Probs
+    filename_probs = 'probs' + filename[:-4] + '.npy'
+    np.save(os.path.join(save_path,filename_probs),prob)
+
+    # Means
+    filename_means = 'means' + filename[:-4] + '.npy'
+    np.save(os.path.join(save_path,filename_means),enc_mean_all)
+
+
 def save_plots_vizu(opts, data_train,
-                recon_train,
+                rec_train,
                 data_test, label_test,
-                enc_test, enc_means_test, recon_test, mix_test,
-                anchors, decod_inteprolation,
-                sample_prior, sample_gen,
-                mean_interpolation,
+                encoded, enc_mean, rec_test, prob,
+                anchors,
+                decod_inteprolation,
+                sample_prior,
+                sample_gen,
+                prior_decod_interpolation,
                 work_dir):
     """ Generates and saves the following plots:
         img1    -   train reconstruction
@@ -1138,7 +1178,7 @@ def save_plots_vizu(opts, data_train,
     save_dir = os.path.join(work_dir,'figures')
     utils.create_dir(save_dir)
 
-    greyscale = np.shape(mean_interpolation)[-1] == 1
+    greyscale = np.shape(prior_decod_interpolation)[-1] == 1
 
     if opts['input_normalize_sym']:
         data_train = data_train / 2. + 0.5
@@ -1147,13 +1187,14 @@ def save_plots_vizu(opts, data_train,
         anchors = anchors / 2. + 0.5
         decod_inteprolation = decod_inteprolation / 2. + 0.5
         sample_gen = sample_gen / 2. + 0.5
-        mean_interpolation = mean_interpolation / 2. + 0.5
+        prior_decod_interpolation = prior_decod_interpolation / 2. + 0.5
 
     images = []
 
+
     ### Reconstruction plots
-    for pair in [(data_train, recon_train),
-                 (data_test, recon_test)]:
+    for pair in [(data_train, rec_train),
+                 (data_test, rec_test)]:
         # Arrange pics and reconstructions in a proper way
         sample, recon = pair
         num_pics = np.shape(sample)[0]
@@ -1179,6 +1220,7 @@ def save_plots_vizu(opts, data_train,
         image = np.concatenate(image, axis=0)
         images.append(image)
 
+
     ### Points Interpolation plots
     white_pix = 4
     num_pics = np.shape(decod_inteprolation)[0]
@@ -1200,21 +1242,21 @@ def save_plots_vizu(opts, data_train,
     image = np.concatenate(pics, axis=0)
     images.append(image)
 
-    ### Prior Interpolation plots
+    ###Prior Interpolation plots
     white_pix = 4
-    num_pics = np.shape(mean_interpolation)[0]
-    num_cols = np.shape(mean_interpolation)[1]
+    num_pics = np.shape(prior_decod_interpolation)[0]
+    num_cols = np.shape(prior_decod_interpolation)[1]
     pics = []
     for idx in range(num_pics):
         if greyscale:
-            pic = 1. - mean_interpolation[idx, :, :, :, :]
+            pic = 1. - prior_decod_interpolation[idx, :, :, :, :]
             pic = np.concatenate(np.split(pic, num_cols),axis=2)
             if opts['zdim']!=2:
                 white = np.zeros((white_pix,)+np.shape(pic)[2:])
                 pic = np.concatenate((white,pic[0]),axis=0)
             pics.append(pic)
         else:
-            pic = mean_interpolation[idx, :, :, :, :]
+            pic = prior_decod_interpolation[idx, :, :, :, :]
             pic = np.concatenate(np.split(pic, num_cols),axis=1)
             if opts['zdim']!=2:
                 white = np.zeros((white_pix,)+np.shape(pic)[1:])
@@ -1224,10 +1266,9 @@ def save_plots_vizu(opts, data_train,
     image = np.concatenate(pics, axis=0)
     images.append(image)
 
-
     img1, img2, img3, img4 = images
 
-    # Settings for pyplot fig
+    ###Settings for pyplot fig
     dpi = 100
     for img, title, filename in zip([img1, img2, img3, img4],
                          ['Train reconstruction',
@@ -1275,11 +1316,11 @@ def save_plots_vizu(opts, data_train,
     fig_width = width_pic / float(dpi)
 
 
-    ### The mean mixtures plots
+    ###The mean mixtures plots
     mean_probs = []
-    num_pics = np.shape(mix_test)[0]
+    num_pics = np.shape(prob)[0]
     for i in range(10):
-        prob = [mix_test[k] for k in range(num_pics) if label_test[k]==i]
+        prob = [prob[k] for k in range(num_pics) if label_test[k]==i]
         prob = np.mean(np.stack(prob,axis=0),axis=0)
         mean_probs.append(prob)
     mean_probs = np.stack(mean_probs,axis=0)
@@ -1288,11 +1329,9 @@ def save_plots_vizu(opts, data_train,
     cluster_to_digit = relabelling_mask(mean_probs, entropies)
     digit_to_cluster = np.argsort(cluster_to_digit)
     mean_probs = mean_probs[::-1,digit_to_cluster]
-    #mean_probs = mean_probs[relab_mask]
     fig = plt.figure(figsize=(fig_width, fig_height))
     plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
     plt.title('Average probs')
-    #plt.yticks(np.arange(10),relab_mask)
     plt.yticks(np.arange(10),np.arange(10)[::-1])
     plt.xticks(np.arange(10))
     # Saving
@@ -1302,7 +1341,7 @@ def save_plots_vizu(opts, data_train,
     plt.close()
 
 
-    ### Sample plots
+    ###Sample plots
     pics = []
     num_cols = 10
     num_pics = np.shape(sample_gen)[0]
@@ -1346,11 +1385,11 @@ def save_plots_vizu(opts, data_train,
     ###UMAP visualization of the embedings
     num_pics = 200
     if opts['zdim']==2:
-        embedding = np.concatenate((enc_test,enc_means_test,sample_prior),axis=0)
+        embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                metric='correlation').fit_transform(np.concatenate((enc_test[:num_pics],enc_means_test[:num_pics],sample_prior),axis=0))
+                                metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],enc_mean[:num_pics],sample_prior),axis=0))
     fig_height = height_pic / float(dpi)
     fig_width = width_pic / float(dpi)
     fig = plt.figure(figsize=(fig_width, fig_height))
@@ -1359,8 +1398,6 @@ def save_plots_vizu(opts, data_train,
     plt.colorbar()
     plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
                color='aqua', s=3, alpha=0.5, marker='x',label='mean Qz test')
-    # plt.scatter(embedding[num_pics:num_pics+200, 0], embedding[num_pics:num_pics+200, 1],
-    #             color='deepskyblue', s=10, marker='x',label='mean Qz test')
     plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
                             color='navy', s=3, alpha=0.5, marker='*',label='Pz')
     xmin = np.amin(embedding[:,0])
@@ -1391,6 +1428,23 @@ def save_plots_vizu(opts, data_train,
     fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
                 dpi=dpi, format='png', bbox_inches='tight')
     plt.close()
+
+
+    ###Saving plots and data
+    data_dir = 'data_for_plots'
+    save_path = os.path.join(work_dir,data_dir)
+    utils.create_dir(save_path)
+    filename = 'final_plots.npy'
+    np.savez(os.path.join(save_path,filename),
+                smples=sample_gen,
+                smples_pr=sample_prior,
+                rec_tr=rec_train,
+                rec_te=rec_test,
+                enc=encoded,
+                enc_mean=enc_mean,
+                points=decod_inteprolation,
+                priors=prior_decod_interpolation,
+                prob=prob)
 
 def discrete_cmap(N, base_cmap=None):
     """Create an N-bin discrete colormap from the specified input map"""

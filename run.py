@@ -89,7 +89,6 @@ def main():
             text.write('%s : %s\n' % (key, opts[key]))
 
     # Loading the dataset
-
     data = DataHandler(opts)
     assert data.num_points >= opts['batch_size'], 'Training set too small'
 
