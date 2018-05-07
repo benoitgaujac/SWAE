@@ -767,11 +767,13 @@ class WAE(object):
                 counter += 1
 
                 # Print debug info
-                cond1 = counter < 61 and counter % 2==0
+                if opts['method']=='vae':
+                    cond1 = counter < 61 and counter % 2==0
+                else:
+                    cond1 = counter==1
                 cond2 = counter % opts['print_every'] == 0
                 if cond1 or cond2:
                     now = time.time()
-
                     # Auto-encoding test images
                     [loss_rec_test, enc_mean_all, encoded, enc_mean, rec_test, prob] = self.sess.run(
                                 [self.loss_reconstruct,
@@ -1140,7 +1142,7 @@ def save_plots(opts, sample_train,sample_test,
     # Losses
     loss_path = os.path.join(save_path,'loss')
     utils.create_dir(loss_path)
-    name = filename[:-4] + '.npy'
+    name = filename[:-4]
     if len(kl_gau)>0:
         np.savez(os.path.join(loss_path,name),
                     loss=np.array(losses[::x_step]),
