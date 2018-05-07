@@ -767,7 +767,7 @@ class WAE(object):
                 counter += 1
 
                 # Print debug info
-                cond1 = counter < 51 and counter % 2==0
+                cond1 = counter < 61 and counter % 2==0
                 cond2 = counter % opts['print_every'] == 0
                 if cond1 or cond2:
                     now = time.time()
