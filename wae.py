@@ -543,8 +543,9 @@ class WAE(object):
         logit = self.reconstructed
         eps = 1e-10
         l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
-        loss = tf.reduce_mean(l,axis=[2,3,4,5,])
-        loss = tf.reduce_sum(tf.multiply(loss,self.enc_mixweight))
+        loss = tf.reduce_sum(l,axis=[3,4,5])
+        loss = tf.reduce_mean(loss,axis=-1)
+        loss = tf.reduce_mean(tf.multiply(loss,self.enc_mixweight))
         return -loss
 
     def optimizer(self, lr, decay=1.):
