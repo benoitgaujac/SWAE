@@ -1040,9 +1040,9 @@ def save_plots(opts, sample_train,sample_test,
     ### Then the mean mixtures plots
     mean_probs = []
     for i in range(10):
-        prob = [prob[k] for k in range(num_pics) if label_test[k]==i]
-        prob = np.mean(np.stack(prob,axis=0),axis=0)
-        mean_probs.append(prob)
+        probs = [prob[k] for k in range(num_pics) if label_test[k]==i]
+        probs = np.mean(np.stack(probs,axis=0),axis=0)
+        mean_probs.append(probs)
     mean_probs = np.stack(mean_probs,axis=0)
     # entropy
     entropies = calculate_row_entropy(mean_probs)
@@ -1066,6 +1066,7 @@ def save_plots(opts, sample_train,sample_test,
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
                 c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
+                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
     plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
                 color='deepskyblue', s=10, marker='x',label='mean Qz test')
@@ -1106,11 +1107,11 @@ def save_plots(opts, sample_train,sample_test,
     plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
     if len(kl_gau)>0:
-        y = np.log(kl_gau[::x_step])
+        y = np.log(np.abs(kl_gau[::x_step]))
         plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(cont KL)')
 
     if len(kl_dis)>0:
-        y = np.log(kl_dis[::x_step])
+        y = np.log(np.abs(kl_dis[::x_step]))
         plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(disc KL)')
 
 
@@ -1131,12 +1132,12 @@ def save_plots(opts, sample_train,sample_test,
     save_path = os.path.join(work_dir,save_dir)
     utils.create_dir(save_path)
     # Losses
-    filename_loss = 'loss' + filename[:-4] + '.npy'
+    filename_loss = 'loss_' + filename[:-4] + '.npy'
     if len(kl_gau)>0:
         np.savez(os.path.join(save_path,filename_loss),
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
-                    loss_match=np.array(opts['lambda']*losses_match[::x_step]),
+                    loss_match=opts['lambda']*np.array(losses_match[::x_step]),
                     kl_cont=np.array(kl_gau[::x_step]),
                     kl_disc=np.array(kl_dis[::x_step]))
     else:
@@ -1145,11 +1146,11 @@ def save_plots(opts, sample_train,sample_test,
                     loss_rec=np.array(losses_rec[::x_step]),
                     loss_match=np.array(opts['lambda']*losses_match[::x_step]))
     # Probs
-    filename_probs = 'probs' + filename[:-4] + '.npy'
+    filename_probs = 'probs_' + filename[:-4] + '.npy'
     np.save(os.path.join(save_path,filename_probs),prob)
 
     # Means
-    filename_means = 'means' + filename[:-4] + '.npy'
+    filename_means = 'means_' + filename[:-4] + '.npy'
     np.save(os.path.join(save_path,filename_means),enc_mean_all)
 
 
