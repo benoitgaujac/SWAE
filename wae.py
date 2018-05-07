@@ -1106,12 +1106,15 @@ def save_plots(opts, sample_train,sample_test,
     y = np.log(losses[::x_step])
     plt.plot(x, y, linewidth=3, color='black', label='log(wae loss)')
 
-    y = np.log(opts['lambda']*np.abs(losses_match[::x_step]))
-    plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
-
     if len(kl_gau)>0:
+        y = np.log(np.abs(losses_match[::x_step]))
+        plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
+
         y = np.log(kl_gau[::x_step])
         plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(cont KL)')
+    else:
+        y = np.log(opts['lambda']*np.abs(losses_match[::x_step]))
+        plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
 
     if len(kl_dis)>0:
         y = np.log(kl_dis[::x_step])
