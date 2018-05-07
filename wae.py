@@ -1138,26 +1138,30 @@ def save_plots(opts, sample_train,sample_test,
     save_path = os.path.join(work_dir,save_dir)
     utils.create_dir(save_path)
     # Losses
-    filename_loss = 'loss_' + filename[:-4] + '.npy'
+    loss_path = os.path.join(save_path,'loss')
+    utils.create_dir(loss_path)
+    name = filename[:-4] + '.npy'
     if len(kl_gau)>0:
-        np.savez(os.path.join(save_path,filename_loss),
+        np.savez(os.path.join(loss_path,name),
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
                     loss_match=np.array(losses_match[::x_step]),
                     kl_cont=np.array(kl_gau[::x_step]),
                     kl_disc=np.array(kl_dis[::x_step]))
     else:
-        np.savez(os.path.join(save_path,filename_loss),
+        np.savez(os.path.join(loss_path,name),
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
                     loss_match=np.array(opts['lambda']*losses_match[::x_step]))
     # Probs
-    filename_probs = 'probs_' + filename[:-4] + '.npy'
-    np.save(os.path.join(save_path,filename_probs),prob)
+    probs_path = os.path.join(save_path,'probs')
+    utils.create_dir(probs_path)
+    np.save(os.path.join(probs_path,name),prob)
 
     # Means
-    filename_means = 'means_' + filename[:-4] + '.npy'
-    np.save(os.path.join(save_path,filename_means),enc_mean_all)
+    means_path = os.path.join(save_path,'means')
+    utils.create_dir(means_path)
+    np.save(os.path.join(means_path,name),enc_mean_all)
 
 def save_plots_vizu(opts, data_train,
                 rec_train,
