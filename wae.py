@@ -1171,7 +1171,7 @@ def save_plots(opts, sample_train,sample_test,
     # reconstruct
     recon_path = os.path.join(save_path,'recon')
     utils.create_dir(recon_path)
-    np.savez(os.path.join(loss_path,name),
+    np.savez(os.path.join(recon_path,name),
                 test_data=sample_test,
                 rec_test=rec_test)
 
