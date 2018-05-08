@@ -643,6 +643,7 @@ class WAE(object):
         mmd_losses= []
         batches_num = int(data.num_points / opts['batch_size'])
         train_size = data.num_points
+        pdb.set_trace()
         self.num_pics = opts['plot_num_pics']
         self.fixed_noise = self.sample_pz(opts['plot_num_pics'],sampling = 'per_mixture')
         self.sess.run(self.init)
@@ -829,6 +830,67 @@ class WAE(object):
                                           'checkpoints',
                                           'trained-wae-final'),
                              global_step=counter)
+
+    def test(self, data, MODEL_DIR, WEIGHTS_FILE):
+        opts = self.opts
+        if opts['method']=='swae':
+            logging.error('SWAE with %s matching penalty' % (opts['penalty']))
+        elif opts['method']=='vae':
+            logging.error('VAE')
+
+        # Load trained weights
+        MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
+        if not tf.gfile.IsDirectory(MODEL_PATH):
+            raise Exception("model doesn't exist")
+        WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
+        if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+            raise Exception("weights file doesn't exist")
+        self.saver.restore(self.sess, WEIGHTS_PATH)
+
+        # Split test data
+        num_test = 400
+        heldout_data = data.test_data[:num_test]
+        heldout_labels = data.test_labels[:num_test]
+        test_data = data.test_data[num_test:]
+        test_labels = data.test_labels[num_test:]
+        debug_str = 'Full test data size: %d ' % (np.shape(data.test_data)[0])
+        logging.error(debug_str)
+        debug_str = 'Held out data size: %d' % (np.shape(heldout_data)[0])
+        logging.error(debug_str)
+        debug_str = 'Effective test data size: %d' % (np.shape(test_data)[0])
+        logging.error(debug_str)
+
+        # Getting probs on held out set
+        logging.error('Determining clusters ID..')
+        probs = self.sess.run(
+                    self.enc_mixweight,
+                    feed_dict={self.sample_points: heldout_data,
+                                    self.is_training: False})
+        # Determine clusters given probs
+        labelled_clusters = get_labels(heldout_labels,probs)
+        print(labelled_clusters)
+        # Getting predictions on effective test set
+        logging.error('Computing accuracy..')
+        probs = self.sess.run(
+                    self.enc_mixweight,
+                    feed_dict={self.sample_points: test_data,
+                                    self.is_training: False})
+        # compute accuracy
+        acc = accuracy(test_labels,probs,labelled_clusters)
+        # Getting predictions on test set
+        probs_full = self.sess.run(
+                    self.enc_mixweight,
+                    feed_dict={self.sample_points: data.test_data,
+                                    self.is_training: False})
+        # compute accuracy
+        acc_full = accuracy(data.test_labels,probs_full,labelled_clusters)
+        # Printing various loss values
+        debug_str = 'acc=%.3f, full acc=%.3f' % (
+                    acc, acc_full)
+        logging.error(debug_str)
+        # saving
+        name = 'acc'
+        np.save(os.path.join(MODEL_PATH,name),np.array(acc,acc_full))
 
     def vizu(self, data, MODEL_DIR, WEIGHTS_FILE):
         opts = self.opts
@@ -1051,7 +1113,7 @@ def save_plots(opts, sample_train,sample_test,
     mean_probs = np.stack(mean_probs,axis=0)
     # entropy
     entropies = calculate_row_entropy(mean_probs)
-    relab_mask = relabelling_mask(mean_probs, entropies)
+    relab_mask = relabelling_mask_from_entropy(mean_probs, entropies)
     mean_probs = mean_probs[relab_mask]
     ax = plt.subplot(gs[1, 0])
     plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
@@ -1174,7 +1236,6 @@ def save_plots(opts, sample_train,sample_test,
     np.savez(os.path.join(recon_path,name),
                 test_data=sample_test,
                 rec_test=rec_test)
-
 
 def save_plots_vizu(opts, data_train,
                 rec_train,
@@ -1343,13 +1404,13 @@ def save_plots_vizu(opts, data_train,
     mean_probs = []
     num_pics = np.shape(prob)[0]
     for i in range(10):
-        prob = [prob[k] for k in range(num_pics) if label_test[k]==i]
-        prob = np.mean(np.stack(prob,axis=0),axis=0)
-        mean_probs.append(prob)
+        probs = [prob[k] for k in range(num_pics) if label_test[k]==i]
+        probs = np.mean(np.stack(probs,axis=0),axis=0)
+        mean_probs.append(probs)
     mean_probs = np.stack(mean_probs,axis=0)
     # entropy
     entropies = calculate_row_entropy(mean_probs)
-    cluster_to_digit = relabelling_mask(mean_probs, entropies)
+    cluster_to_digit = relabelling_mask_from_entropy(mean_probs, entropies)
     digit_to_cluster = np.argsort(cluster_to_digit)
     mean_probs = mean_probs[::-1,digit_to_cluster]
     fig = plt.figure(figsize=(fig_width, fig_height))
@@ -1369,7 +1430,7 @@ def save_plots_vizu(opts, data_train,
     num_cols = 10
     num_pics = np.shape(sample_gen)[0]
     size_pics = np.shape(sample_gen)[1]
-    num_to_keep = 20
+    num_to_keep = 10
     for idx in range(num_pics):
         if greyscale:
             pics.append(1. - sample_gen[idx, :, :, :])
@@ -1408,21 +1469,25 @@ def save_plots_vizu(opts, data_train,
     ###UMAP visualization of the embedings
     num_pics = 200
     if opts['zdim']==2:
-        embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
+        embedding = np.concatenate((encoded,sample_prior),axis=0)
+        #embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],enc_mean[:num_pics],sample_prior),axis=0))
+                                metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],sample_prior),axis=0))
+                                #metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],enc_mean[:num_pics],sample_prior),axis=0))
     fig_height = height_pic / float(dpi)
     fig_width = width_pic / float(dpi)
     fig = plt.figure(figsize=(fig_width, fig_height))
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
-    plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
-               color='aqua', s=3, alpha=0.5, marker='x',label='mean Qz test')
-    plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
+    plt.scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
                             color='navy', s=3, alpha=0.5, marker='*',label='Pz')
+    # plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
+    #            color='aqua', s=3, alpha=0.5, marker='x',label='mean Qz test')
+    # plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
+    #                         color='navy', s=3, alpha=0.5, marker='*',label='Pz')
     xmin = np.amin(embedding[:,0])
     xmax = np.amax(embedding[:,0])
     magnify = 0.1
@@ -1469,24 +1534,44 @@ def save_plots_vizu(opts, data_train,
                 priors=prior_decod_interpolation,
                 prob=prob)
 
-def discrete_cmap(N, base_cmap=None):
-    """Create an N-bin discrete colormap from the specified input map"""
-    # Note that if base_cmap is a string or None, you can simply do
-    #    return plt.cm.get_cmap(base_cmap, N)
-    # The following works for string, None, or a colormap instance:
-    base = plt.cm.get_cmap(base_cmap)
-    color_list = base(np.linspace(0, 1, N))
-    cmap_name = base.name + str(N)
-    return matplotlib.colors.LinearSegmentedColormap.from_list(cmap_name, color_list, N)
+def accuracy(labels, probs, clusters_id):
+    preds = np.argmax(probs,axis=-1)
+    relabelled_preds = np.choose(preds,clusters_id)
+    correct_prediction = (relabelled_preds==labels)
+    return np.mean(correct_prediction)
 
-def calculate_row_entropy(mean_probs):
-    entropies = []
-    for i in range(np.shape(mean_probs)[0]):
-        entropies.append(scistats.entropy(mean_probs[i]))
-    entropies = np.asarray(entropies)
-    return entropies
+def get_labels(labels,probs):
+    mean_probs = []
+    num_pics = np.shape(probs)[0]
+    for i in range(10):
+        prob = [probs[k] for k in range(num_pics) if labels[k]==i]
+        prob = np.mean(np.stack(prob,axis=0),axis=0)
+        mean_probs.append(prob)
+    mean_probs = np.stack(mean_probs,axis=0)
+    cluster_to_digit = relabelling_mask_from_probs(mean_probs)
+    return cluster_to_digit
 
-def relabelling_mask(mean_probs, entropies):
+def relabelling_mask_from_probs(mean_probs):
+    probs_copy = mean_probs
+    nmixtures = np.shape(mean_probs)[-1]
+    k_vals = []
+    min_prob = np.zeros(nmixtures)
+    mask = np.arange(10)
+    while np.amax(probs_copy) > 0.:
+        max_probs = np.amax(probs_copy,axis=-1)
+        digit_idx = np.argmax(max_probs)
+        k_val_sort = np.argsort(probs_copy[digit_idx])
+        i = -1
+        k_val = k_val_sort[i]
+        while k_val in k_vals:
+            i -= 1
+            k_val = k_val_sort[i]
+        k_vals.append(k_val)
+        mask[k_val] = digit_idx
+        probs_copy[digit_idx] = min_prob
+    return mask
+
+def relabelling_mask_from_entropy(mean_probs, entropies):
     k_vals = []
     max_entropy_state = np.ones(len(entropies))/len(entropies)
     max_entropy = scistats.entropy(max_entropy_state)
@@ -1503,6 +1588,23 @@ def relabelling_mask(mean_probs, entropies):
         mask[k_val] = digit_idx
         entropies[digit_idx] = max_entropy
     return mask
+
+def calculate_row_entropy(mean_probs):
+    entropies = []
+    for i in range(np.shape(mean_probs)[0]):
+        entropies.append(scistats.entropy(mean_probs[i]))
+    entropies = np.asarray(entropies)
+    return entropies
+
+def discrete_cmap(N, base_cmap=None):
+    """Create an N-bin discrete colormap from the specified input map"""
+    # Note that if base_cmap is a string or None, you can simply do
+    #    return plt.cm.get_cmap(base_cmap, N)
+    # The following works for string, None, or a colormap instance:
+    base = plt.cm.get_cmap(base_cmap)
+    color_list = base(np.linspace(0, 1, N))
+    cmap_name = base.name + str(N)
+    return matplotlib.colors.LinearSegmentedColormap.from_list(cmap_name, color_list, N)
 
 def set_2d_priors(nmixtures):
     assert nmixtures==10, 'Too many mixtures to initialize prior'
