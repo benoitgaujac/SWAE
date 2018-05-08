@@ -643,7 +643,6 @@ class WAE(object):
         mmd_losses= []
         batches_num = int(data.num_points / opts['batch_size'])
         train_size = data.num_points
-        pdb.set_trace()
         self.num_pics = opts['plot_num_pics']
         self.fixed_noise = self.sample_pz(opts['plot_num_pics'],sampling = 'per_mixture')
         self.sess.run(self.init)
