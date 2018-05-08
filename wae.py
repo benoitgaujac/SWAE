@@ -1063,20 +1063,24 @@ def save_plots(opts, sample_train,sample_test,
     ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])
     if opts['zdim']==2:
-        embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
+        embedding = np.concatenate((encoded,sample_prior),axis=0)
+        #embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                metric='correlation').fit_transform(np.concatenate((encoded,enc_mean,sample_prior),axis=0))
+                                metric='correlation').fit_transform(np.concatenate((encoded,sample_prior),axis=0))
+                                #metric='correlation').fit_transform(np.concatenate((encoded,enc_mean,sample_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
                 c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
                 #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
-    plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
-                color='deepskyblue', s=10, marker='x',label='mean Qz test')
-    plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
+    plt.scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
                             color='navy', s=10, marker='*',label='Pz')
+    # plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
+    #             color='deepskyblue', s=10, marker='x',label='mean Qz test')
+    # plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
+    #                         color='navy', s=10, marker='*',label='Pz')
 
     xmin = np.amin(embedding[:,0])
     xmax = np.amax(embedding[:,0])
@@ -1122,7 +1126,6 @@ def save_plots(opts, sample_train,sample_test,
         y = np.log(kl_dis[::x_step])
         plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(disc KL)')
 
-
     plt.grid(axis='y')
     plt.legend(loc='lower left')
     plt.text(0.47, 1., 'Loss curves', ha="center", va="bottom",
@@ -1164,6 +1167,14 @@ def save_plots(opts, sample_train,sample_test,
     means_path = os.path.join(save_path,'means')
     utils.create_dir(means_path)
     np.save(os.path.join(means_path,name),enc_mean_all)
+
+    # reconstruct
+    recon_path = os.path.join(save_path,'recon')
+    utils.create_dir(recon_path)
+    np.savez(os.path.join(loss_path,name),
+                test_data=sample_test,
+                rec_test=rec_test)
+
 
 def save_plots_vizu(opts, data_train,
                 rec_train,
