@@ -712,18 +712,33 @@ class WAE(object):
                 batch_images = data.data[data_ids].astype(np.float32)
                 batch_mix_noise = self.sample_pz(opts['batch_size'],sampling='all_mixtures')
                 # Update encoder and decoder
-                [_, loss, loss_rec, loss_match, kl_g, kl_d] = self.sess.run(
-                        [self.swae_opt,
-                         self.objective,
-                         self.loss_reconstruct,
-                         self.penalty,
-                         self.kl_g,
-                         self.kl_d],
-                        feed_dict={self.sample_points: batch_images,
-                                   self.sample_mix_noise: batch_mix_noise,
-                                   self.lr_decay: decay,
-                                   self.lmbd: wae_lambda,
-                                   self.is_training: True})
+                if opts['method']=='swae':
+                    [_, loss, loss_rec, loss_match] = self.sess.run(
+                            [self.swae_opt,
+                             self.objective,
+                             self.loss_reconstruct,
+                             self.penalty],
+                            feed_dict={self.sample_points: batch_images,
+                                       self.sample_mix_noise: batch_mix_noise,
+                                       self.lr_decay: decay,
+                                       self.lmbd: wae_lambda,
+                                       self.is_training: True})
+                elif opts['method']=='vae':
+                    [_, loss, loss_rec, loss_match, kl_g, kl_d] = self.sess.run(
+                            [self.swae_opt,
+                             self.objective,
+                             self.loss_reconstruct,
+                             self.penalty,
+                             self.kl_g,
+                             self.kl_d],
+                            feed_dict={self.sample_points: batch_images,
+                                       self.sample_mix_noise: batch_mix_noise,
+                                       self.lr_decay: decay,
+                                       self.lmbd: wae_lambda,
+                                       self.is_training: True})
+                    kl_gau.append(kl_g)
+                    kl_dis.append(kl_d)
+
 
 
                 # Update learning rate if necessary
@@ -744,10 +759,6 @@ class WAE(object):
                 losses.append(loss)
                 losses_rec.append(loss_rec)
                 losses_match.append(loss_match)
-                if kl_g is not None:
-                    kl_gau.append(kl_g)
-                if kl_d is not None:
-                    kl_dis.append(kl_d)
                 if opts['verbose']:
                     logging.error('Matching penalty after %d steps: %f' % (
                         counter, losses_match[-1]))
@@ -1129,12 +1140,12 @@ def save_plots(opts, sample_train,sample_test,
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                metric='correlation').fit_transform(np.concatenate((encoded,sample_prior),axis=0))
-                                #metric='correlation').fit_transform(np.concatenate((encoded,enc_mean,sample_prior),axis=0))
+                                #metric='correlation').fit_transform(np.concatenate((encoded,sample_prior),axis=0))
+                                metric='correlation').fit_transform(np.concatenate((encoded,enc_mean,sample_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
-                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
-                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
+                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
+                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
     plt.scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
                             color='navy', s=10, marker='*',label='Pz')
@@ -1218,7 +1229,7 @@ def save_plots(opts, sample_train,sample_test,
         np.savez(os.path.join(loss_path,name),
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
-                    loss_match=np.array(opts['lambda']*losses_match[::x_step]))
+                    loss_match=np.array(opts['lambda']*np.array(losses_match[::x_step])))
     # Probs
     probs_path = os.path.join(save_path,'probs')
     utils.create_dir(probs_path)
