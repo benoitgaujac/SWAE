@@ -7,9 +7,11 @@ from wae import WAE
 from datahandler import DataHandler
 import utils
 
+import pdb
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", default='vizu',
-                    help='mode to run [train/vizu]')
+                    help='mode to run [train/test/vizu]')
 parser.add_argument("--exp", default='mnist',
                     help='dataset [mnist/celebA/dsprites]')
 parser.add_argument("--alg",
@@ -92,11 +94,12 @@ def main():
     data = DataHandler(opts)
     assert data.num_points >= opts['batch_size'], 'Training set too small'
 
-    # Training WAE
-
+    # WAE
     wae = WAE(opts)
     if FLAGS.mode=="train":
         wae.train(data)
+    if FLAGS.mode=="test":
+        wae.test(data, opts['work_dir'], FLAGS.weights_file)
     elif FLAGS.mode=="vizu":
         logging.error('Visualization')
         wae.vizu(data, opts['work_dir'], FLAGS.weights_file)
