@@ -134,10 +134,15 @@ class WAE(object):
             tf.float32, [None] + [opts['zdim']], name='noise_ph')
         mix_noise = tf.placeholder(
             tf.float32, [None] + [opts['nmixtures'],opts['nsamples'],opts['zdim']], name='mix_noise_ph')
-
         self.sample_points = data
         self.sample_noise = noise
         self.sample_mix_noise = mix_noise
+
+        # logistic regression
+        preds = tf.placeholder(tf.float32, [None, 10], name='predictions') # discrete probabilities
+        y = tf.placeholder(tf.float32, [None, 10],name='labels') # 0-9 digits recognition => 10 classes
+        self.preds = preds
+        self.y = y
 
     def add_training_placeholders(self):
         opts = self.opts
@@ -739,8 +744,6 @@ class WAE(object):
                     kl_gau.append(kl_g)
                     kl_dis.append(kl_d)
 
-
-
                 # Update learning rate if necessary
                 if opts['lr_schedule'] == 'plateau':
                     # First 30 epochs do nothing
@@ -842,12 +845,6 @@ class WAE(object):
                              global_step=counter)
 
     def test(self, data, MODEL_DIR, WEIGHTS_FILE):
-        opts = self.opts
-        if opts['method']=='swae':
-            logging.error('SWAE with %s matching penalty' % (opts['penalty']))
-        elif opts['method']=='vae':
-            logging.error('VAE')
-
         # Load trained weights
         MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
         if not tf.gfile.IsDirectory(MODEL_PATH):
@@ -858,57 +855,173 @@ class WAE(object):
         self.saver.restore(self.sess, WEIGHTS_PATH)
 
         # Split test data
-        num_test = 400
-        heldout_data = data.test_data[:num_test]
-        heldout_labels = data.test_labels[:num_test]
-        test_data = data.test_data[num_test:]
-        test_labels = data.test_labels[num_test:]
-        debug_str = 'Full test data size: %d ' % (np.shape(data.test_data)[0])
+        train_size = 50000
+        batch_size = 500
+        batches_num = int(train_size / batch_size)
+        num_epoch = 100
+        train_data = data.data[:train_size]
+        train_labels = data.labels[:train_size]
+        debug_str = 'training data size: %d ' % (train_size)
         logging.error(debug_str)
-        debug_str = 'Held out data size: %d' % (np.shape(heldout_data)[0])
+        debug_str = 'test data size: %d' % (np.shape(data.test_data)[0])
         logging.error(debug_str)
-        debug_str = 'Effective test data size: %d' % (np.shape(test_data)[0])
-        logging.error(debug_str)
+        # Iterate over batches
+        logging.error('Determining clusters ID using training..')
+        mean_probs = np.zeros((10,10))
+        for it in range(batches_num):
+            # Sample batches of data points and Pz noise
+            data_ids = np.random.choice(train_size,
+                                opts['batch_size'],
+                                replace=False)
+            batch_images = train_data[data_ids].astype(np.float32)
+            batch_labels = train_labels[data_ids].astype(np.float32)
 
-        # Getting probs on held out set
-        logging.error('Determining clusters ID..')
-        probs = self.sess.run(
-                    self.enc_mixweight,
-                    feed_dict={self.sample_points: heldout_data,
-                                    self.is_training: False})
-        # Determine clusters given probs
-        labelled_clusters = get_labels(heldout_labels,probs)
+            probs = self.sess.run(
+                        self.enc_mixweight,
+                        feed_dict={self.sample_points: batch_images,
+                                        self.is_training: False})
+            mean_prob = get_mean_probs(batch_labels,probs)
+            mean_probs += mean_prob / batches_num
+        # Determine clusters given mean probs
+        labelled_clusters = relabelling_mask_from_probs(mean_probs)
+        logging.error('Clusters ID:')
         print(labelled_clusters)
-        # Getting predictions on effective test set
+        # Accuracy
         logging.error('Computing accuracy..')
+        # Training accuracy
+        tr_acc = 0.
+        for it in range(batches_num):
+            # Sample batches of data points and Pz noise
+            data_ids = np.random.choice(train_size,
+                                opts['batch_size'],
+                                replace=False)
+            batch_images = train_data[data_ids].astype(np.float32)
+            batch_labels = train_labels[data_ids].astype(np.float32)
+            probs = self.sess.run(
+                        self.enc_mixweight,
+                        feed_dict={self.sample_points: batch_images,
+                                        self.is_training: False})
+            acc = accuracy(batch_labels,probs,labelled_clusters)
+            tr_acc += acc / batches_num
+        # Testing acc
         probs = self.sess.run(
-                    self.enc_mixweight,
-                    feed_dict={self.sample_points: test_data,
-                                    self.is_training: False})
-        # compute accuracy
-        acc = accuracy(test_labels,probs,labelled_clusters)
-        # Getting predictions on test set
-        probs_full = self.sess.run(
                     self.enc_mixweight,
                     feed_dict={self.sample_points: data.test_data,
-                                    self.is_training: False})
-        # compute accuracy
-        acc_full = accuracy(data.test_labels,probs_full,labelled_clusters)
-        # Printing various loss values
-        debug_str = 'acc=%.3f, full acc=%.3f' % (
-                    acc, acc_full)
+                                        self.is_training: False})
+        te_acc = accuracy(data.test_labels,probs,labelled_clusters)
+        # Printing
+        debug_str = 'training acc=%.3f, testing acc=%.3f' % (
+                                                tr_acc, te_acc)
         logging.error(debug_str)
         # saving
         name = 'acc'
-        np.save(os.path.join(MODEL_PATH,name),np.array(acc,acc_full))
+        np.save(os.path.join(MODEL_PATH,name),np.array(tr_acc,te_acc))
+
+    def reg(self, data, MODEL_DIR, WEIGHTS_FILE):
+        opts = self.opts
+        # Load trained weights
+        MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
+        if not tf.gfile.IsDirectory(MODEL_PATH):
+            raise Exception("model doesn't exist")
+        WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
+        if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+            raise Exception("weights file doesn't exist")
+        self.saver.restore(self.sess, WEIGHTS_PATH)
+
+        epoch_num = 50
+        print_every = 1
+        batch_size = 200
+        batches_num = int(data.num_points / batch_size)
+        train_size = data.num_points
+        lr = 0.001
+        costs, test_acc, train_acc  = [], [], []
+
+        # Define the model
+        # Construct model
+        linear_layer = ops.linear(opts, self.preds, 10, scope='log_reg')
+        logreg_preds = tf.nn.softmax(linear_layer) # Softmax
+        # Minimize error using cross entropy
+        cross_entropy = tf.reduce_mean(-tf.reduce_sum(self.y*tf.log(logreg_preds), reduction_indices=1))
+        # Accuracy
+        correct_prediction = tf.equal(tf.argmax(logreg_preds, 1),tf.argmax(self.y, 1))
+        acc = tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
+        # Optimizer
+        logreg_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='log_reg')
+        opt = tf.train.AdamOptimizer(lr, beta1=0.5)
+        logreg_opt = opt.minimize(loss=cross_entropy,
+                                    var_list=logreg_vars)
+        for var in logreg_vars:
+            self.sess.run(var.initializer)
+        self.start_time = time.time()
+        for epoch in range(epoch_num):
+            cost = 0.
+            # Iterate over batches
+            for it in range(batches_num):
+                # Sample batches of data points and Pz noise
+                data_ids = np.random.choice(train_size,
+                                            batch_size,
+                                            replace=False)
+                batch_images = data.data[data_ids].astype(np.float32)
+                # Get preds
+                tr_preds = self.sess.run(self.enc_mixweight,
+                            feed_dict={self.sample_points: batch_images,
+                                                self.is_training: False})
+                # Train linear reg
+                batch_labels = one_hot(data.labels[data_ids])
+                [_ , c] = self.sess.run([logreg_opt,cross_entropy],
+                            feed_dict={self.preds: tr_preds,
+                                        self.y: batch_labels})
+                cost += c / batches_num
+                costs.append(cost)
+
+            if epoch % print_every == 0:
+                # Testing and logging info
+                te_acc, tr_acc  = 0., 0.
+                # Training Acc
+                for it in range(batches_num):
+                    # Sample batches of data points and Pz noise
+                    data_ids = np.random.choice(train_size,
+                                                batch_size,
+                                                replace=False)
+                    batch_images = data.data[data_ids].astype(np.float32)
+                    tr_preds = self.sess.run(self.enc_mixweight,
+                                feed_dict={self.sample_points: batch_images,
+                                                    self.is_training: False})
+                    batch_labels = one_hot(data.labels[data_ids])
+                    acc = self.sess.run(accuracy,
+                                feed_dict={self.preds: tr_preds,
+                                            self.y: batch_labels,
+                                            is_training: False})
+                    tr_acc += acc / batches_num
+                # Testing Acc
+                te_preds = self.sess.run(self.enc_mixweight,
+                            feed_dict={self.sample_points: data.test_data,
+                                                self.is_training: False})
+                test_labels = one_hot(data.test_labels)
+                te_acc = self.sess.run(acc,
+                        feed_dict={self.preds: te_preds,
+                                    self.y: test_labels,
+                                    is_training: False})
+                train_acc.append(tr_acc)
+                test_acc.append(te_acc)
+                # Printing various loss values
+                debug_str = 'EPOCH: %d/%d, BATCH:%d/%d' % (
+                            epoch + 1, epoch_num,
+                            it + 1, batches_num)
+                logging.error(debug_str)
+                debug_str = 'cost=%.3f, TRAIN ACC=%.2f%, TEST ACC=%.2f%' % (
+                            costs[-1], 100.*tr_acc, 100.*te_acc)
+                logging.error(debug_str)
+
+        # saving
+        name = 'log_reg'
+        np.savez(os.path.join(MODEL_PATH,name),
+                    costs=np.array(costs[::batches_num]),
+                    tr_acc=np.array(tr_acc),
+                    te_acc=np.array(te_acc))
+
 
     def vizu(self, data, MODEL_DIR, WEIGHTS_FILE):
-        opts = self.opts
-        if opts['method']=='swae':
-            logging.error('SWAE with %s matching penalty' % (opts['penalty']))
-        elif opts['method']=='vae':
-            logging.error('VAE')
-
         num_pics = 400
         step_inter = 20
         num_anchors = 10
@@ -1285,7 +1398,6 @@ def save_plots_vizu(opts, data_train,
 
     images = []
 
-
     ### Reconstruction plots
     for pair in [(data_train, rec_train),
                  (data_test, rec_test)]:
@@ -1313,7 +1425,6 @@ def save_plots_vizu(opts, data_train,
         image = np.concatenate(np.split(pics, num_cols), axis=2)
         image = np.concatenate(image, axis=0)
         images.append(image)
-
 
     ### Points Interpolation plots
     white_pix = 4
@@ -1402,13 +1513,11 @@ def save_plots_vizu(opts, data_train,
         #             format='png')
         plt.close()
 
-
     # Set size for following plots
     height_pic= img1.shape[0]
     width_pic = img1.shape[1]
     fig_height = height_pic / float(dpi)
     fig_width = width_pic / float(dpi)
-
 
     ###The mean mixtures plots
     mean_probs = []
@@ -1419,8 +1528,9 @@ def save_plots_vizu(opts, data_train,
         mean_probs.append(probs)
     mean_probs = np.stack(mean_probs,axis=0)
     # entropy
-    entropies = calculate_row_entropy(mean_probs)
-    cluster_to_digit = relabelling_mask_from_entropy(mean_probs, entropies)
+    #entropies = calculate_row_entropy(mean_probs)
+    #cluster_to_digit = relabelling_mask_from_entropy(mean_probs, entropies)
+    cluster_to_digit = relabelling_mask_from_probs(mean_probs)
     digit_to_cluster = np.argsort(cluster_to_digit)
     mean_probs = mean_probs[::-1,digit_to_cluster]
     fig = plt.figure(figsize=(fig_width, fig_height))
@@ -1433,7 +1543,6 @@ def save_plots_vizu(opts, data_train,
     fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
                 dpi=dpi, format='png', bbox_inches='tight')
     plt.close()
-
 
     ###Sample plots
     pics = []
@@ -1474,7 +1583,6 @@ def save_plots_vizu(opts, data_train,
     # fig.savefig(utils.o_gfile((save_dir, filename), 'wb'),
     #             format='png')
     plt.close()
-
 
     ###UMAP visualization of the embedings
     num_pics = 200
@@ -1527,7 +1635,6 @@ def save_plots_vizu(opts, data_train,
                 dpi=dpi, format='png', bbox_inches='tight')
     plt.close()
 
-
     ###Saving plots and data
     data_dir = 'data_for_plots'
     save_path = os.path.join(work_dir,data_dir)
@@ -1550,7 +1657,7 @@ def accuracy(labels, probs, clusters_id):
     correct_prediction = (relabelled_preds==labels)
     return np.mean(correct_prediction)
 
-def get_labels(labels,probs):
+def get_mean_probs(labels,probs):
     mean_probs = []
     num_pics = np.shape(probs)[0]
     for i in range(10):
@@ -1558,11 +1665,13 @@ def get_labels(labels,probs):
         prob = np.mean(np.stack(prob,axis=0),axis=0)
         mean_probs.append(prob)
     mean_probs = np.stack(mean_probs,axis=0)
+    return mean_probs
+
     cluster_to_digit = relabelling_mask_from_probs(mean_probs)
     return cluster_to_digit
 
 def relabelling_mask_from_probs(mean_probs):
-    probs_copy = mean_probs
+    probs_copy = mean_probs.copy()
     nmixtures = np.shape(mean_probs)[-1]
     k_vals = []
     min_prob = np.zeros(nmixtures)
@@ -1605,6 +1714,11 @@ def calculate_row_entropy(mean_probs):
         entropies.append(scistats.entropy(mean_probs[i]))
     entropies = np.asarray(entropies)
     return entropies
+
+def one_hot(labels):
+    one_hot = np.zeros((labels.size, labels.max()+1))
+    one_hot[np.arange(labels.size),labels] = 1
+    return one_hot
 
 def discrete_cmap(N, base_cmap=None):
     """Create an N-bin discrete colormap from the specified input map"""

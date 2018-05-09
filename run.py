@@ -60,7 +60,6 @@ def main():
 
     if FLAGS.alg:
         opts['method'] = FLAGS.alg
-
     if FLAGS.zdim:
         opts['zdim'] = FLAGS.zdim
     if FLAGS.z_test:
@@ -97,9 +96,14 @@ def main():
     # WAE
     wae = WAE(opts)
     if FLAGS.mode=="train":
+        logging.error('Training')
         wae.train(data)
-    if FLAGS.mode=="test":
+    elif FLAGS.mode=="test":
+        logging.error('Testing')
         wae.test(data, opts['work_dir'], FLAGS.weights_file)
+    elif FLAGS.mode=="reg":
+        logging.error('Logistic regression')
+        wae.reg(data, opts['work_dir'], FLAGS.weights_file)
     elif FLAGS.mode=="vizu":
         logging.error('Visualization')
         wae.vizu(data, opts['work_dir'], FLAGS.weights_file)
