@@ -782,7 +782,7 @@ class WAE(object):
 
                 # Print debug info
                 if opts['method']=='vae':
-                    cond1 = counter < 71 and counter % 2==0
+                    cond1 = counter < 101 and counter % 2==0
                 else:
                     cond1 = counter==1
                 cond2 = counter % opts['print_every'] == 0
@@ -845,6 +845,7 @@ class WAE(object):
                              global_step=counter)
 
     def test(self, data, MODEL_DIR, WEIGHTS_FILE):
+        opts = self.opts
         # Load trained weights
         MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
         if not tf.gfile.IsDirectory(MODEL_PATH):
@@ -928,13 +929,14 @@ class WAE(object):
             raise Exception("weights file doesn't exist")
         self.saver.restore(self.sess, WEIGHTS_PATH)
 
-        epoch_num = 10
-        print_every = 1
+        epoch_num = 20
+        print_every = 69
         batch_size = 100
         batches_num = int(data.num_points / batch_size)
         train_size = data.num_points
         lr = 0.001
         costs, test_acc, train_acc  = [], [], []
+        counter = 0
 
         # Define the model
         # Construct model
@@ -976,7 +978,9 @@ class WAE(object):
                 cost += c / batches_num
                 costs.append(cost)
 
-            if epoch % print_every == 0:
+                counter += 1
+
+            if counter==1 or counter % print_every == 0:
                 # Testing and logging info
                 te_acc, tr_acc  = 0., 0.
                 # Training Acc
@@ -1015,12 +1019,14 @@ class WAE(object):
 
         # saving
         name = 'log_reg'
+        xstep = int(len(costs)/100)
         np.savez(os.path.join(MODEL_PATH,name),
-                    costs=np.array(costs[::batches_num]),
+                    costs=np.array(costs[::xstep]),
                     tr_acc=np.array(tr_acc),
                     te_acc=np.array(te_acc))
 
     def vizu(self, data, MODEL_DIR, WEIGHTS_FILE):
+        opts = self.opts
         num_pics = 400
         step_inter = 20
         num_anchors = 10
