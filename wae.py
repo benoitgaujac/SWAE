@@ -782,7 +782,7 @@ class WAE(object):
 
                 # Print debug info
                 if opts['method']=='vae':
-                    cond1 = counter < 61 and counter % 2==0
+                    cond1 = counter < 71 and counter % 2==0
                 else:
                     cond1 = counter==1
                 cond2 = counter % opts['print_every'] == 0
@@ -1019,7 +1019,6 @@ class WAE(object):
                     costs=np.array(costs[::batches_num]),
                     tr_acc=np.array(tr_acc),
                     te_acc=np.array(te_acc))
-
 
     def vizu(self, data, MODEL_DIR, WEIGHTS_FILE):
         num_pics = 400
