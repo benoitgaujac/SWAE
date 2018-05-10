@@ -477,25 +477,25 @@ class WAE(object):
 
     def vae_matching_penalty(self,samples_qz):
         opts = self.opts
-        # Continuous KL (actually -KL)
-        kl_g = opts['zdim'] + self.enc_logsigmas - tf.log(self.pz_covs) \
-                - tf.square(self.enc_mean - self.pz_means) / self.pz_covs \
-                - tf.exp(self.enc_logsigmas) / self.pz_covs
+        # Continuous KL
+        kl_g = tf.exp(self.enc_logsigmas) / self.pz_covs \
+                + tf.square(self.pz_means - self.enc_mean) / self.pz_covs \
+                - 1. + tf.log(self.pz_covs) - self.enc_logsigmas
         kl_g = 0.5 * tf.reduce_sum(kl_g,axis=-1)
         kl_g = tf.multiply(kl_g,self.enc_mixweight)
         kl_g = tf.reduce_sum(kl_g,axis=-1)
         kl_g = tf.reduce_mean(kl_g)
-        self.kl_g = -kl_g
-        # Discrete KL (actually -KL)
-        kl_d = - tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32)) \
-                    - tf.log(self.enc_mixweight)
+        self.kl_g = kl_g
+        # Discrete KL
+        kl_d = tf.log(self.enc_mixweight) \
+                + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         kl_d = tf.multiply(kl_d,self.enc_mixweight)
         kl_d = tf.reduce_sum(kl_d,axis=-1)
         kl_d = tf.reduce_mean(kl_d)
-        self.kl_d = -kl_d
+        self.kl_d = kl_d
 
         loss_match = kl_g + kl_d
-        return - loss_match
+        return loss_match
 
     def reconstruction_loss(self):
         opts = self.opts
@@ -1253,8 +1253,7 @@ def save_plots(opts, sample_train,sample_test,
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                #metric='correlation').fit_transform(np.concatenate((encoded,sample_prior),axis=0))
-                                metric='correlation').fit_transform(np.concatenate((encoded,enc_mean,sample_prior),axis=0))
+                                metric='correlation').fit_transform(np.concatenate((encoded,sample_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
                 c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
@@ -1262,10 +1261,6 @@ def save_plots(opts, sample_train,sample_test,
     plt.colorbar()
     plt.scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
                             color='navy', s=10, marker='*',label='Pz')
-    # plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
-    #             color='deepskyblue', s=10, marker='x',label='mean Qz test')
-    # plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
-    #                         color='navy', s=10, marker='*',label='Pz')
 
     xmin = np.amin(embedding[:,0])
     xmax = np.amax(embedding[:,0])
