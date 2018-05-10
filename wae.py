@@ -478,9 +478,9 @@ class WAE(object):
     def vae_matching_penalty(self,samples_qz):
         opts = self.opts
         # Continuous KL (actually -KL)
-        kl_g = 1 + self.enc_logsigmas \
-                    - tf.square(self.enc_mean) \
-                    - tf.exp(self.enc_logsigmas)
+        kl_g = opts['zdim'] + self.enc_logsigmas - tf.log(self.pz_covs) \
+                - tf.square(self.enc_mean - self.pz_means) / self.pz_covs \
+                - tf.exp(self.enc_logsigmas) / self.pz_covs
         kl_g = 0.5 * tf.reduce_sum(kl_g,axis=-1)
         kl_g = tf.multiply(kl_g,self.enc_mixweight)
         kl_g = tf.reduce_sum(kl_g,axis=-1)
@@ -928,9 +928,9 @@ class WAE(object):
             raise Exception("weights file doesn't exist")
         self.saver.restore(self.sess, WEIGHTS_PATH)
 
-        epoch_num = 50
+        epoch_num = 10
         print_every = 1
-        batch_size = 200
+        batch_size = 100
         batches_num = int(data.num_points / batch_size)
         train_size = data.num_points
         lr = 0.001
@@ -946,12 +946,14 @@ class WAE(object):
         correct_prediction = tf.equal(tf.argmax(logreg_preds, 1),tf.argmax(self.y, 1))
         acc = tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
         # Optimizer
+        opt = tf.train.GradientDescentOptimizer(lr)
         logreg_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='log_reg')
-        opt = tf.train.AdamOptimizer(lr, beta1=0.5)
         logreg_opt = opt.minimize(loss=cross_entropy,
                                     var_list=logreg_vars)
         for var in logreg_vars:
             self.sess.run(var.initializer)
+        # Training loop
+        logging.error('Start training..')
         self.start_time = time.time()
         for epoch in range(epoch_num):
             cost = 0.
@@ -988,11 +990,10 @@ class WAE(object):
                                 feed_dict={self.sample_points: batch_images,
                                                     self.is_training: False})
                     batch_labels = one_hot(data.labels[data_ids])
-                    acc = self.sess.run(accuracy,
+                    a = self.sess.run(acc,
                                 feed_dict={self.preds: tr_preds,
-                                            self.y: batch_labels,
-                                            is_training: False})
-                    tr_acc += acc / batches_num
+                                            self.y: batch_labels})
+                    tr_acc += a/ batches_num
                 # Testing Acc
                 te_preds = self.sess.run(self.enc_mixweight,
                             feed_dict={self.sample_points: data.test_data,
@@ -1000,8 +1001,7 @@ class WAE(object):
                 test_labels = one_hot(data.test_labels)
                 te_acc = self.sess.run(acc,
                         feed_dict={self.preds: te_preds,
-                                    self.y: test_labels,
-                                    is_training: False})
+                                    self.y: test_labels})
                 train_acc.append(tr_acc)
                 test_acc.append(te_acc)
                 # Printing various loss values
@@ -1009,8 +1009,8 @@ class WAE(object):
                             epoch + 1, epoch_num,
                             it + 1, batches_num)
                 logging.error(debug_str)
-                debug_str = 'cost=%.3f, TRAIN ACC=%.2f%, TEST ACC=%.2f%' % (
-                            costs[-1], 100.*tr_acc, 100.*te_acc)
+                debug_str = 'cost=%.3f, TRAIN ACC=%.4f, TEST ACC=%.4f' % (
+                            costs[-1], tr_acc, te_acc)
                 logging.error(debug_str)
 
         # saving
@@ -1715,8 +1715,8 @@ def calculate_row_entropy(mean_probs):
     entropies = np.asarray(entropies)
     return entropies
 
-def one_hot(labels):
-    one_hot = np.zeros((labels.size, labels.max()+1))
+def one_hot(labels,depth=10):
+    one_hot = np.zeros((labels.size, 10))
     one_hot[np.arange(labels.size),labels] = 1
     return one_hot
 
