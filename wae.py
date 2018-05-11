@@ -1234,23 +1234,23 @@ def save_plots(opts, sample_train,sample_test,
         ax.axes.set_ylim([height_pic, 0])
         ax.axes.set_aspect(1)
 
-    # ### Then the mean mixtures plots
-    # mean_probs = []
-    # for i in range(10):
-    #     probs = [prob[k] for k in range(num_pics) if label_test[k]==i]
-    #     probs = np.mean(np.stack(probs,axis=0),axis=0)
-    #     mean_probs.append(probs)
-    # mean_probs = np.stack(mean_probs,axis=0)
+    ### Then the mean mixtures plots
+    mean_probs = []
+    for i in range(10):
+        probs = [prob[k] for k in range(num_pics) if label_test[k]==i]
+        probs = np.mean(np.stack(probs,axis=0),axis=0)
+        mean_probs.append(probs)
+    mean_probs = np.stack(mean_probs,axis=0)
     # # entropy
     # entropies = calculate_row_entropy(mean_probs)
     # relab_mask = relabelling_mask_from_entropy(mean_probs, entropies)
     # mean_probs = mean_probs[relab_mask]
-    # ax = plt.subplot(gs[1, 0])
-    # plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
-    # plt.text(0.47, 1., 'Test means probs',
-    #        ha="center", va="bottom", size=20, transform=ax.transAxes)
-    # plt.yticks(np.arange(10),relab_mask)
-    # plt.xticks(np.arange(10))
+    ax = plt.subplot(gs[1, 0])
+    plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
+    plt.text(0.47, 1., 'Test means probs',
+           ha="center", va="bottom", size=20, transform=ax.transAxes)
+    plt.yticks(np.arange(10),relab_mask)
+    plt.xticks(np.arange(10))
 
     ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])
