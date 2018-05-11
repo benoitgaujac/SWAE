@@ -1249,7 +1249,7 @@ def save_plots(opts, sample_train,sample_test,
     plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
     plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
-    plt.yticks(np.arange(10),relab_mask)
+    #plt.yticks(np.arange(10),relab_mask)
     plt.xticks(np.arange(10))
 
     ###UMAP visualization of the embedings
