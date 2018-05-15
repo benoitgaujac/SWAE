@@ -782,10 +782,10 @@ class WAE(object):
 
                 # Print debug info
                 if opts['method']=='vae':
-                    # cond1_bis = counter < 101 and counter % 2==0
+                    # cond1_bis = counter < 101 and counter % 10==0
                     # cond1_bisbis = counter > 100 and counter % 100==0
                     # cond1 = cond1_bis or cond1_bisbis
-                    cond1 = counter==1                    
+                    cond1 = ccounter < 101 and counter % 10==0
                 else:
                     cond1 = counter==1
                 cond2 = counter % opts['print_every'] == 0
