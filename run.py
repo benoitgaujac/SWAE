@@ -91,8 +91,13 @@ def main():
     data = DataHandler(opts)
     assert data.num_points >= opts['batch_size'], 'Training set too small'
 
-    # WAE
+    #Reset tf graph
+    tf.reset_default_graph()
+
+    # build WAE
     wae = WAE(opts)
+
+    # Training/testing/vizu
     if FLAGS.mode=="train":
         logging.error('Training')
         wae.train(data, opts['work_dir'], FLAGS.weights_file)
