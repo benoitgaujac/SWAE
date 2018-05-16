@@ -72,8 +72,6 @@ def main():
         opts['lambda'] = FLAGS.wae_lambda
     if FLAGS.enc_noise:
         opts['e_noise'] = FLAGS.enc_noise
-    if FLAGS.stop_grad:
-        opts['stop_grad'] = FLAGS.stop_grad
 
     if opts['verbose']:
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
@@ -97,7 +95,7 @@ def main():
     wae = WAE(opts)
     if FLAGS.mode=="train":
         logging.error('Training')
-        wae.train(data)
+        wae.train(data, opts['work_dir'], FLAGS.weights_file)
     elif FLAGS.mode=="test":
         logging.error('Testing')
         wae.test(data, opts['work_dir'], FLAGS.weights_file)
