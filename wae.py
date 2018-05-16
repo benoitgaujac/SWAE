@@ -787,15 +787,10 @@ class WAE(object):
                 counter += 1
 
                 # Print debug info
-                if opts['method']=='vae':
-                    # cond1_bis = counter < 101 and counter % 10==0
-                    # cond1_bisbis = counter > 100 and counter % 100==0
-                    # cond1 = cond1_bis or cond1_bisbis
-                    cond1 = counter < 101 and counter % 10==0
-                else:
-                    cond1 = counter==1
-                cond2 = counter % opts['print_every'] == 0
-                if cond1 or cond2:
+                cond1 = counter < 101 and counter % 10==0
+                cond2 = counter==1
+                cond3 = counter % opts['print_every'] == 0
+                if cond1 or cond2 or cond3:
                     now = time.time()
                     # Auto-encoding test images
                     [loss_rec_test, enc_mean_all, encoded, enc_mean, rec_test, prob] = self.sess.run(
