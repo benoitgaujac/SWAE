@@ -547,7 +547,7 @@ class WAE(object):
         opts = self.opts
         real = tf.expand_dims(tf.expand_dims(self.sample_points,axis=1),axis=1)
         logit = self.reconstructed
-        eps = 1e-10
+        eps = 1e-5
         l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
         loss = tf.reduce_sum(l,axis=[3,4,5])
         loss = tf.reduce_mean(loss,axis=-1)
