@@ -487,7 +487,8 @@ class WAE(object):
         kl_g = tf.reduce_mean(kl_g)
         self.kl_g = kl_g
         # Discrete KL
-        kl_d = tf.log(self.enc_mixweight) \
+        eps = 1e-10
+        kl_d = tf.log(eps+self.enc_mixweight) \
                 + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
         kl_d = tf.multiply(kl_d,self.enc_mixweight)
         kl_d = tf.reduce_sum(kl_d,axis=-1)
@@ -546,7 +547,7 @@ class WAE(object):
         opts = self.opts
         real = tf.expand_dims(tf.expand_dims(self.sample_points,axis=1),axis=1)
         logit = self.reconstructed
-        eps = 1e-8
+        eps = 1e-10
         l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
         loss = tf.reduce_sum(l,axis=[3,4,5])
         loss = tf.reduce_mean(loss,axis=-1)
