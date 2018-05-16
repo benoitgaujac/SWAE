@@ -7,6 +7,8 @@ from wae import WAE
 from datahandler import DataHandler
 import utils
 
+import tensorflow as tf
+
 import pdb
 
 parser = argparse.ArgumentParser()
