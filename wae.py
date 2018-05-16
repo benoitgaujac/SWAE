@@ -634,31 +634,37 @@ class WAE(object):
                             self.sample_mix_noise: batch_mix_noise,
                             self.is_training: True})
 
-    def train(self, data):
+    def train(self, data, MODEL_DIR, WEIGHTS_FILE):
         opts = self.opts
         if opts['method']=='swae':
             logging.error('Training WAE, Matching penalty: %s' % (opts['penalty']))
         elif opts['method']=='vae':
             logging.error('Training VAE')
 
+        # Create work_dir
         utils.create_dir(opts['method'])
         work_dir = os.path.join(opts['method'],opts['work_dir'])
 
-        losses, losses_rec, losses_match, kl_gau, kl_dis  = [], [], [], [], []
-        mmd_losses= []
+        # Init sess and load trained weights if needed
+        if opts['use_pretrain']:
+            if not tf.gfile.Exists(WEIGHTS_FILE+".meta"):
+                raise Exception("weights file doesn't exist")
+            self.saver.restore(self.sess, WEIGHTS_FILE)
+        else:
+            self.sess.run(self.init)
+            if opts['e_pretrain']:
+                logging.error('Pretraining the encoder')
+                self.pretrain_encoder(data)
+                logging.error('Pretraining the encoder done.')
+
         batches_num = int(data.num_points / opts['batch_size'])
         train_size = data.num_points
         self.num_pics = opts['plot_num_pics']
         self.fixed_noise = self.sample_pz(opts['plot_num_pics'],sampling = 'per_mixture')
-        self.sess.run(self.init)
-
-        if opts['e_pretrain']:
-            logging.error('Pretraining the encoder')
-            self.pretrain_encoder(data)
-            logging.error('Pretraining the encoder done.')
-
 
         self.start_time = time.time()
+        losses, losses_rec, losses_match, kl_gau, kl_dis  = [], [], [], [], []
+        mmd_losses= []
         counter = 0
         decay = 1.
         if opts['method']=='swae':
