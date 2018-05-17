@@ -788,7 +788,7 @@ class WAE(object):
                 counter += 1
 
                 # Print debug info
-                cond1 = counter < 101 and counter % 10==0
+                cond1 = counter < 101 and counter % 2==0
                 cond2 = counter==1
                 cond3 = counter % opts['print_every'] == 0
                 if cond1 or cond2 or cond3:
@@ -1286,8 +1286,8 @@ def save_plots(opts, sample_train,sample_test,
                                 metric='correlation').fit_transform(np.concatenate((encoded,sample_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
-                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
-                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
+                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
+                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
     plt.scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
                             color='navy', s=10, marker='*',label='Pz')
