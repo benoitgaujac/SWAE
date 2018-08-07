@@ -2,8 +2,8 @@
 # Distributed under the BSD-3 Software license,
 # (See accompanying file ./LICENSE.txt or copy at
 # https://opensource.org/licenses/BSD-3-Clause)
-"""Various utilities.
-
+"""
+Various utilities.
 """
 
 import tensorflow as tf

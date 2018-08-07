@@ -510,8 +510,10 @@ class DataHandler(object):
                 labels.append(y[idx])
             X = np.array(points)
             y = np.array(y)
-        self.data = Data(opts, X[:-test_size])
-        #self.data = Data(opts, X[:opts['train_dataset_size']])
+        if opts['train_dataset_size']==-1:
+            self.data = Data(opts, X[:-test_size])
+        else:
+            self.data = Data(opts, X[:opts['train_dataset_size']])
         self.test_data = Data(opts, X[-test_size:])
         self.labels = y[:-test_size]
         self.test_labels = y[-test_size:]
