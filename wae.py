@@ -551,6 +551,7 @@ class WAE(object):
                                                         losses_match[-1][1],
                                                         losses_xent[-1][0],
                                                         losses_xent[-1][1])
+                    logging.error(debug_str)
                     print('')
                     # Making plots
                     #logging.error('Saving images..')
