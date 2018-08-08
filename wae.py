@@ -481,7 +481,7 @@ class WAE(object):
                     labelled_clusters = relabelling_mask_from_probs(mean_probs)
                     # Test accuracy & loss
                     u_loss_rec_test, l_loss_rec_test = 0., 0.
-                    l_acc_test, u_acc_test = 0., 0.
+                    u_acc_test = 0.
                     for it_ in range(te_batches_num):
                         # Sample batches of data points
                         data_ids = te_size + np.random.choice(tr_size,
@@ -489,27 +489,25 @@ class WAE(object):
                                                         replace=False)
                         batch_images = data.test_data[data_ids].astype(np.float32)
                         batch_labels = data.test_labels[data_ids].astype(np.float32)
-                        [u_loss_rec, l_loss_rec, preds, probs_test] = self.sess.run(
+                        [u_loss_rec, l_loss_rec, probs_test] = self.sess.run(
                                                         [self.u_loss_reconstruct,
                                                          self.l_loss_reconstruct,
-                                                         self.labels_reconstructed,
                                                          self.probs],
                                                         feed_dict={self.l_points:batch_images,
                                                                    self.l_labels:batch_labels,
                                                                    self.u_points:batch_images,
                                                                    self.is_training:False})
                         # Computing accuracy
-                        l_acc = accuracy(batch_labels, preds, labelled_clusters)
                         u_acc = accuracy(batch_labels, probs_test, labelled_clusters)
-                        l_acc_test += l_acc / te_batches_num
                         u_acc_test += u_acc / te_batches_num
                         u_loss_rec_test += u_loss_rec / te_batches_num
                         l_loss_rec_test += l_loss_rec / te_batches_num
 
                     # Auto-encoding unlabeled test images
-                    [rec_test, encoded, probs_test] = self.sess.run(
+                    [rec_test, encoded, labeling, probs_test] = self.sess.run(
                                                         [self.reconstructed_point,
                                                          self.encoded_point,
+                                                         self.labels_reconstructed,
                                                          self.probs],
                                                         feed_dict={self.l_points:data.test_data[:npics],
                                                                    self.u_points:data.test_data[:npics],
@@ -532,18 +530,14 @@ class WAE(object):
                                 it + 1, batches_num,
                                 losses[-1])
                     logging.error(debug_str)
-                    #logging.error('LOSS=%.3f' % (losses[-1]))
-                    debug_str = 'Clusters ID: %d%d%d%d%d%d%d%d%d%d' % (
-                                labelled_clusters[0], labelled_clusters[1],
-                                labelled_clusters[2], labelled_clusters[3],
-                                labelled_clusters[4], labelled_clusters[5],
-                                labelled_clusters[6], labelled_clusters[7],
-                                labelled_clusters[8], labelled_clusters[9],)
+                    debug_str = 'Clusters ID: %s' % (str(labelled_clusters))
                     logging.error(debug_str)
-                    debug_str = 'TEST REC(L/U)=%.3f/%.3f, TEST ACC(L/U)=%.2f/%.2f' % (
+                    labs = np.argmax(labeling,axis=-1)
+                    debug_str = 'Labelling: %s' % (str(labs))
+                    logging.error(debug_str)
+                    debug_str = 'TEST REC(L/U)=%.3f/%.3f, TEST ACC=%.2f' % (
                                                         l_loss_rec_test,
                                                         u_loss_rec_test,
-                                                        100*l_acc_test,
                                                         100*u_acc_test)
                     logging.error(debug_str)
                     debug_str = 'MATCH(L/U)=%.3f/%.3f, XENT(L/U)=%.3f/%.3f' % (
