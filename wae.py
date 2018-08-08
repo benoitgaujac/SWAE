@@ -464,7 +464,7 @@ class WAE(object):
                     tr_batches_num = int(tr_size/opts['batch_size'])
                     # Determine clusters ID
                     mean_probs = np.zeros((10,10))
-                    for it in range(tr_batches_num):
+                    for it_ in range(tr_batches_num):
                         # Sample batches of data points
                         data_ids = te_size + np.random.choice(tr_size,
                                                        opts['batch_size'],
@@ -482,7 +482,7 @@ class WAE(object):
                     # Test accuracy & loss
                     u_loss_rec_test, l_loss_rec_test = 0., 0.
                     l_acc_test, u_acc_test = 0., 0.
-                    for it in range(te_batches_num):
+                    for it_ in range(te_batches_num):
                         # Sample batches of data points
                         data_ids = te_size + np.random.choice(tr_size,
                                                         opts['batch_size'],
