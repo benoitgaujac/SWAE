@@ -74,15 +74,15 @@ class WAE(object):
                                                         sample_size,'tensorflow')
         # --- Decoding encoded points (i.e. reconstruct)
         self.l_reconstructed, self.l_reconstructed_logits = self.decoder(self.l_mixtures_encoded,
-                                                                    False,
-                                                                    True)
+                                                        False,
+                                                        True)
         self.u_reconstructed, self.u_reconstructed_logits = self.decoder(self.u_mixtures_encoded,
-                                                                    True,
-                                                                    True)
+                                                        True,
+                                                        True)
         self.labels_reconstructed, self.labels_reconstructed_logits = discrete_decoder(opts,
-                                                                    self.label_noise,
-                                                                    False,
-                                                                    self.is_training)
+                                                        self.label_noise,
+                                                        False,
+                                                        self.is_training)
         # --- Reconstructing inputs (only for visualization)
         idx = tf.reshape(tf.multinomial(self.u_pi, 1),[-1])
         mix_idx = tf.stack([range,idx],axis=-1)
@@ -98,24 +98,24 @@ class WAE(object):
         # --- Objectives, losses, penalties, pretraining
         # Compute reconstruction cost
         self.l_loss_reconstruct = reconstruction_loss(opts, self.l_pi,
-                                                            self.l_points,
-                                                            self.l_reconstructed,
-                                                            self.l_labels,
-                                                            tf.argmax(self.labels_reconstructed,axis=-1))
+                                                        self.l_points,
+                                                        self.l_reconstructed,
+                                                        self.l_labels,
+                                                        tf.argmax(self.labels_reconstructed,axis=-1))
         self.u_loss_reconstruct = reconstruction_loss(opts, self.u_pi,
-                                                            self.u_points,
-                                                            self.u_reconstructed)
+                                                        self.u_points,
+                                                        self.u_reconstructed)
         # Compute matching penalty cost
         self.kl_g, self.kl_d, self.l_cont_penalty, self.l_disc_penalty = matching_penalty(opts,
-                                                   self.pi0, self.l_pi,
-                                                   self.l_enc_mean, self.l_enc_logSigma,
-                                                   self.pz_mean, self.pz_sigma,
-                                                   self.l_sample_mix_noise, self.l_mixtures_encoded)
+                                                        self.pi0, self.l_pi,
+                                                        self.l_enc_mean, self.l_enc_logSigma,
+                                                        self.pz_mean, self.pz_sigma,
+                                                        self.l_sample_mix_noise, self.l_mixtures_encoded)
         self.kl_g, self.kl_d, self.u_cont_penalty, self.u_disc_penalty = matching_penalty(opts,
-                                                   self.pi0, self.u_pi,
-                                                   self.u_enc_mean, self.u_enc_logSigma,
-                                                   self.pz_mean, self.pz_sigma,
-                                                   self.u_sample_mix_noise, self.u_mixtures_encoded)
+                                                        self.pi0, self.u_pi,
+                                                        self.u_enc_mean, self.u_enc_logSigma,
+                                                        self.pz_mean, self.pz_sigma,
+                                                        self.u_sample_mix_noise, self.u_mixtures_encoded)
         # Compute Labeled obj
         self.l_loss = self.l_loss_reconstruct\
                          + self.lmbd * self.l_cont_penalty\
@@ -263,13 +263,13 @@ class WAE(object):
     def decoder(self, encoded, reuse=False, reshape=True):
         noise = tf.reshape(encoded,[-1,self.opts['zdim']])
         recon, log = continuous_decoder(self.opts, noise=noise,
-                                                    reuse=reuse,
-                                                    is_training=self.is_training)
+                                                        reuse=reuse,
+                                                        is_training=self.is_training)
         if reshape:
             reconstructed = tf.reshape(recon,
-                                [-1,self.opts['nmixtures']]+self.data_shape)
+                            [-1,self.opts['nmixtures']]+self.data_shape)
             logits = tf.reshape(log,
-                                [-1,self.opts['nmixtures']]+self.data_shape)
+                            [-1,self.opts['nmixtures']]+self.data_shape)
         else:
             reconstructed = recon
             logits = log
@@ -286,7 +286,7 @@ class WAE(object):
 
     def pretrain_encoder(self, data):
         opts=self.opts
-        steps_max = 50
+        steps_max = 500
         batch_size = opts['e_pretrain_sample_size']
         full_train_size = data.num_points
         l_train_size = max(int(full_train_size*opts['lu_split']),5)
@@ -334,6 +334,15 @@ class WAE(object):
         utils.create_dir(opts['method'])
         work_dir = os.path.join(opts['method'],opts['work_dir'])
 
+        # Split data set
+        full_train_size = data.num_points
+        l_train_size = max(int(full_train_size*opts['lu_split']),5)
+        u_train_size = full_train_size-l_train_size
+        debug_str = 'Total:%d, Unlabelled:%d, Labelled:%d' % (
+                    full_train_size, u_train_size, l_train_size)
+        logging.error(debug_str)
+        print('')
+
         # Init sess and load trained weights if needed
         if opts['use_trained']:
             if not tf.gfile.Exists(WEIGHTS_FILE+".meta"):
@@ -346,20 +355,11 @@ class WAE(object):
                 self.pretrain_encoder(data)
         print('')
 
-        full_train_size = data.num_points
-        l_train_size = max(int(full_train_size*opts['lu_split']),5)
-        u_train_size = full_train_size-l_train_size
-        debug_str = 'Total:%d, Unlabelled:%d, Labelled:%d' % (
-                    full_train_size, u_train_size, l_train_size)
-        logging.error(debug_str)
-        print('')
         batches_num = int(max(l_train_size,u_train_size)/opts['batch_size'])
         npics = opts['plot_num_pics']
-        fixed_noise = sample_pz(opts, self.pz_mean,
-                                      self.pz_sigma,
-                                      opts['plot_num_pics'],
-                                      sampling_mode = 'per_mixture')
-
+        fixed_noise = sample_pz(opts, self.pz_mean, self.pz_sigma,
+                                                        opts['plot_num_pics'],
+                                                        sampling_mode = 'per_mixture')
         self.start_time = time.time()
         losses, losses_rec, losses_match, losses_xent = [], [], [], []
         kl_gau, kl_dis  = [], []
@@ -372,7 +372,6 @@ class WAE(object):
             assert False, 'to implement VAE'
             wae_lmbda = 1
         wait = 0
-
         for epoch in range(opts['epoch_num']):
             # Update learning rate if necessary
             if epoch == 30:
@@ -383,32 +382,33 @@ class WAE(object):
                 decay = decay / 10.
             # Save the model
             if epoch > 0 and epoch % opts['save_every_epoch'] == 0:
-                self.saver.save(self.sess,
-                                os.path.join(work_dir,'checkpoints','trained-wae'),
-                                global_step=counter)
-            # Initialize mean probs for each epoch
-            mean_probs = np.zeros((10,10))
-            # Iterate over batches
+                self.saver.save(self.sess, os.path.join(
+                                                        work_dir,'checkpoints',
+                                                        'trained-wae'),
+                                                        global_step=counter)
+            # # Initialize mean probs for each epoch
+            # mean_probs = np.zeros((10,10))
+            ##### TRAINING LOOP #####
             for it in range(batches_num):
                 # Sample batches of data points and Pz noise
                 data_ids = np.random.choice(l_train_size,
-                                    opts['batch_size'],
-                                    replace=True)
+                                                        opts['batch_size'],
+                                                        replace=True)
                 l_batch_images = data.data[data_ids].astype(np.float32)
                 l_batch_labels = data.labels[data_ids].astype(np.float32)
                 l_batch_mix_noise = sample_pz(opts, self.pz_mean,
-                                                  self.pz_sigma,
-                                                  opts['batch_size'],
-                                                  sampling_mode='all_mixtures')
+                                                        self.pz_sigma,
+                                                        opts['batch_size'],
+                                                        sampling_mode='all_mixtures')
                 data_ids = l_train_size + np.random.choice(u_train_size,
                                                            opts['batch_size'],
                                                            replace=False)
                 u_batch_images = data.data[data_ids].astype(np.float32)
                 u_batch_labels = data.labels[data_ids].astype(np.float32)
                 u_batch_mix_noise = sample_pz(opts, self.pz_mean,
-                                                  self.pz_sigma,
-                                                  opts['batch_size'],
-                                                  sampling_mode='all_mixtures')
+                                                        self.pz_sigma,
+                                                        opts['batch_size'],
+                                                        sampling_mode='all_mixtures')
                 # Feeding dictionary
                 feed_dict={self.l_points: l_batch_images,
                            self.l_labels: l_batch_labels,
@@ -439,57 +439,93 @@ class WAE(object):
                 elif opts['method']=='vae':
                     assert False, 'to implement VAE'
                     [_, loss, loss_rec, loss_match, enc_mw, kl_g, kl_d] = self.sess.run(
-                                                     [self.swae_opt,
-                                                      self.objective,
-                                                      self.loss_reconstruct,
-                                                      self.penalty,
-                                                      self.enc_mixweight,
-                                                      self.kl_g,
-                                                      self.kl_d],
-                                                     feed_dict=feed_dict)
+                                                        [self.swae_opt,
+                                                         self.objective,
+                                                         self.loss_reconstruct,
+                                                         self.penalty,
+                                                         self.enc_mixweight,
+                                                         self.kl_g,
+                                                         self.kl_d],
+                                                        feed_dict=feed_dict)
                     kl_gau.append(kl_g)
                     kl_dis.append(kl_d)
                 losses.append(loss)
                 losses_rec.append([l_loss_rec,u_loss_rec])
                 losses_match.append([l_loss_match,u_loss_match])
                 losses_xent.append([l_loss_xent,u_loss_xent])
-                mean_probs += get_mean_probs(u_batch_labels,probs_labels) / batches_num
-                # Print debug info
+                #mean_probs += get_mean_probs(u_batch_labels,probs_labels) / batches_num
+                ##### TESTING LOOP #####
                 if counter % opts['print_every'] == 0:
                     now = time.time()
-                    # Auto-encoding labeled test images
-                    [l_loss_rec_test, preds] = self.sess.run(
-                                    [self.l_loss_reconstruct,
-                                     self.labels_reconstructed],
-                                    feed_dict={self.l_points:data.test_data[:npics],
-                                               self.l_labels:data.test_labels[:npics],
-                                               self.is_training:False})
+                    test_size = np.shape(data.test_data)[0]
+                    te_size = max(int(test_size*0.1),opts['batch_size'])
+                    te_batches_num = int(te_size/opts['batch_size'])
+                    tr_size = test_size - te_size
+                    tr_batches_num = int(tr_size/opts['batch_size'])
+                    # Determine clusters ID
+                    mean_probs = np.zeros((10,10))
+                    for it in range(tr_batches_num):
+                        # Sample batches of data points
+                        data_ids = te_size + np.random.choice(tr_size,
+                                                       opts['batch_size'],
+                                                       replace=False)
+                        batch_images = data.test_data[data_ids].astype(np.float32)
+                        batch_labels = data.test_labels[data_ids].astype(np.float32)
+                        probs_train = self.sess.run(self.probs,
+                                                        feed_dict={self.l_points:batch_images,
+                                                                   self.u_points:batch_images,
+                                                                   self.is_training:False})
+                        mean_prob = get_mean_probs(batch_labels,probs_train)
+                        mean_probs += mean_prob / tr_batches_num
+                    # Determine clusters given mean probs
+                    labelled_clusters = relabelling_mask_from_probs(mean_probs)
+                    # Test accuracy & loss
+                    u_loss_rec_test, l_loss_rec_test = 0., 0.
+                    l_acc_test, u_acc_test = 0., 0.
+                    for it in range(te_batches_num):
+                        # Sample batches of data points
+                        data_ids = te_size + np.random.choice(tr_size,
+                                                        opts['batch_size'],
+                                                        replace=False)
+                        batch_images = data.test_data[data_ids].astype(np.float32)
+                        batch_labels = data.test_labels[data_ids].astype(np.float32)
+                        [u_loss_rec, l_loss_rec, preds, probs_test] = self.sess.run(
+                                                        [self.u_loss_reconstruct,
+                                                         self.l_loss_reconstruct,
+                                                         self.labels_reconstructed,
+                                                         self.probs],
+                                                        feed_dict={self.l_points:batch_images,
+                                                                   self.l_labels:batch_labels,
+                                                                   self.u_points:batch_images,
+                                                                   self.is_training:False})
+                        # Computing accuracy
+                        l_acc = accuracy(batch_labels, preds, labelled_clusters)
+                        u_acc = accuracy(batch_labels, probs_test, labelled_clusters)
+                        l_acc_test += l_acc / te_batches_num
+                        u_acc_test += u_acc / te_batches_num
+                        u_loss_rec_test += u_loss_rec / te_batches_num
+                        l_loss_rec_test += l_loss_rec / te_batches_num
+
                     # Auto-encoding unlabeled test images
-                    [u_loss_rec_test, rec_test, encoded, probs_test] = self.sess.run(
-                                    [self.u_loss_reconstruct,
-                                     self.reconstructed_point,
-                                     self.encoded_point,
-                                     self.probs],
-                                    feed_dict={self.l_points:data.test_data[:npics],
-                                               self.u_points:data.test_data[:npics],
-                                               self.is_training:False})
+                    [rec_test, encoded, probs_test] = self.sess.run(
+                                                        [self.reconstructed_point,
+                                                         self.encoded_point,
+                                                         self.probs],
+                                                        feed_dict={self.l_points:data.test_data[:npics],
+                                                                   self.u_points:data.test_data[:npics],
+                                                                   self.is_training:False})
                     # Auto-encoding training images
                     [rec_train, probs_train] = self.sess.run(
-                                    [self.reconstructed_point,
-                                     self.probs],
-                                    feed_dict={self.l_points:data.test_data[:npics],
-                                               self.u_points:data.data[:npics],
-                                               self.is_training:False})
-                    # Computing accuracy
-                    labelled_clusters = relabelling_mask_from_probs(mean_probs)
-                    l_acc_test = accuracy(data.labels[:npics], preds, labelled_clusters)
-                    u_acc_train = accuracy(data.labels[:npics], probs_train, labelled_clusters)
-                    u_acc_test = accuracy(data.test_labels[:npics], probs_test, labelled_clusters)
+                                                        [self.reconstructed_point,
+                                                         self.probs],
+                                                        feed_dict={self.l_points:data.data[:npics],
+                                                                   self.u_points:data.data[:npics],
+                                                                   self.is_training:False})
                     # Random samples generated by the model
                     sample_gen = self.sess.run(self.decoded,
-                                    feed_dict={self.l_points:data.test_data[:npics],
-                                               self.sample_noise: fixed_noise,
-                                               self.is_training: False})
+                                                        feed_dict={self.l_points:data.data[:npics],
+                                                                   self.sample_noise: fixed_noise,
+                                                                   self.is_training: False})
                     # Printing various loss values
                     debug_str = 'EPOCH: %d/%d, BATCH:%d/%d, LOSS=%.3f' % (
                                 epoch + 1, opts['epoch_num'],
@@ -497,30 +533,35 @@ class WAE(object):
                                 losses[-1])
                     logging.error(debug_str)
                     #logging.error('LOSS=%.3f' % (losses[-1]))
-                    debug_str = 'REC(L/U)=%.3f/%.3f, MATCH(L/U)=%.3f/%.3f, ' \
-                                                     'XENT(L/U)=%.3f/%.3f' % (
-                                losses_rec[-1][0], losses_rec[-1][1],
-                                                   losses_match[-1][0],
-                                                   losses_match[-1][1],
-                                                   losses_xent[-1][0],
-                                                   losses_xent[-1][1])
+                    debug_str = 'Clusters ID: %d%d%d%d%d%d%d%d%d%d' % (
+                                labelled_clusters[0], labelled_clusters[1],
+                                labelled_clusters[2], labelled_clusters[3],
+                                labelled_clusters[4], labelled_clusters[5],
+                                labelled_clusters[6], labelled_clusters[7],
+                                labelled_clusters[8], labelled_clusters[9],)
                     logging.error(debug_str)
-                    debug_str = 'ACC TRAIN(U)=%.2f, ACC TEST(L/U)=%.2f/%.2f' % (
-                                                    100*u_acc_train,
-                                                    100*l_acc_test,
-                                                    100*u_acc_test)
+                    debug_str = 'TEST REC(L/U)=%.3f/%.3f, TEST ACC(L/U)=%.2f/%.2f' % (
+                                                        l_loss_rec_test,
+                                                        u_loss_rec_test,
+                                                        100*l_acc_test,
+                                                        100*u_acc_test)
                     logging.error(debug_str)
+                    debug_str = 'MATCH(L/U)=%.3f/%.3f, XENT(L/U)=%.3f/%.3f' % (
+                                                        losses_match[-1][0],
+                                                        losses_match[-1][1],
+                                                        losses_xent[-1][0],
+                                                        losses_xent[-1][1])
                     print('')
                     # Making plots
                     #logging.error('Saving images..')
                     save_train(opts, data.data[:npics], data.test_data[:npics],                 # images
                                      data.test_labels[:npics],                                  # labels
                                      rec_train[:npics], rec_test[:npics],                       # reconstructions
-                                     probs_train, probs_test, preds,                             # mixweights
+                                     probs_train, probs_test,                                   # mixweights
                                      encoded,                                                   # encoded points
                                      fixed_noise,                                               # prior samples
                                      sample_gen,                                                # samples
-                                     losses, losses_rec, losses_match, losses_xent,              # loses
+                                     losses, losses_rec, losses_match, losses_xent,             # loses
                                      kl_gau, kl_dis,                                            # KL terms
                                      work_dir,                                                  # working directory
                                      'res_e%04d_mb%05d.png' % (epoch, it))                      # filename

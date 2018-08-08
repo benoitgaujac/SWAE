@@ -492,7 +492,7 @@ class DataHandler(object):
         np.random.seed()
 
         self.data_shape = (28, 28, 1)
-        test_size = 1000
+        test_size = 10000
 
         if modified:
             self.original_mnist = X
