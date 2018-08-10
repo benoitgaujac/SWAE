@@ -54,16 +54,16 @@ class WAE(object):
         self.pi0 = init_cat_prior(opts)
 
         # --- Encoding inputs
-        pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(self.l_points,
+        l_pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(self.l_points,
                                                         False)
         idx_label = tf.stack([range,self.l_labels], axis=-1)
-        self.l_pi = tf.gather_nd(pi,idx_label)
+        self.l_pi = tf.gather_nd(l_pi,idx_label)
 
-        pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(self.u_points,
+        u_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(self.u_points,
                                                         True)
         self.probs = label_encoder(self.opts, self.u_points, False,
                                                         self.is_training)
-        self.u_pi = tf.reduce_sum(tf.multiply(pi,tf.expand_dims(self.probs,axis=-1)),axis=1)
+        self.u_pi = tf.reduce_sum(tf.multiply(u_pi,tf.expand_dims(self.probs,axis=-1)),axis=1)
 
         # --- Sampling from encoded MoG prior
         self.l_mixtures_encoded = sample_mixtures(opts, self.l_enc_mean,
@@ -93,8 +93,8 @@ class WAE(object):
 
         # --- Sampling from model (only for generation)
         self.decoded, self.decoded_logits = self.decoder(self.sample_noise,
-                                                                    True,
-                                                                    False)
+                                                        True,
+                                                        False)
         # --- Objectives, losses, penalties, pretraining
         # Compute reconstruction cost
         self.l_loss_reconstruct = reconstruction_loss(opts, self.l_pi,

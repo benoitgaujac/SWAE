@@ -58,7 +58,6 @@ def wae_matching_penalty(opts, pi0, pi, samples_pz, samples_qz):
     (add here other penalty if any)
     """
     cont_penalty = mmd_penalty(opts, pi0, pi, samples_pz, samples_qz)
-    disc_penalty = Xentropy(opts, pi0, pi)
     disc_penalty = KL(opts, pi0, pi)
 
     return None, None, cont_penalty, disc_penalty
@@ -87,7 +86,7 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
     """
     sigma2_p = opts['pz_scale'] ** 2
     kernel = opts['mmd_kernel']
-    n = utils.get_batch_size(sample_qz)
+    n = utils.get_batch_size(sample_pz)
     n = tf.cast(n, tf.int32)
     nf = tf.cast(n, tf.float32)
     half_size = tf.cast((n * n - n) / 2,tf.int32)
@@ -142,8 +141,8 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             # Cross term of the MMD
             res2 = C / (C + distances)
             res2 = tf.multiply(tf.expand_dims(pi,axis=-1),
-                               res2)
-            res2 = tf.reduce_sum(res2,axis=[0,-1]) * pi0 / (nf * nf)
+                               tf.multiply(res2,tf.expand_dims(pi0,axis=-1)))
+            res2 = tf.reduce_sum(res2,axis=[0,-1]) / (nf * nf)
             res += tf.reduce_sum(tf.div(res1 - 2. * res2,tf.square(pi0)))
     else:
         raise ValueError('%s Unknown kernel' % kernel)
@@ -155,10 +154,129 @@ def square_dist(sample_x, norms_x, sample_y, norms_y):
     Wrapper to compute square distance
     """
     dotprod = tf.matmul(tf.transpose(sample_x,perm=[1,0,2]),
-                        tf.transpose(sample_y,perm=[1,2,0]))
+                        tf.transpose(sample_y,perm=[1,0,2]),
+                        transpose_b=True)
     dotprod = tf.transpose(dotprod,perm=[1,0,2])
     distances = norms_x + tf.transpose(norms_y) - 2. * dotprod
     return distances
+
+
+def Xentropy(opts, pi0, pi):
+    Xent = tf.multiply(pi,tf.log(tf.expand_dims(pi0,axis=0)))
+    Xent = - tf.reduce_sum(Xent,axis=-1)
+    Xent = tf.reduce_mean(Xent)
+    return Xent
+
+
+def KL(opts, pi0, pi):
+    kl = tf.log(pi0) - tf.log(pi)
+    kl = tf.multiply(kl,pi0)
+    kl = tf.reduce_sum(kl,axis=-1)
+    kl = tf.reduce_mean(kl)
+    return kl
+
+
+def reconstruction_loss(opts, pi, x1, x2, y1=None, y2=None):
+    """
+    Compute the reconstruction part of the objective function
+    """
+    if opts['method']=='swae':
+        loss = wae_recons_loss(opts, pi, x1, x2, y1, y2)
+    elif opts['method']=='vae':
+        loss = vae_recons_loss(opts, pi, x1, x2, y1, y2)
+    return loss
+
+
+def wae_recons_loss(opts, pi, x1, x2, y1=None, y2=None):
+    """
+    Compute the WAE's reconstruction losses
+    pi: weights
+    x1: continuous (image) data             [batch,im_dim]
+    x2: continuous (image) reconstruction   [batch,K,im_dim]
+    y1: discrete (label) data               [batch,1]
+    y2: discrete (label) reconstruction     [K,1]
+    """
+    # Continuous cost
+    cont_real = tf.expand_dims(x1,axis=1)
+    cont_recon = x2
+    cont_cost = continous_cost(opts, cont_real, cont_recon)
+    # Discrete cost
+    if y1 is not None:
+        disc_real = tf.one_hot(y1, opts["nclasses"])
+        disc_recon = tf.one_hot(y2, opts["nclasses"])
+        disc_cost = discrete_cost(opts, disc_real, disc_recon)
+    else:
+        disc_cost = 0.
+    # Compute loss
+    loss = tf.multiply(cont_cost + disc_cost, pi)
+    loss = tf.reduce_sum(loss,axis=-1)
+    loss = 1. * tf.reduce_mean(loss) #coef: .2 for L2 and L1, .05 for L2sqr,
+    return loss
+
+
+def continous_cost(opts, x1, x2):
+    if opts['cost'] == 'l2':
+        # c(x,y) = ||x - y||_2
+        c = tf.reduce_sum(tf.square(x1 - x2), axis=[2,3,4])
+        c = tf.sqrt(1e-10 + c)
+    elif opts['cost'] == 'l2sq':
+        # c(x,y) = ||x - y||_2^2
+        c = tf.reduce_sum(tf.square(x1 - x2), axis=[2,3,4])
+    elif opts['cost'] == 'l1':
+        # c(x,y) = ||x - y||_1
+        c = tf.reduce_sum(tf.abs(x1 - x2), axis=[2,3,4])
+    else:
+        assert False, 'Unknown cost function %s' % opts['cost']
+    return c
+
+
+def discrete_cost(opts, y1, y2):
+    y1 = tf.expand_dims(y1,axis=1)
+    if opts['cost'] == 'l2':
+        # c(x,y) = ||x - y||_2
+        c = tf.reduce_sum(tf.square(y1 - y2), axis=-1)
+        c = tf.sqrt(1e-10 + loss)
+    elif opts['cost'] == 'l2sq':
+        # c(x,y) = ||x - y||_2^2
+        c = tf.reduce_sum(tf.square(y1 - y2), axis=-1)
+    elif opts['cost'] == 'l1':
+        # c(x,y) = ||x - y||_1
+        c = tf.reduce_sum(tf.abs(y1 - y2), axis=-1)
+    else:
+        assert False, 'Unknown cost function %s' % opts['cost']
+    return c
+
+
+def vae_recons_loss(opts, x, y, pi):
+    """
+    Compute the VAE's reconstruction losses
+    """
+    assert False, 'No implemented yet'
+    real = tf.expand_dims(tf.expand_dims(x,axis=1),axis=1)
+    logit = y
+    eps = 1e-10
+    l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
+    loss = tf.reduce_sum(l,axis=[3,4,5])
+    loss = tf.reduce_mean(loss,axis=-1)
+    loss = tf.reduce_mean(tf.multiply(loss,pi))
+    return -loss
+
+
+def moments_loss(prior_samples, model_samples):
+    # Matching the first 2 moments (mean and covariance)
+    # Means
+    qz_means = tf.reduce_mean(model_samples, axis=0, keepdims=True)
+    pz_mean = tf.reduce_mean(prior_samples, axis=0, keepdims=True)
+    mean_loss = tf.reduce_sum(tf.square(qz_means - pz_mean),axis=-1)
+    mean_loss = tf.reduce_mean(mean_loss)
+    # Covariances
+    qz_covs = tf.reduce_mean(tf.square(model_samples-qz_means),axis=0)
+    pz_cov = tf.reduce_mean(tf.square(prior_samples-pz_mean),axis=0)
+    cov_loss = tf.reduce_sum(tf.square(qz_covs - pz_cov),axis=-1)
+    cov_loss = tf.reduce_mean(cov_loss)
+    # Loss
+    pre_loss = mean_loss + cov_loss
+    return pre_loss
 
 
 def old_mmd(opts, pi, sample_pz, sample_qz):
@@ -245,121 +363,3 @@ def old_square_dist(sample_x, norms_x, sample_y, norms_y):
     reshape_norms_x = [-1]+norms_x.get_shape().as_list()[1:]+[1,1]
     distances = tf.reshape(norms_x, reshape_norms_x) + tf.transpose(norms_y) - 2. * dotprod
     return distances
-
-
-def Xentropy(opts, pi0, pi):
-    Xent = tf.multiply(pi,tf.log(tf.expand_dims(pi0,axis=0)))
-    Xent = - tf.reduce_sum(Xent,axis=-1)
-    Xent = tf.reduce_mean(Xent)
-    return Xent
-
-def KL(opts, pi0, pi):
-    pi0_reshaped = tf.expand_dims(pi0,axis=0)
-    kl = tf.log(pi0_reshaped) - tf.log(pi)
-    kl = tf.multiply(pi0_reshaped,kl)
-    kl = tf.reduce_sum(kl,axis=-1)
-    kl = tf.reduce_mean(kl)
-    return kl
-
-
-def reconstruction_loss(opts, pi, x1, x2, y1=None, y2=None):
-    """
-    Compute the reconstruction part of the objective function
-    """
-    if opts['method']=='swae':
-        loss = wae_recons_loss(opts, pi, x1, x2, y1, y2)
-    elif opts['method']=='vae':
-        loss = vae_recons_loss(opts, pi, x1, x2, y1, y2)
-    return loss
-
-
-def wae_recons_loss(opts, pi, x1, x2, y1=None, y2=None):
-    """
-    Compute the WAE's reconstruction losses
-    pi: weights
-    x1: continuous (image) data
-    x2: continuous (image) reconstruction
-    y1: discrete (label) data
-    y2: discrete (label) reconstruction
-    """
-    # Continuous cost
-    cont_real = tf.expand_dims(x1,axis=1)
-    cont_recon = x2
-    cont_cost = continous_cost(opts, cont_real, cont_recon)
-    # Discrete cost
-    if y1 is not None:
-        disc_real = tf.one_hot(y1, opts["nclasses"])
-        disc_recon = tf.one_hot(y2, opts["nclasses"])
-        disc_cost = discrete_cost(opts, disc_real, disc_recon)
-    else:
-        disc_cost = 0
-    # Compute loss
-    loss = tf.multiply(cont_cost + disc_cost, pi)
-    loss = tf.reduce_sum(loss,axis=-1)
-    loss = .1 * tf.reduce_mean(loss) #coef: .2 for L2 and L1, .05 for L2sqr,
-    return loss
-
-
-def continous_cost(opts, x1, x2):
-    if opts['cost'] == 'l2':
-        # c(x,y) = ||x - y||_2
-        c = tf.reduce_sum(tf.square(x1 - x2), axis=[2,3,4])
-        c = tf.sqrt(1e-10 + c)
-    elif opts['cost'] == 'l2sq':
-        # c(x,y) = ||x - y||_2^2
-        c = tf.reduce_sum(tf.square(x1 - x2), axis=[2,3,4])
-    elif opts['cost'] == 'l1':
-        # c(x,y) = ||x - y||_1
-        c = tf.reduce_sum(tf.abs(x1 - x2), axis=[2,3,4])
-    else:
-        assert False, 'Unknown cost function %s' % opts['cost']
-    return c
-
-
-def discrete_cost(opts, y1, y2):
-    y1 = tf.expand_dims(y1,axis=1)
-    if opts['cost'] == 'l2':
-        # c(x,y) = ||x - y||_2
-        c = tf.reduce_sum(tf.square(y1 - y2), axis=-1)
-        c = tf.sqrt(1e-10 + loss)
-    elif opts['cost'] == 'l2sq':
-        # c(x,y) = ||x - y||_2^2
-        c = tf.reduce_sum(tf.square(y1 - y2), axis=-1)
-    elif opts['cost'] == 'l1':
-        # c(x,y) = ||x - y||_1
-        c = tf.reduce_sum(tf.abs(y1 - y2), axis=-1)
-    else:
-        assert False, 'Unknown cost function %s' % opts['cost']
-    return c
-
-
-def vae_recons_loss(opts, x, y, pi):
-    """
-    Compute the VAE's reconstruction losses
-    """
-    assert False, 'No implemented yet'
-    real = tf.expand_dims(tf.expand_dims(x,axis=1),axis=1)
-    logit = y
-    eps = 1e-10
-    l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
-    loss = tf.reduce_sum(l,axis=[3,4,5])
-    loss = tf.reduce_mean(loss,axis=-1)
-    loss = tf.reduce_mean(tf.multiply(loss,pi))
-    return -loss
-
-
-def moments_loss(prior_samples, model_samples):
-    # Matching the first 2 moments (mean and covariance)
-    # Means
-    qz_means = tf.reduce_mean(model_samples, axis=0, keepdims=True)
-    pz_mean = tf.reduce_mean(prior_samples, axis=0, keepdims=True)
-    mean_loss = tf.reduce_sum(tf.square(qz_means - pz_mean),axis=-1)
-    mean_loss = tf.reduce_mean(mean_loss)
-    # Covariances
-    qz_covs = tf.reduce_mean(tf.square(model_samples-qz_means),axis=0)
-    pz_cov = tf.reduce_mean(tf.square(prior_samples-pz_mean),axis=0)
-    cov_loss = tf.reduce_sum(tf.square(qz_covs - pz_cov),axis=-1)
-    cov_loss = tf.reduce_mean(cov_loss)
-    # Loss
-    pre_loss = mean_loss + cov_loss
-    return pre_loss
