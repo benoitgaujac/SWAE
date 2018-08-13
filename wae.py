@@ -168,7 +168,7 @@ class WAE(object):
         label_noise = tf.range(opts['nmixtures'],
                                     dtype=tf.float32,
                                     name='label_noise_ph')
-        self.label_noise = tf.expand_dims(label_noise, axis=-1)
+        self.label_noise = tf.expand_dims(label_noise, axis=0)
 
         # placeholders fo logistic regression
         self.preds = tf.placeholder(tf.float32, [None, 10], name='predictions') # discrete probabilities
