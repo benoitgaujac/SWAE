@@ -79,6 +79,7 @@ class WAE(object):
         self.u_reconstructed, self.u_reconstructed_logits = self.decoder(self.u_mixtures_encoded,
                                                         True,
                                                         True)
+        pdb.set_trace()
         self.labels_reconstructed, self.labels_reconstructed_logits = discrete_decoder(opts,
                                                         self.label_noise,
                                                         False,
@@ -168,7 +169,7 @@ class WAE(object):
         label_noise = tf.range(opts['nmixtures'],
                                     dtype=tf.float32,
                                     name='label_noise_ph')
-        self.label_noise = tf.expand_dims(label_noise, axis=0)
+        self.label_noise = tf.expand_dims(label_noise, axis=-1)
 
         # placeholders fo logistic regression
         self.preds = tf.placeholder(tf.float32, [None, 10], name='predictions') # discrete probabilities
