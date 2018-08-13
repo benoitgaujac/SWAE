@@ -79,7 +79,6 @@ class WAE(object):
         self.u_reconstructed, self.u_reconstructed_logits = self.decoder(self.u_mixtures_encoded,
                                                         True,
                                                         True)
-        pdb.set_trace()
         self.labels_reconstructed, self.labels_reconstructed_logits = discrete_decoder(opts,
                                                         self.label_noise,
                                                         False,

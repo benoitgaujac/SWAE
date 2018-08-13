@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 import utils
+from datahandler import datashapes
 
 import pdb
 
@@ -196,21 +197,23 @@ def wae_recons_loss(opts, pi, x1, x2, y1=None, y2=None):
     y1: discrete (label) data               [batch,1]
     y2: discrete (label) reconstruction     [K,1]
     """
+    # Data shape
+    shpe = datashapes[opts['dataset']]
     # Continuous cost
     cont_real = tf.expand_dims(x1,axis=1)
     cont_recon = x2
-    cont_cost = continous_cost(opts, cont_real, cont_recon)
+    cont_cost = continous_cost(opts, cont_real, cont_recon) / np.prod(shpe)
     # Discrete cost
     if y1 is not None:
         disc_real = tf.one_hot(y1, opts["nclasses"])
         disc_recon = tf.one_hot(y2, opts["nclasses"])
-        disc_cost = discrete_cost(opts, disc_real, disc_recon)
+        disc_cost = discrete_cost(opts, disc_real, disc_recon) / opts["nclasses"]
     else:
         disc_cost = 0.
     # Compute loss
     loss = tf.multiply(cont_cost + disc_cost, pi)
     loss = tf.reduce_sum(loss,axis=-1)
-    loss = .05 * tf.reduce_mean(loss) #coef: .2 for L2 and L1, .05 for L2sqr,
+    loss = 1.0 * tf.reduce_mean(loss) #coef: .2 for L2 and L1, .05 for L2sqr,
     return loss
 
 
