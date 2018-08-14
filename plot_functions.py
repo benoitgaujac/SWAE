@@ -81,6 +81,10 @@ def save_train(opts, sample_train, sample_test,
         images.append(image)
 
     ### Sample plots
+    # reshaping samples
+    sample_shape = np.shape(samples)
+    new_shape = (-1,) + sample_shape[2:]
+    samples = np.reshape(np.transpose(samples,(1,0,2,3,4)),new_shape)    
     for sample in [samples, sample_train]:
         assert len(sample) == num_pics
         pics = []

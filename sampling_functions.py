@@ -36,10 +36,11 @@ def sample_pz(opts, means, covs, num=100, sampling_mode='one_mixture'):
         noise = noises[np.arange(num),mixture]
     elif sampling_mode == 'per_mixture':
         samples_per_mixture = int(num / opts['nmixtures'])
-        class_i = np.repeat(np.arange(opts['nmixtures']),samples_per_mixture,axis=0)
-        mixture = np.zeros([num,],dtype='int32')
-        mixture[(num % opts['nmixtures']):] = class_i
-        noise = noises[np.arange(num),mixture]
+        # class_i = np.repeat(np.arange(opts['nmixtures']),samples_per_mixture,axis=0)
+        # mixture = np.zeros([num,],dtype='int32')
+        # mixture[(num % opts['nmixtures']):] = class_i
+        # noise = noises[np.arange(num),mixture]
+        noise = noises[:samples_per_mixture]
     elif sampling_mode == 'all_mixtures':
         noise = noises
     else:

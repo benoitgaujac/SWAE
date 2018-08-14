@@ -54,11 +54,12 @@ class WAE(object):
         self.pi0 = init_cat_prior(opts)
 
         # --- Encoding inputs
+        # labelled
         l_pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(self.l_points,
                                                         False)
         idx_label = tf.stack([range,self.l_labels], axis=-1)
         self.l_pi = tf.gather_nd(l_pi,idx_label)
-
+        # unlabelled
         u_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(self.u_points,
                                                         True)
         self.probs = label_encoder(self.opts, self.u_points, False,
@@ -74,10 +75,8 @@ class WAE(object):
                                                         sample_size,'tensorflow')
         # --- Decoding encoded points (i.e. reconstruct)
         self.l_reconstructed, self.l_reconstructed_logits = self.decoder(self.l_mixtures_encoded,
-                                                        False,
-                                                        True)
+                                                        False)
         self.u_reconstructed, self.u_reconstructed_logits = self.decoder(self.u_mixtures_encoded,
-                                                        True,
                                                         True)
         self.labels_reconstructed, self.labels_reconstructed_logits = discrete_decoder(opts,
                                                         self.label_noise,
@@ -93,8 +92,7 @@ class WAE(object):
 
         # --- Sampling from model (only for generation)
         self.decoded, self.decoded_logits = self.decoder(self.sample_noise,
-                                                        True,
-                                                        False)
+                                                        True)
         # --- Objectives, losses, penalties, pretraining
         # Compute reconstruction cost
         self.l_loss_reconstruct = reconstruction_loss(opts, self.l_pi,
@@ -159,7 +157,7 @@ class WAE(object):
         # self.u_points = u_data
         # self.u_sample_mix_noise = u_mix_noise
         self.sample_noise = tf.placeholder(tf.float32,
-                                    [None] + [opts['zdim']],
+                                    [None] + [opts['nmixtures'],opts['zdim']],
                                     name='noise_ph')
         # self.sample_noise = noise
         # self.label_noise = tf.placeholder(tf.float32,
@@ -260,20 +258,15 @@ class WAE(object):
                                                     is_training=self.is_training)
         return pi, enc_mean, enc_logSigma
 
-    def decoder(self, encoded, reuse=False, reshape=True):
+    def decoder(self, encoded, reuse=False):
         noise = tf.reshape(encoded,[-1,self.opts['zdim']])
         recon, log = continuous_decoder(self.opts, noise=noise,
                                                         reuse=reuse,
                                                         is_training=self.is_training)
-        if reshape:
-            reconstructed = tf.reshape(recon,
-                            [-1,self.opts['nmixtures']]+self.data_shape)
-            logits = tf.reshape(log,
-                            [-1,self.opts['nmixtures']]+self.data_shape)
-        else:
-            reconstructed = recon
-            logits = log
-
+        reconstructed = tf.reshape(recon,
+                        [-1,self.opts['nmixtures']]+self.data_shape)
+        logits = tf.reshape(log,
+                        [-1,self.opts['nmixtures']]+self.data_shape)
         return reconstructed, logits
 
     def pretrain_loss(self):
