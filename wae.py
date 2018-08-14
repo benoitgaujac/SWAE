@@ -116,14 +116,14 @@ class WAE(object):
                                                         self.u_sample_mix_noise, self.u_mixtures_encoded)
         # Compute Labeled obj
         self.l_loss = self.l_loss_reconstruct\
-                         + self.lmbd * self.l_cont_penalty\
-                         + self.beta * self.l_disc_penalty
+                         + self.l_lmbd * self.l_cont_penalty\
+                         + self.l_beta * self.l_disc_penalty
         # Compute Unlabeled obj
         self.u_loss = self.u_loss_reconstruct\
-                         + self.lmbd * self.u_cont_penalty\
-                         + self.beta * self.u_disc_penalty
+                         + self.u_lmbd * self.u_cont_penalty\
+                         + self.u_beta * self.u_disc_penalty
         # Compute wae obj
-        self.objective = self.l_loss + self.alpha * self.u_loss
+        self.objective = self.alpha * self.l_loss + self.u_loss
 
         # Pre Training
         self.pretrain_loss()
@@ -179,14 +179,18 @@ class WAE(object):
         decay = tf.placeholder(tf.float32, name='rate_decay_ph')
         is_training = tf.placeholder(tf.bool, name='is_training_ph')
         alpha = tf.placeholder(tf.float32, name='alpha')
-        lmbda = tf.placeholder(tf.float32, name='lambda')
-        beta = tf.placeholder(tf.float32, name='beta')
+        l_lmbda = tf.placeholder(tf.float32, name='lambda')
+        l_beta = tf.placeholder(tf.float32, name='beta')
+        u_lmbda = tf.placeholder(tf.float32, name='lambda')
+        u_beta = tf.placeholder(tf.float32, name='beta')
 
         self.lr_decay = decay
         self.is_training = is_training
         self.alpha = alpha
-        self.lmbd = lmbda
-        self.beta = beta
+        self.l_lmbd = l_lmbda
+        self.l_beta = l_beta
+        self.u_lmbd = u_lmbda
+        self.u_beta = u_beta
 
     def add_savers(self):
         opts = self.opts
@@ -359,8 +363,10 @@ class WAE(object):
         decay, counter = 1., 0
         if opts['method']=='swae':
             alpha = opts['alpha']
-            lmbda = opts['lambda']
-            beta = opts['beta']
+            l_lmbda = opts['l_lambda']
+            l_beta = opts['l_beta']
+            u_lmbda = opts['u_lambda']
+            u_beta = opts['u_beta']
         else:
             assert False, 'to implement VAE'
             wae_lmbda = 1
@@ -410,8 +416,10 @@ class WAE(object):
                            self.u_sample_mix_noise: u_batch_mix_noise,
                            self.lr_decay: decay,
                            self.alpha: alpha,
-                           self.lmbd: lmbda,
-                           self.beta: beta,
+                           self.l_lmbd: l_lmbda,
+                           self.l_beta: l_beta,
+                           self.u_lmbd: u_lmbda,
+                           self.u_beta: u_beta,
                            self.is_training: True}
                 # Update encoder and decoder
                 if opts['method']=='swae':
@@ -534,10 +542,10 @@ class WAE(object):
                                                         100*u_acc_test)
                     logging.error(debug_str)
                     debug_str = 'MATCH(L/U)=%.3f/%.3f, XENT(L/U)=%.3f/%.3f' % (
-                                                        losses_match[-1][0],
-                                                        losses_match[-1][1],
-                                                        losses_xent[-1][0],
-                                                        losses_xent[-1][1])
+                                                        opts['l_lambda']*losses_match[-1][0],
+                                                        opts['u_lambda']*losses_match[-1][1],
+                                                        opts['l_beta']*losses_xent[-1][0],
+                                                        opts['u_beta']*losses_xent[-1][1])
                     logging.error(debug_str)
                     print('')
                     # Making plots

@@ -109,8 +109,8 @@ def save_train(opts, sample_train, sample_test,
     dpi = 100
     height_pic = img1.shape[0]
     width_pic = img1.shape[1]
-    fig_height = 4 * height_pic / float(dpi)
-    fig_width = 6 * width_pic / float(dpi)
+    fig_height = 4 * 2*height_pic / float(dpi)
+    fig_width = 6 * 2*width_pic / float(dpi)
 
     fig = plt.figure(figsize=(fig_width, fig_height))
     gs = matplotlib.gridspec.GridSpec(2, 3)
@@ -202,11 +202,15 @@ def save_train(opts, sample_train, sample_test,
     x = np.arange(1, len(losses) + 1, x_step)
 
     y = np.log(losses[::x_step])
-    plt.plot(x, y, linewidth=3, color='black', label='log(wae loss)')
+    plt.plot(x, y, linewidth=3, color='black', label='loss')
+
+    l = np.array(losses_rec)[:,0]
+    y = np.log(l[::x_step] * opts['alpha'])
+    plt.plot(x, y, linewidth=2, color='red', linestyle=':', label='lrec')
 
     l = np.array(losses_rec)[:,1]
     y = np.log(l[::x_step])
-    plt.plot(x, y, linewidth=2, color='red', label='log(rec loss)')
+    plt.plot(x, y, linewidth=2, color='red', label='urec')
 
     if len(kl_gau)>0:
         y = np.log(np.abs(losses_match[::x_step]))
@@ -215,13 +219,21 @@ def save_train(opts, sample_train, sample_test,
         y = np.log(kl_gau[::x_step])
         plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(cont KL)')
     else:
+        l = np.array(losses_match)[:,0]
+        y = np.log(opts['l_lambda']*opts['alpha']*np.abs(l[::x_step]))
+        plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='|lMMD|)')
+
         l = np.array(losses_match)[:,1]
-        y = np.log(opts['lambda']*np.abs(l[::x_step]))
-        plt.plot(x, y, linewidth=2, color='blue', label='log(|MMD loss|)')
+        y = np.log(opts['u_lambda']*np.abs(l[::x_step]))
+        plt.plot(x, y, linewidth=2, color='blue', label='|uMMD|')
+
+        l = np.array(losses_xent)[:,0]
+        y = np.log(opts['l_beta']*opts['alpha']*np.abs(l[::x_step]))
+        plt.plot(x, y, linewidth=2, color='green', linestyle=':', label='|lKL|')
 
         l = np.array(losses_xent)[:,1]
-        y = np.log(opts['beta']*np.abs(l[::x_step]))
-        plt.plot(x, y, linewidth=2, color='green', label='log(|Xent loss|)')
+        y = np.log(opts['u_beta']*np.abs(l[::x_step]))
+        plt.plot(x, y, linewidth=2, color='green', label='|uKL|')
 
     if len(kl_dis)>0:
         y = np.log(kl_dis[::x_step])
@@ -264,8 +276,8 @@ def save_train(opts, sample_train, sample_test,
                     probs=probs_test,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
-                    loss_match=np.array(opts['lambda']*np.array(losses_match[::x_step])),
-                    loss_xent=np.array(opts['beta']*np.array(losses_xent[::x_step])))
+                    loss_match=np.array(np.array(losses_match[::x_step])),
+                    loss_xent=np.array(np.array(losses_xent[::x_step])))
 
 def save_vizu(opts, data_train, data_test,              # images
                     label_test,                         # labels
