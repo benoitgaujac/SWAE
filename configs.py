@@ -7,7 +7,7 @@ config_mnist = {}
 # Outputs set up
 config_mnist['verbose'] = False
 config_mnist['save_every_epoch'] = 1000
-config_mnist['print_every'] = 400 #250
+config_mnist['print_every'] = 200 #250
 config_mnist['work_dir'] = 'results_mnist'
 config_mnist['plot_num_pics'] = 100
 config_mnist['plot_num_cols'] = 10
@@ -19,8 +19,8 @@ config_mnist['data_dir'] = 'mnist'
 config_mnist['data_source_url'] = 'http://yann.lecun.com/exdb/mnist/'
 
 # Experiment set up
-config_mnist['train_dataset_size'] = -1
-config_mnist['lu_split'] = 0.001
+config_mnist['train_dataset_size'] = 10000
+config_mnist['lu_split'] = 0.01
 config_mnist['batch_size'] = 150
 config_mnist['epoch_num'] = 20
 config_mnist['method'] = 'swae' #vae, swae
@@ -42,7 +42,7 @@ config_mnist['batch_norm_decay'] = 0.9
 # Objective set up
 config_mnist['cost'] = 'l2sq' #l2, l2sq, l1, l2sq_wrong
 config_mnist['sqrt_MMD'] = False #use true MMD estimator or square estimator
-config_mnist['alpha'] = 10. * config_mnist['lu_split']
+config_mnist['alpha'] = 1. #10. * config_mnist['lu_split']
 config_mnist['l_lambda'] = 10.
 config_mnist['l_beta'] = 10.
 config_mnist['u_lambda'] = 10.
@@ -66,15 +66,15 @@ config_mnist['e_means'] = 'learnable'
 config_mnist['init_e_std'] = -2.0
 
 config_mnist['e_gaus_arch'] = 'mlp' # mlp, dcgan, ali, began
-config_mnist['e_gaus_nlayers'] = 2
+config_mnist['e_gaus_nlayers'] = 1
 config_mnist['e_gaus_nfilters'] = 16
 config_mnist['e_cat_arch'] = 'dcgan' # mlp, dcgan, ali, began
-config_mnist['e_cat_nlayers'] = 3
-config_mnist['e_cat_nfilters'] = 64
+config_mnist['e_cat_nlayers'] = 2
+config_mnist['e_cat_nfilters'] = 32
 config_mnist['e_lab_arch'] = 'dcgan' # mlp, dcgan, ali, began
-config_mnist['e_lab_nlayers'] = 3
-config_mnist['e_lab_nfilters'] = 64
+config_mnist['e_lab_nlayers'] = 2
+config_mnist['e_lab_nfilters'] = 32
 
-config_mnist['g_cont_arch'] = 'dcgan_mod' # mlp, dcgan, dcgan_mod, ali, began
-config_mnist['g_cont_nlayers'] = 3
-config_mnist['g_cont_nfilters'] = 64
+config_mnist['g_cont_arch'] = 'mlp' # mlp, dcgan, dcgan_mod, ali, began
+config_mnist['g_cont_nlayers'] = 1
+config_mnist['g_cont_nfilters'] = 16

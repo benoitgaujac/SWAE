@@ -45,48 +45,49 @@ class WAE(object):
         # --- Placeholders
         self.add_model_placeholders()
         self.add_training_placeholders()
-        sample_size = tf.shape(self.l_points,out_type=tf.int64)[0]
+        sample_size = tf.shape(self.u_points,out_type=tf.int64)[0]
         range = tf.range(sample_size)
         zero = tf.zeros([tf.cast(sample_size,dtype=tf.int32)],dtype=tf.int64)
-
         # --- Initialize prior parameters
         self.pz_mean, self.pz_sigma = init_gaussian_prior(opts)
         self.pi0 = init_cat_prior(opts)
-
         # --- Encoding inputs
-        # labelled
-        l_pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(self.l_points,
+        u_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(
+                                                        self.u_points,
                                                         False)
-        idx_label = tf.stack([range,self.l_labels], axis=-1)
-        self.l_pi = tf.gather_nd(l_pi,idx_label)
-        # unlabelled
-        u_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(self.u_points,
-                                                        True)
         self.probs = label_encoder(self.opts, self.u_points, False,
                                                         self.is_training)
-        self.u_pi = tf.reduce_sum(tf.multiply(u_pi,tf.expand_dims(self.probs,axis=-1)),axis=1)
-
+        self.u_pi = tf.reduce_sum(tf.multiply(u_pi,tf.expand_dims(
+                                                        self.probs,axis=-1)),
+                                                        axis=1)
+        l_pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(
+                                                        self.l_points,
+                                                        True)
+        idx_label = tf.stack([range,self.l_labels], axis=-1)
+        self.l_pi = tf.gather_nd(l_pi,idx_label)
         # --- Sampling from encoded MoG prior
-        self.l_mixtures_encoded = sample_mixtures(opts, self.l_enc_mean,
-                                                        tf.exp(self.l_enc_logSigma),
-                                                        sample_size,'tensorflow')
         self.u_mixtures_encoded = sample_mixtures(opts, self.u_enc_mean,
                                                         tf.exp(self.u_enc_logSigma),
                                                         sample_size,'tensorflow')
+        self.l_mixtures_encoded = sample_mixtures(opts, self.l_enc_mean,
+                                                        tf.exp(self.l_enc_logSigma),
+                                                        sample_size,'tensorflow')
         # --- Decoding encoded points (i.e. reconstruct)
-        self.l_reconstructed, self.l_reconstructed_logits = self.decoder(self.l_mixtures_encoded,
+        self.u_reconstructed, self.u_reconstructed_logits = self.decoder(
+                                                        self.u_mixtures_encoded,
                                                         False)
-        self.u_reconstructed, self.u_reconstructed_logits = self.decoder(self.u_mixtures_encoded,
+        self.l_reconstructed, self.l_reconstructed_logits = self.decoder(
+                                                        self.l_mixtures_encoded,
                                                         True)
-        self.labels_reconstructed, self.labels_reconstructed_logits = discrete_decoder(opts,
+        self.labels_reconstructed, self.labels_reconstructed_logits = discrete_decoder(
+                                                        opts,
                                                         self.label_noise,
                                                         False,
                                                         self.is_training)
         # --- Reconstructing inputs (only for visualization)
-        idx = tf.reshape(tf.multinomial(self.u_pi, 1),[-1])
+        idx = tf.reshape(tf.multinomial(tf.log(self.u_pi), 1),[-1])
         mix_idx = tf.stack([range,idx],axis=-1)
         self.encoded_point = tf.gather_nd(self.u_mixtures_encoded,mix_idx)
-        #mix_idx = tf.stack([range,idx],axis=-1)
         self.reconstructed_point = tf.gather_nd(self.u_reconstructed,mix_idx)
         self.reconstructed_logit = tf.gather_nd(self.u_reconstructed_logits,mix_idx)
 
@@ -224,7 +225,8 @@ class WAE(object):
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
         prior_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='prior')
-        ae_vars = encoder_vars + decoder_vars + prior_vars
+        #ae_vars = encoder_vars + decoder_vars + prior_vars
+        ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         if opts['clip_grad']:
             grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=ae_vars))
             clip_grad, _ = tf.clip_by_global_norm(grad, opts['clip_norm'])
@@ -233,7 +235,7 @@ class WAE(object):
             self.swae_opt = opt.minimize(loss=self.objective, var_list=ae_vars)
         # Pretraining optimizer
         pre_opt = self.optimizer(lr)
-        self.pre_opt = pre_opt.minimize(loss=self.pre_loss, var_list=encoder_vars)
+        self.pre_opt = pre_opt.minimize(loss=self.pre_loss, var_list=encoder_vars+prior_vars)
 
     def encoder(self, input_points, reuse=False):
         ## Categorical encoding
@@ -385,8 +387,6 @@ class WAE(object):
                                                         work_dir,'checkpoints',
                                                         'trained-wae'),
                                                         global_step=counter)
-            # # Initialize mean probs for each epoch
-            # mean_probs = np.zeros((10,10))
             ##### TRAINING LOOP #####
             for it in range(batches_num):
                 # Sample batches of data points and Pz noise
@@ -473,8 +473,7 @@ class WAE(object):
                         batch_images = data.test_data[data_ids].astype(np.float32)
                         batch_labels = data.test_labels[data_ids].astype(np.float32)
                         probs_train = self.sess.run(self.probs,
-                                                        feed_dict={self.l_points:batch_images,
-                                                                   self.u_points:batch_images,
+                                                        feed_dict={self.u_points:batch_images,
                                                                    self.is_training:False})
                         mean_prob = get_mean_probs(batch_labels,probs_train)
                         mean_probs += mean_prob / tr_batches_num
@@ -485,7 +484,7 @@ class WAE(object):
                     u_acc_test = 0.
                     for it_ in range(te_batches_num):
                         # Sample batches of data points
-                        data_ids = te_size + np.random.choice(tr_size,
+                        data_ids =  np.random.choice(te_size,
                                                         opts['batch_size'],
                                                         replace=False)
                         batch_images = data.test_data[data_ids].astype(np.float32)
@@ -517,12 +516,11 @@ class WAE(object):
                     [rec_train, probs_train] = self.sess.run(
                                                         [self.reconstructed_point,
                                                          self.probs],
-                                                        feed_dict={self.l_points:data.data[:npics],
-                                                                   self.u_points:data.data[:npics],
+                                                        feed_dict={self.u_points:data.data[:npics],
                                                                    self.is_training:False})
                     # Random samples generated by the model
                     sample_gen = self.sess.run(self.decoded,
-                                                        feed_dict={self.l_points:data.data[:npics],
+                                                        feed_dict={self.u_points:data.data[:npics],
                                                                    self.sample_noise: fixed_noise,
                                                                    self.is_training: False})
                     # Printing various loss values
@@ -577,13 +575,13 @@ class WAE(object):
                         wait = 0
                 counter += 1
 
-        # Save the final model
-        if epoch > 0:
-            self.saver.save(self.sess,
-                             os.path.join(work_dir,
-                                          'checkpoints',
-                                          'trained-wae-final'),
-                             global_step=counter)
+        # # Save the final model
+        # if epoch > 0:
+        #     self.saver.save(self.sess,
+        #                      os.path.join(work_dir,
+        #                                   'checkpoints',
+        #                                   'trained-wae-final'),
+        #                      global_step=counter)
 
     def test(self, data, MODEL_DIR, WEIGHTS_FILE):
         """

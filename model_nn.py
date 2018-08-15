@@ -84,12 +84,12 @@ def mlp_encoder(opts, inputs, num_layers, num_units, output_dim,
     for k in range(num_mixtures):
         layer_x = inputs
         for i in range(num_layers):
-            layer_x = ops.linear(opts, layer_x, num_units, scope='mix{}_hid{}_lin'.format(k,i))
+            layer_x = ops.linear(opts, layer_x, num_units, scope='mix{}/hid{}/lin'.format(k,i))
             if batch_norm:
                 layer_x = ops.batch_norm(opts, layer_x, is_training,
-                                    reuse, scope='mix{}_hid{}_bn'.format(k,i))
+                                    reuse, scope='mix{}/hid{}/bn'.format(k,i))
             layer_x = tf.nn.relu(layer_x)
-        output = ops.linear(opts, layer_x, output_dim, scope='mix{}_hid_final'.format(k))
+        output = ops.linear(opts, layer_x, output_dim, scope='mix{}/hid_final'.format(k))
         outputs.append(output)
     return outputs
 
@@ -104,12 +104,12 @@ def dcgan_encoder(opts, inputs, num_layers, num_units, output_dim,
         for i in range(num_layers):
             scale = 2**(num_layers - i - 1)
             layer_x = ops.conv2d(opts, layer_x, int(num_units / scale),
-                                 scope='mix{}_hid{}_conv'.format(k,i))
+                                 scope='mix{}/hid{}/conv'.format(k,i))
             if batch_norm:
                 layer_x = ops.batch_norm(opts, layer_x, is_training,
-                                         reuse, scope='mix{}_hid{}_bn'.format(k,i))
+                                         reuse, scope='mix{}/hid{}/bn'.format(k,i))
             layer_x = tf.nn.relu(layer_x)
-        output = ops.linear(opts, layer_x, output_dim, scope='mix{}_hid_final'.format(k))
+        output = ops.linear(opts, layer_x, output_dim, scope='mix{}/hid_final'.format(k))
         outputs.append(output)
     return outputs
 
@@ -169,11 +169,11 @@ def mlp_decoder(opts, inputs, num_layers, num_units, output_shape,
     # Architecture with only fully connected layers and ReLUs
     layer_x = inputs
     for i in range(num_layers):
-        layer_x = ops.linear(opts, layer_x, num_units, 'hid%d_lin' % i)
+        layer_x = ops.linear(opts, layer_x, num_units, 'hid%d/lin' % i)
         layer_x = tf.nn.relu(layer_x)
         if batch_norm:
             layer_x = ops.batch_norm(
-                opts, layer_x, is_training, reuse, scope='hid%d_bn' % i)
+                opts, layer_x, is_training, reuse, scope='hid%d/bn' % i)
     out = ops.linear(opts, layer_x,
                      np.prod(output_shape), 'hid_final')
     out = tf.reshape(out, [-1] + list(output_shape))
@@ -196,7 +196,7 @@ def  dcgan_decoder(opts, inputs, archi, num_layers, num_units,
         width = output_shape[1] / 2**(num_layers - 1)
 
     h0 = ops.linear(opts, inputs, num_units * ceil(height) * ceil(width),
-                                            scope='hid0_lin')
+                                            scope='hid0/lin')
     h0 = tf.reshape(h0, [-1, ceil(height), ceil(width), num_units])
     h0 = tf.nn.relu(h0)
     layer_x = h0
@@ -205,18 +205,18 @@ def  dcgan_decoder(opts, inputs, archi, num_layers, num_units,
         _out_shape = [batch_size, ceil(height * scale),
                       ceil(width * scale), int(num_units / scale)]
         layer_x = ops.deconv2d(opts, layer_x, _out_shape,
-                               scope='hid%d_deconv' % i)
+                               scope='hid%d/deconv' % i)
         if batch_norm:
             layer_x = ops.batch_norm(opts, layer_x,
-                                     is_training, reuse, scope='hid%d_bn' % i)
+                                     is_training, reuse, scope='hid%d/bn' % i)
         layer_x = tf.nn.relu(layer_x)
     _out_shape = [batch_size] + list(output_shape)
     if archi == 'dcgan':
         last_h = ops.deconv2d(
-            opts, layer_x, _out_shape, scope='hid_final_deconv')
+            opts, layer_x, _out_shape, scope='hid_final/deconv')
     elif archi == 'dcgan_mod':
         last_h = ops.deconv2d(
-            opts, layer_x, _out_shape, d_h=1, d_w=1, scope='hid_final_deconv')
+            opts, layer_x, _out_shape, d_h=1, d_w=1, scope='hid_final/deconv')
     if opts['input_normalize_sym']:
         return tf.nn.tanh(last_h), last_h
     else:
