@@ -128,7 +128,7 @@ def continuous_decoder(opts, noise, reuse=False, is_training=True):
 
 def discrete_decoder(opts, noise, reuse=False, is_training=True):
     with tf.variable_scope("generator", reuse=reuse):
-        _, logits = decoder(opts, noise, 'mlp', 0, 32, [opts['nclasses']],
+        _, logits = decoder(opts, noise, 'mlp', 1, 16, [opts['nclasses']],
                                                       'disc_gen',
                                                       opts['batch_norm'],
                                                       reuse,
