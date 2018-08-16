@@ -87,7 +87,7 @@ def init_cat_prior(opts):
     """
     Initialize parameters of discrete distribution
     """
-    with tf.variable_scope('prior', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope('prior'):
         mean_param = tf.get_variable("pi0", [opts['nmixtures']], initializer=cat_initializer)
     logits = tf.nn.softmax(mean_param)
     return logits

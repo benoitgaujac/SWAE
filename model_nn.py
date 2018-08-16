@@ -128,11 +128,13 @@ def continuous_decoder(opts, noise, reuse=False, is_training=True):
 
 def discrete_decoder(opts, noise, reuse=False, is_training=True):
     with tf.variable_scope("generator", reuse=reuse):
-        _, logits = decoder(opts, noise, 'mlp', 1, 16, [opts['nclasses']],
-                                                      'disc_gen',
-                                                      opts['batch_norm'],
-                                                      reuse,
-                                                      is_training)
+        _, logits = decoder(opts, noise, 'mlp', opts['g_disc_nlayers'],
+                                                opts['g_disc_nfilters'],
+                                                [opts['nclasses']],
+                                                'disc_gen',
+                                                opts['batch_norm'],
+                                                reuse,
+                                                is_training)
         outputs = tf.nn.softmax(logits,axis=-1)
     return outputs, logits
 
