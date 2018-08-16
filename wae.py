@@ -489,7 +489,7 @@ class WAE(object):
                                                         replace=False)
                         batch_images = data.test_data[data_ids].astype(np.float32)
                         batch_labels = data.test_labels[data_ids].astype(np.float32)
-                        [u_loss_rec, l_loss_rec, probs_test] = self.sess.run(
+                        [ulr, llr, probs_test] = self.sess.run(
                                                         [self.u_loss_reconstruct,
                                                          self.l_loss_reconstruct,
                                                          self.probs],
@@ -500,11 +500,11 @@ class WAE(object):
                         # Computing accuracy
                         u_acc = accuracy(batch_labels, probs_test, labelled_clusters)
                         u_acc_test += u_acc / te_batches_num
-                        u_loss_rec_test += u_loss_rec / te_batches_num
-                        l_loss_rec_test += l_loss_rec / te_batches_num
+                        u_loss_rec_test += ulr / te_batches_num
+                        l_loss_rec_test += llr / te_batches_num
 
                     # Auto-encoding unlabeled test images
-                    [rec_test, encoded, labeling, probs_test] = self.sess.run(
+                    [rec_pics_test, encoded, labeling, probs_pics_test] = self.sess.run(
                                                         [self.reconstructed_point,
                                                          self.encoded_point,
                                                          self.labels_reconstructed,
@@ -513,7 +513,7 @@ class WAE(object):
                                                                    self.u_points:data.test_data[:npics],
                                                                    self.is_training:False})
                     # Auto-encoding training images
-                    [rec_train, probs_train] = self.sess.run(
+                    [rec_pics_train, probs_pics_train] = self.sess.run(
                                                         [self.reconstructed_point,
                                                          self.probs],
                                                         feed_dict={self.u_points:data.data[l_train_size:l_train_size+npics],
@@ -524,34 +524,38 @@ class WAE(object):
                                                                    self.sample_noise: fixed_noise,
                                                                    self.is_training: False})
                     # Printing various loss values
-                    debug_str = 'EPOCH: %d/%d, BATCH:%d/%d, LOSS=%.3f' % (
+                    debug_str = 'EPOCH: %d/%d, BATCH:%d/%d' % (
                                 epoch + 1, opts['epoch_num'],
-                                it + 1, batches_num,
-                                losses[-1])
+                                it + 1, batches_num)
+                    logging.error(debug_str)
+                    debug_str = 'TRAIN LOSS=%.3f, TEST ACC=%.2f' % (
+                                                    losses[-1],
+                                                    100*u_acc_test)
+                    logging.error(debug_str)
+                    debug_str = 'TEST REC(L/U)=%.3f/%.3f, TRAIN REC(L/U)=%.3f/%.3f' % (
+                                                        opts['alpha']*l_loss_rec_test,
+                                                        u_loss_rec_test,
+                                                        opts['alpha']*losses_rec[-1][0],
+                                                        losses_rec[-1][1])
+                    logging.error(debug_str)
+                    debug_str = 'MATCH(L/U)=%.3f/%.3f, XENT(L/U)=%.3f/%.3f' % (
+                                                        opts['l_lambda']*opts['alpha']*losses_match[-1][0],
+                                                        opts['u_lambda']*losses_match[-1][1],
+                                                        opts['l_beta']*opts['alpha']*losses_xent[-1][0],
+                                                        opts['u_beta']*losses_xent[-1][1])
                     logging.error(debug_str)
                     debug_str = 'Clusters ID: %s' % (str(labelled_clusters))
                     logging.error(debug_str)
                     labs = np.argmax(labeling,axis=-1)
                     debug_str = 'Labelling: %s' % (str(labs))
                     logging.error(debug_str)
-                    debug_str = 'TEST REC(L/U)=%.3f/%.3f, TEST ACC=%.2f' % (
-                                                        l_loss_rec_test,
-                                                        u_loss_rec_test,
-                                                        100*u_acc_test)
-                    logging.error(debug_str)
-                    debug_str = 'MATCH(L/U)=%.3f/%.3f, XENT(L/U)=%.3f/%.3f' % (
-                                                        opts['l_lambda']*losses_match[-1][0],
-                                                        opts['u_lambda']*losses_match[-1][1],
-                                                        opts['l_beta']*losses_xent[-1][0],
-                                                        opts['u_beta']*losses_xent[-1][1])
-                    logging.error(debug_str)
                     print('')
                     # Making plots
                     #logging.error('Saving images..')
                     save_train(opts, data.data[:npics], data.test_data[:npics],                 # images
                                      data.test_labels[:npics],                                  # labels
-                                     rec_train[:npics], rec_test[:npics],                       # reconstructions
-                                     probs_train, probs_test,                                   # mixweights
+                                     rec_pics_test[:npics], rec_pics_test[:npics],              # reconstructions
+                                     probs_pics_train, probs_pics_test,                         # mixweights
                                      encoded,                                                   # encoded points
                                      fixed_noise,                                               # prior samples
                                      sample_gen,                                                # samples
