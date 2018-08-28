@@ -52,21 +52,17 @@ class WAE(object):
         self.pz_mean, self.pz_sigma = init_gaussian_prior(opts)
         self.pi0 = init_cat_prior(opts)
         # --- Encoding inputs
-        self.log_probs = label_encoder(self.opts, self.u_points, False,
+        log_probs = label_encoder(self.opts, self.u_points, False,
                                                         self.is_training)
-        self.probs = ops.softmax(self.log_probs,axis=-1)
+        self.probs = ops.softmax(log_probs,axis=-1)
         log_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(
                                                         self.u_points,
                                                         False)
         log_Zpi = ops.log_sum_exp(log_pi,axis=-1,keepdims=True)
         logit = log_pi - log_Zpi \
-                + tf.expand_dims(self.log_probs,axis=-1)
+                + tf.expand_dims(log_probs,axis=-1)
         u_logit = ops.log_sum_exp(logit,axis=1,keepdims=False)
         self.u_pi = ops.softmax(u_logit,axis=-1)
-        # probs = ops.softmax(self.log_probs,axis=-1)
-        # self.u_pi = tf.reduce_sum(tf.multiply(u_pi, tf.expand_dims(
-        #                                                 probs,axis=-1)),
-        #                                                 axis=1)
 
         log_pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(
                                                         self.l_points,
@@ -236,8 +232,8 @@ class WAE(object):
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
         prior_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='prior')
-        #ae_vars = encoder_vars + decoder_vars
-        ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        ae_vars = encoder_vars + decoder_vars
+        #ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         if opts['clip_grad']:
             grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=ae_vars))
             clip_grad, _ = tf.clip_by_global_norm(grad, opts['clip_norm'])
@@ -251,7 +247,7 @@ class WAE(object):
     def encoder(self, input_points, reuse=False):
         ## Categorical encoding
         logit = cat_encoder(self.opts, inputs=input_points, reuse=reuse,
-                            is_training=self.is_training)
+                                                    is_training=self.is_training)
         ## Gaussian encoding
         if self.opts['e_means']=='fixed':
             eps = tf.zeros([tf.cast(sample_size, dtype=tf.int32), self.opts['nmixtures'],
