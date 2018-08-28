@@ -52,19 +52,28 @@ class WAE(object):
         self.pz_mean, self.pz_sigma = init_gaussian_prior(opts)
         self.pi0 = init_cat_prior(opts)
         # --- Encoding inputs
-        u_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(
+        self.log_probs = label_encoder(self.opts, self.u_points, False,
+                                                        self.is_training)
+        self.probs = ops.softmax(self.log_probs,axis=-1)
+        log_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(
                                                         self.u_points,
                                                         False)
-        self.probs = label_encoder(self.opts, self.u_points, False,
-                                                        self.is_training)
-        self.u_pi = tf.reduce_sum(tf.multiply(u_pi,tf.expand_dims(
-                                                        self.probs,axis=-1)),
-                                                        axis=1)
-        l_pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(
+        log_Zpi = ops.log_sum_exp(log_pi,axis=-1)
+        logit = log_pi - tf.expand_dims(log_Zpi,axis=-1) \
+                + tf.expand_dims(self.log_probs,axis=-1)
+        u_logit = ops.log_sum_exp(logit,axis=1)
+        self.u_pi = ops.softmax(u_logit,axis=-1)
+        # probs = ops.softmax(self.log_probs,axis=-1)
+        # self.u_pi = tf.reduce_sum(tf.multiply(u_pi, tf.expand_dims(
+        #                                                 probs,axis=-1)),
+        #                                                 axis=1)
+
+        log_pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(
                                                         self.l_points,
                                                         True)
         idx_label = tf.stack([range,self.l_labels], axis=-1)
-        self.l_pi = tf.gather_nd(l_pi,idx_label)
+        l_logit = tf.gather_nd(log_pi,idx_label)
+        self.l_pi = ops.softmax(l_logit,axis=-1)
         # --- Sampling from encoded MoG prior
         self.u_mixtures_encoded = sample_mixtures(opts, self.u_enc_mean,
                                                         tf.exp(self.u_enc_logSigma),
@@ -85,7 +94,7 @@ class WAE(object):
                                                         False,
                                                         self.is_training)
         # --- Reconstructing inputs (only for visualization)
-        idx = tf.reshape(tf.multinomial(tf.log(self.u_pi), 1),[-1])
+        idx = tf.reshape(tf.multinomial(tf.nn.log_softmax(u_logit),1),[-1])
         mix_idx = tf.stack([range,idx],axis=-1)
         self.encoded_point = tf.gather_nd(self.u_mixtures_encoded,mix_idx)
         self.reconstructed_point = tf.gather_nd(self.u_reconstructed,mix_idx)
@@ -152,22 +161,24 @@ class WAE(object):
         self.u_sample_mix_noise = tf.placeholder(tf.float32,
                                     [None] + [opts['nmixtures'],opts['zdim']],
                                     name='u_mix_noise_ph')
+        self.sample_noise = tf.placeholder(tf.float32,
+                                    [None] + [opts['nmixtures'],opts['zdim']],
+                                    name='noise_ph')
+
         # self.l_points = l_data
         # self.l_labels = l_label
         # self.l_sample_mix_noise = l_mix_noise
         # self.u_points = u_data
         # self.u_sample_mix_noise = u_mix_noise
-        self.sample_noise = tf.placeholder(tf.float32,
-                                    [None] + [opts['nmixtures'],opts['zdim']],
-                                    name='noise_ph')
         # self.sample_noise = noise
+
         # self.label_noise = tf.placeholder(tf.float32,
         #                             [None,1],
         #                             name='noise_ph')
         label_noise = tf.range(opts['nmixtures'],
                                     dtype=tf.float32,
                                     name='label_noise_ph')
-        self.label_noise = tf.expand_dims(label_noise, axis=-1)
+        self.label_noise = tf.expand_dims(label_noise, axis=0)
 
         # placeholders fo logistic regression
         self.preds = tf.placeholder(tf.float32, [None, 10], name='predictions') # discrete probabilities
@@ -239,7 +250,7 @@ class WAE(object):
 
     def encoder(self, input_points, reuse=False):
         ## Categorical encoding
-        pi = cat_encoder(self.opts, inputs=input_points, reuse=reuse,
+        logit = cat_encoder(self.opts, inputs=input_points, reuse=reuse,
                             is_training=self.is_training)
         ## Gaussian encoding
         if self.opts['e_means']=='fixed':
@@ -262,7 +273,7 @@ class WAE(object):
                                                     inputs=input_points,
                                                     reuse=reuse,
                                                     is_training=self.is_training)
-        return pi, enc_mean, enc_logSigma
+        return logit, enc_mean, enc_logSigma
 
     def decoder(self, encoded, reuse=False):
         noise = tf.reshape(encoded,[-1,self.opts['zdim']])
@@ -335,7 +346,7 @@ class WAE(object):
 
         # Split data set
         full_train_size = data.num_points
-        l_train_size = max(int(full_train_size*opts['lu_split']),5)
+        l_train_size = max(int(full_train_size*opts['lu_split']),opts['min_u_size'])
         u_train_size = full_train_size-l_train_size
         debug_str = 'Total:%d, Unlabelled:%d, Labelled:%d' % (
                     full_train_size, u_train_size, l_train_size)
@@ -352,7 +363,7 @@ class WAE(object):
             if opts['e_pretrain']:
                 logging.error('Pretraining the encoder')
                 self.pretrain_encoder(data)
-        print('')
+                print('')
 
         batches_num = int(max(l_train_size,u_train_size)/opts['batch_size'])
         npics = opts['plot_num_pics']
@@ -400,8 +411,8 @@ class WAE(object):
                                                         opts['batch_size'],
                                                         sampling_mode='all_mixtures')
                 data_ids = l_train_size + np.random.choice(u_train_size,
-                                                           opts['batch_size'],
-                                                           replace=False)
+                                                       opts['batch_size'],
+                                                       replace=False)
                 u_batch_images = data.data[data_ids].astype(np.float32)
                 u_batch_labels = data.labels[data_ids].astype(np.float32)
                 u_batch_mix_noise = sample_pz(opts, self.pz_mean,

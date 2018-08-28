@@ -10,6 +10,8 @@ import tensorflow as tf
 import numpy as np
 import logging
 
+import pdb
+
 def lrelu(x, leak=0.3):
     return tf.maximum(x, leak * x)
 
@@ -142,18 +144,15 @@ def deconv2d(opts, input_, output_shape, d_h=2, d_w=2, scope=None, conv_filters_
             initializer=tf.constant_initializer(0.0))
         deconv = tf.nn.bias_add(deconv, biases)
 
-
     return deconv
 
-
-def log_sum_exp(logits):
-    l_max = tf.reduce_max(logits, axis=1, keep_dims=True)
-    return tf.add(l_max,
-                  tf.reduce_sum(
-                    tf.exp(tf.subtract(
-                        logits,
-                        tf.tile(l_max, tf.stack([1, logits.get_shape()[1]])))),
-                    axis=1))
+def log_sum_exp(logits,axis=1,shift=False):
+    if shift:
+        l_max = tf.reduce_max(logits, axis=axis, keepdims=True)
+        logsumexp = tf.reduce_sum(tf.exp(logits-l_max),axis=axis)
+        return l_max[:,0] + logsumexp
+    else:
+        return tf.reduce_sum(tf.exp(logits),axis=axis)
 
 def softmax(logits,axis=None):
     return tf.nn.softmax(logits,axis=axis)

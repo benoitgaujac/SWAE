@@ -8,7 +8,7 @@ import pdb
 
 def label_encoder(opts, inputs, reuse=False, is_training=False):
     with tf.variable_scope("encoder", reuse=reuse):
-        probs = encoder(opts, inputs, opts['e_lab_arch'], opts['e_lab_nlayers'],
+        logits = encoder(opts, inputs, opts['e_lab_arch'], opts['e_lab_nlayers'],
                                                           opts['e_lab_nfilters'],
                                                           opts['nclasses'],
                                                           1,
@@ -16,8 +16,9 @@ def label_encoder(opts, inputs, reuse=False, is_training=False):
                                                           opts['batch_norm'],
                                                           reuse,
                                                           is_training)
-        probs = tf.nn.softmax(probs[0],axis=-1)
-        return probs
+        # probs = ops.softmax(probs[0],axis=-1)
+        # return probs
+        return logits[0]
 
 def cat_encoder(opts, inputs, reuse=False, is_training=False):
     with tf.variable_scope("encoder", reuse=reuse):
@@ -30,7 +31,7 @@ def cat_encoder(opts, inputs, reuse=False, is_training=False):
                                                        reuse,
                                                        is_training)
         pi = tf.stack(pi,axis=1)
-        pi = tf.nn.softmax(pi,axis=-1)
+        # pi = ops.softmax(pi,axis=-1)
         return pi
 
 def gaussian_encoder(opts, inputs, reuse=False, is_training=False):
@@ -127,15 +128,21 @@ def continuous_decoder(opts, noise, reuse=False, is_training=True):
     return outputs, logits
 
 def discrete_decoder(opts, noise, reuse=False, is_training=True):
-    with tf.variable_scope("generator", reuse=reuse):
-        _, logits = decoder(opts, noise, 'mlp', opts['g_disc_nlayers'],
+    with tf.variable_scope('generator/disc_gen', reuse=reuse):
+        outputs, logits = [], []
+        for i in range(opts["nmixtures"]):
+            input = tf.expand_dims(noise[:,i],axis=0)
+            _, logit = decoder(opts, input, 'mlp', opts['g_disc_nlayers'],
                                                 opts['g_disc_nfilters'],
                                                 [opts['nclasses']],
-                                                'disc_gen',
+                                                'mix%d' % i,
                                                 opts['batch_norm'],
                                                 reuse,
                                                 is_training)
-        outputs = tf.nn.softmax(logits,axis=-1)
+            outputs.append(ops.softmax(logit,axis=-1))
+            logits.append(logit)
+    outputs = tf.concat(outputs,axis=0)
+    logits = tf.concat(logits,axis=0)
     return outputs, logits
 
 def decoder(opts, inputs, archi, num_layers, num_units, output_shape,
