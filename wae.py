@@ -232,8 +232,8 @@ class WAE(object):
         encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
         prior_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='prior')
-        ae_vars = encoder_vars + decoder_vars
-        #ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        #ae_vars = encoder_vars + decoder_vars
+        ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         if opts['clip_grad']:
             grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=ae_vars))
             clip_grad, _ = tf.clip_by_global_norm(grad, opts['clip_norm'])
