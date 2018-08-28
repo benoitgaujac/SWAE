@@ -146,13 +146,8 @@ def deconv2d(opts, input_, output_shape, d_h=2, d_w=2, scope=None, conv_filters_
 
     return deconv
 
-def log_sum_exp(logits,axis=1,shift=False):
-    if shift:
-        l_max = tf.reduce_max(logits, axis=axis, keepdims=True)
-        logsumexp = tf.reduce_sum(tf.exp(logits-l_max),axis=axis)
-        return l_max[:,0] + logsumexp
-    else:
-        return tf.reduce_sum(tf.exp(logits),axis=axis)
+def log_sum_exp(logits,axis=1,keepdims=True):
+    return tf.reduce_sum(tf.exp(logits),axis=axis,keepdims=keepdims)
 
 def softmax(logits,axis=None):
     return tf.nn.softmax(logits,axis=axis)

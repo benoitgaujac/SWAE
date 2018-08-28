@@ -58,10 +58,10 @@ class WAE(object):
         log_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(
                                                         self.u_points,
                                                         False)
-        log_Zpi = ops.log_sum_exp(log_pi,axis=-1)
-        logit = log_pi - tf.expand_dims(log_Zpi,axis=-1) \
+        log_Zpi = ops.log_sum_exp(log_pi,axis=-1,keepdims=True)
+        logit = log_pi - log_Zpi \
                 + tf.expand_dims(self.log_probs,axis=-1)
-        u_logit = ops.log_sum_exp(logit,axis=1)
+        u_logit = ops.log_sum_exp(logit,axis=1,keepdims=False)
         self.u_pi = ops.softmax(u_logit,axis=-1)
         # probs = ops.softmax(self.log_probs,axis=-1)
         # self.u_pi = tf.reduce_sum(tf.multiply(u_pi, tf.expand_dims(
