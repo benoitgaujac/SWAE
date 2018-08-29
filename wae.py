@@ -79,6 +79,7 @@ class WAE(object):
         self.loss_reconstruct = reconstruction_loss(opts, self.pi,
                                                         self.points,
                                                         self.reconstructed)
+        #self.log_loss_reconstruct
         # Compute matching penalty cost
         self.kl_g, self.kl_d, self.match_penalty= matching_penalty(opts,
                                                         self.pi0, self.pi,
@@ -271,10 +272,6 @@ class WAE(object):
         losses, losses_rec, losses_match, losses_xent = [], [], [], []
         kl_gau, kl_dis  = [], []
         decay, counter = 1., 0
-        if opts['method']=='swae':
-            lmbda = opts['lambda']
-        else:
-            lmbda = 1.
         wait = 0
         for epoch in range(opts['epoch_num']):
             # Update learning rate if necessary
@@ -304,7 +301,7 @@ class WAE(object):
                 feed_dict={self.points: batch_images,
                            self.sample_mix_noise: batch_mix_noise,
                            self.lr_decay: decay,
-                           self.lmbd: lmbda,
+                           self.lmbd: opts['lambda'],
                            self.is_training: True}
                 # Update encoder and decoder
                 if opts['method']=='swae':
@@ -415,7 +412,7 @@ class WAE(object):
                     print('')
                     # Making plots
                     #logging.error('Saving images..')
-                    save_train(opts, data.data[:npics], data.test_data[:npics],                 # images
+                    save_train(opts, data.data[200:200+npics], data.test_data[:npics],                 # images
                                      data.test_labels[:npics],                                  # labels
                                      decoded_train[:npics], decoded_test[:npics],               # reconstructions
                                      p_train, p_test,                                           # mixweights
