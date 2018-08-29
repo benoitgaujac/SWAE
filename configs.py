@@ -60,13 +60,13 @@ config_mnist['init_bias'] = 0.0
 config_mnist['e_means'] = 'learnable'
 config_mnist['init_e_std'] = -2.0
 
-config_mnist['e_gaus_arch'] = 'mlp' # mlp, dcgan, ali, began
-config_mnist['e_gaus_nlayers'] = 2
-config_mnist['e_gaus_nfilters'] = 16
+config_mnist['e_gaus_arch'] = 'dcgan' # mlp, dcgan, ali, began
+config_mnist['e_gaus_nlayers'] = 3
+config_mnist['e_gaus_nfilters'] = 128
 config_mnist['e_cat_arch'] = 'dcgan' # mlp, dcgan, ali, began
 config_mnist['e_cat_nlayers'] = 3
-config_mnist['e_cat_nfilters'] = 32
+config_mnist['e_cat_nfilters'] = 128
 
 config_mnist['g_cont_arch'] = 'dcgan' # mlp, dcgan, dcgan_mod, ali, began
 config_mnist['g_cont_nlayers'] = 3
-config_mnist['g_cont_nfilters'] = 32
+config_mnist['g_cont_nfilters'] = 128
