@@ -20,7 +20,7 @@ import ops
 import utils
 from priors import init_gaussian_prior, init_cat_prior
 from sampling_functions import sample_mixtures, sample_pz, generate_linespace
-from loss_functions import matching_penalty, reconstruction_loss, moments_loss
+from loss_functions import matching_penalty, reconstruction_loss, vae_recons_loss, moments_loss
 from supervised_functions import accuracy, get_mean_probs, relabelling_mask_from_probs, one_hot
 from plot_functions import save_train, save_vizu
 from model_nn import cat_encoder, gaussian_encoder
@@ -79,7 +79,9 @@ class WAE(object):
         self.loss_reconstruct = reconstruction_loss(opts, self.pi,
                                                         self.points,
                                                         self.reconstructed)
-        #self.log_loss_reconstruct
+        self.VAE_reconstruct = vae_recons_loss(opts, self.pi,
+                                                        self.points,
+                                                        self.reconstructed)
         # Compute matching penalty cost
         self.kl_g, self.kl_d, self.match_penalty= matching_penalty(opts,
                                                         self.pi0, self.pi,
@@ -269,7 +271,7 @@ class WAE(object):
                                                         opts['plot_num_pics'],
                                                         sampling_mode = 'per_mixture')
         self.start_time = time.time()
-        losses, losses_rec, losses_match, losses_xent = [], [], [], []
+        losses, losses_rec, losses_match, losses_VAE = [], [], [], []
         kl_gau, kl_dis  = [], []
         decay, counter = 1., 0
         wait = 0
@@ -305,11 +307,13 @@ class WAE(object):
                            self.is_training: True}
                 # Update encoder and decoder
                 if opts['method']=='swae':
-                    [_, loss, loss_rec, loss_match] = self.sess.run([self.swae_opt,
+                    [_, loss, loss_rec, loss_vae, loss_match] = self.sess.run([self.swae_opt,
                                                         self.objective,
                                                         self.loss_reconstruct,
+                                                        self.VAE_reconstruct,
                                                         self.match_penalty],
-                                             feed_dict=feed_dict)
+                                                        feed_dict=feed_dict)
+                    losses_VAE.append(loss_vae)
                 elif opts['method']=='vae':
                     [_, loss, loss_rec, loss_match, kl_g, kl_d] = self.sess.run(
                                                         [self.swae_opt,
@@ -419,7 +423,7 @@ class WAE(object):
                                      encoded,                                                   # encoded points
                                      fixed_noise,                                               # prior samples
                                      sample_gen,                                                # samples
-                                     losses, losses_rec, losses_match,                          # loses
+                                     losses, losses_rec, losses_match, losses_VAE,              # loses
                                      kl_gau, kl_dis,                                            # KL terms
                                      work_dir,                                                  # working directory
                                      'res_e%04d_mb%05d.png' % (epoch, it))                      # filename

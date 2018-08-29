@@ -19,7 +19,7 @@ def save_train(opts, sample_train, sample_test,
                      encoded,
                      samples_prior,
                      samples,
-                     losses, losses_rec, losses_match,
+                     losses, losses_rec, losses_match, losses_VAE,
                      kl_gau, kl_dis,
                      work_dir,
                      filename):
@@ -210,18 +210,22 @@ def save_train(opts, sample_train, sample_test,
 
     if len(kl_gau)>0:
         y = np.log(np.abs(losses_match[::x_step]))
-        plt.plot(x, y, linewidth=2, color='blue', label='log(|match loss|)')
+        plt.plot(x, y, linewidth=2, color='blue', label='|match loss|)')
 
         y = np.log(kl_gau[::x_step])
-        plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(cont KL)')
+        plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='cont KL')
+
+        y = np.log(kl_dis[::x_step])
+        plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='disc KL')
+
     else:
         l = np.array(losses_match)
         y = np.log(opts['lambda']*np.abs(l[::x_step]))
         plt.plot(x, y, linewidth=2, color='blue', label='|MMD|')
 
-    if len(kl_dis)>0:
-        y = np.log(kl_dis[::x_step])
-        plt.plot(x, y, linewidth=2, color='blue', linestyle='--', label='log(disc KL)')
+        # l = np.array(losses_VAE)
+        # y = np.log(l[::x_step])
+        # plt.plot(x, y, linewidth=2, color='red', linestyle=(0, (5, 10)), label='VAE rec')
 
     plt.grid(axis='y')
     plt.legend(loc='lower left')
@@ -261,6 +265,7 @@ def save_train(opts, sample_train, sample_test,
                     probs_train=probs_train,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
+                    loss_vae=np.array(losses_VAE[::x_step]),
                     loss_match=np.array(np.array(losses_match[::x_step])))
 
 def save_vizu(opts, data_train, data_test,              # images
