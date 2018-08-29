@@ -23,8 +23,8 @@ from sampling_functions import sample_mixtures, sample_pz, generate_linespace
 from loss_functions import matching_penalty, reconstruction_loss, moments_loss
 from supervised_functions import accuracy, get_mean_probs, relabelling_mask_from_probs, one_hot
 from plot_functions import save_train, save_vizu
-from model_nn import label_encoder, cat_encoder, gaussian_encoder
-from model_nn import continuous_decoder, discrete_decoder
+from model_nn import cat_encoder, gaussian_encoder
+from model_nn import continuous_decoder
 from datahandler import datashapes
 
 import pdb
@@ -45,91 +45,48 @@ class WAE(object):
         # --- Placeholders
         self.add_model_placeholders()
         self.add_training_placeholders()
-        sample_size = tf.shape(self.u_points,out_type=tf.int64)[0]
+        sample_size = tf.shape(self.points,out_type=tf.int64)[0]
         range = tf.range(sample_size)
         zero = tf.zeros([tf.cast(sample_size,dtype=tf.int32)],dtype=tf.int64)
         # --- Initialize prior parameters
         self.pz_mean, self.pz_sigma = init_gaussian_prior(opts)
         self.pi0 = init_cat_prior(opts)
         # --- Encoding inputs
-        log_probs = label_encoder(self.opts, self.u_points, False,
-                                                        self.is_training)
-        self.probs = ops.softmax(log_probs,axis=-1)
-        log_pi, self.u_enc_mean, self.u_enc_logSigma = self.encoder(
-                                                        self.u_points,
+        logit, self.enc_mean, self.enc_logSigma = self.encoder(
+                                                        self.points,
                                                         False)
-        log_Zpi = ops.log_sum_exp(log_pi,axis=-1,keepdims=True)
-        logit = log_pi - log_Zpi \
-                + tf.expand_dims(log_probs,axis=-1)
-        u_logit = ops.log_sum_exp(logit,axis=1,keepdims=False)
-        self.u_pi = ops.softmax(u_logit,axis=-1)
-
-        log_pi, self.l_enc_mean, self.l_enc_logSigma = self.encoder(
-                                                        self.l_points,
-                                                        True)
-        idx_label = tf.stack([range,self.l_labels], axis=-1)
-        l_logit = tf.gather_nd(log_pi,idx_label)
-        self.l_pi = ops.softmax(l_logit,axis=-1)
+        self.pi = ops.softmax(logit,axis=-1)
         # --- Sampling from encoded MoG prior
-        self.u_mixtures_encoded = sample_mixtures(opts, self.u_enc_mean,
-                                                        tf.exp(self.u_enc_logSigma),
-                                                        sample_size,'tensorflow')
-        self.l_mixtures_encoded = sample_mixtures(opts, self.l_enc_mean,
-                                                        tf.exp(self.l_enc_logSigma),
+        self.mixtures_encoded = sample_mixtures(opts, self.enc_mean,
+                                                        tf.exp(self.enc_logSigma),
                                                         sample_size,'tensorflow')
         # --- Decoding encoded points (i.e. reconstruct)
-        self.u_reconstructed, self.u_reconstructed_logits = self.decoder(
-                                                        self.u_mixtures_encoded,
+        self.reconstructed, self.logits_reconstructed = self.decoder(
+                                                        self.mixtures_encoded,
                                                         False)
-        self.l_reconstructed, self.l_reconstructed_logits = self.decoder(
-                                                        self.l_mixtures_encoded,
-                                                        True)
-        self.labels_reconstructed, self.labels_reconstructed_logits = discrete_decoder(
-                                                        opts,
-                                                        self.label_noise,
-                                                        False,
-                                                        self.is_training)
         # --- Reconstructing inputs (only for visualization)
-        idx = tf.reshape(tf.multinomial(tf.nn.log_softmax(u_logit),1),[-1])
+        idx = tf.reshape(tf.multinomial(tf.nn.log_softmax(logit),1),[-1])
         mix_idx = tf.stack([range,idx],axis=-1)
-        self.encoded_point = tf.gather_nd(self.u_mixtures_encoded,mix_idx)
-        self.reconstructed_point = tf.gather_nd(self.u_reconstructed,mix_idx)
-        self.reconstructed_logit = tf.gather_nd(self.u_reconstructed_logits,mix_idx)
+        self.encoded_point = tf.gather_nd(self.mixtures_encoded,mix_idx)
+        self.reconstructed_point = tf.gather_nd(self.reconstructed,mix_idx)
+        self.reconstructed_logit = tf.gather_nd(self.logits_reconstructed,mix_idx)
 
         # --- Sampling from model (only for generation)
         self.decoded, self.decoded_logits = self.decoder(self.sample_noise,
                                                         True)
         # --- Objectives, losses, penalties, pretraining
         # Compute reconstruction cost
-        self.l_loss_reconstruct = reconstruction_loss(opts, self.l_pi,
-                                                        self.l_points,
-                                                        self.l_reconstructed,
-                                                        self.l_labels,
-                                                        tf.argmax(self.labels_reconstructed,axis=-1))
-        self.u_loss_reconstruct = reconstruction_loss(opts, self.u_pi,
-                                                        self.u_points,
-                                                        self.u_reconstructed)
+        self.loss_reconstruct = reconstruction_loss(opts, self.pi,
+                                                        self.points,
+                                                        self.reconstructed)
         # Compute matching penalty cost
-        self.kl_g, self.kl_d, self.l_cont_penalty, self.l_disc_penalty = matching_penalty(opts,
-                                                        self.pi0, self.l_pi,
-                                                        self.l_enc_mean, self.l_enc_logSigma,
+        self.kl_g, self.kl_d, self.match_penalty= matching_penalty(opts,
+                                                        self.pi0, self.pi,
+                                                        self.enc_mean, self.enc_logSigma,
                                                         self.pz_mean, self.pz_sigma,
-                                                        self.l_sample_mix_noise, self.l_mixtures_encoded)
-        self.kl_g, self.kl_d, self.u_cont_penalty, self.u_disc_penalty = matching_penalty(opts,
-                                                        self.pi0, self.u_pi,
-                                                        self.u_enc_mean, self.u_enc_logSigma,
-                                                        self.pz_mean, self.pz_sigma,
-                                                        self.u_sample_mix_noise, self.u_mixtures_encoded)
-        # Compute Labeled obj
-        self.l_loss = self.l_loss_reconstruct\
-                         + self.l_lmbd * self.l_cont_penalty\
-                         + self.l_beta * self.l_disc_penalty
+                                                        self.sample_mix_noise, self.mixtures_encoded)
         # Compute Unlabeled obj
-        self.u_loss = self.u_loss_reconstruct\
-                         + self.u_lmbd * self.u_cont_penalty\
-                         + self.u_beta * self.u_disc_penalty
-        # Compute wae obj
-        self.objective = self.alpha * self.l_loss + self.u_loss
+        self.objective = self.loss_reconstruct + self.lmbd * self.match_penalty
 
         # Pre Training
         self.pretrain_loss()
@@ -142,63 +99,29 @@ class WAE(object):
     def add_model_placeholders(self):
         opts = self.opts
         shape = self.data_shape
-        self.l_points = tf.placeholder(tf.float32,
+        self.points = tf.placeholder(tf.float32,
                                     [None] + shape,
-                                    name='l_points_ph')
-        self.l_labels = tf.placeholder(tf.int64,
-                                    [None,],
-                                    name='l_labels_ph')
-        self.l_sample_mix_noise = tf.placeholder(tf.float32,
+                                    name='points_ph')
+        self.sample_mix_noise = tf.placeholder(tf.float32,
                                     [None] + [opts['nmixtures'],opts['zdim']],
-                                    name='l_mix_noise_ph')
-        self.u_points = tf.placeholder(tf.float32,
-                                    [None] + shape,
-                                    name='u_points_ph')
-        self.u_sample_mix_noise = tf.placeholder(tf.float32,
-                                    [None] + [opts['nmixtures'],opts['zdim']],
-                                    name='u_mix_noise_ph')
+                                    name='mix_noise_ph')
         self.sample_noise = tf.placeholder(tf.float32,
                                     [None] + [opts['nmixtures'],opts['zdim']],
                                     name='noise_ph')
-
-        # self.l_points = l_data
-        # self.l_labels = l_label
-        # self.l_sample_mix_noise = l_mix_noise
-        # self.u_points = u_data
-        # self.u_sample_mix_noise = u_mix_noise
-        # self.sample_noise = noise
-
-        # self.label_noise = tf.placeholder(tf.float32,
-        #                             [None,1],
-        #                             name='noise_ph')
-        label_noise = tf.range(opts['nmixtures'],
-                                    dtype=tf.float32,
-                                    name='label_noise_ph')
-        self.label_noise = tf.expand_dims(label_noise, axis=0)
-
         # placeholders fo logistic regression
         self.preds = tf.placeholder(tf.float32, [None, 10], name='predictions') # discrete probabilities
         self.y = tf.placeholder(tf.float32, [None, 10],name='labels') # 0-9 digits recognition => 10 classes
-        # self.preds = preds
-        # self.y = y
 
     def add_training_placeholders(self):
         opts = self.opts
         decay = tf.placeholder(tf.float32, name='rate_decay_ph')
         is_training = tf.placeholder(tf.bool, name='is_training_ph')
         alpha = tf.placeholder(tf.float32, name='alpha')
-        l_lmbda = tf.placeholder(tf.float32, name='lambda')
-        l_beta = tf.placeholder(tf.float32, name='beta')
-        u_lmbda = tf.placeholder(tf.float32, name='lambda')
-        u_beta = tf.placeholder(tf.float32, name='beta')
+        lmbda = tf.placeholder(tf.float32, name='lambda')
 
         self.lr_decay = decay
         self.is_training = is_training
-        self.alpha = alpha
-        self.l_lmbd = l_lmbda
-        self.l_beta = l_beta
-        self.u_lmbd = u_lmbda
-        self.u_beta = u_beta
+        self.lmbd = lmbda
 
     def add_savers(self):
         opts = self.opts
@@ -285,41 +208,25 @@ class WAE(object):
     def pretrain_loss(self):
         # Adding ops to pretrain the encoder so that mean and covariance
         # of Qz will try to match those of Pz
-        l_pre_loss = moments_loss(self.l_sample_mix_noise, self.l_mixtures_encoded)
-        u_pre_loss = moments_loss(self.u_sample_mix_noise, self.u_mixtures_encoded)
-        # Loss
-        self.pre_loss = l_pre_loss + u_pre_loss
+        self.pre_loss = moments_loss(self.sample_mix_noise, self.mixtures_encoded)
 
     def pretrain_encoder(self, data):
         opts=self.opts
         steps_max = 500
         batch_size = opts['e_pretrain_sample_size']
-        full_train_size = data.num_points
-        l_train_size = max(int(full_train_size*opts['lu_split']),5)
-        u_train_size = full_train_size-l_train_size
+        train_size = data.num_points
         for step in range(steps_max):
-            data_ids = np.random.choice(l_train_size,
-                                batch_size,
-                                replace=True)
-            l_batch_images = data.data[data_ids].astype(np.float32)
-            l_batch_mix_noise = sample_pz(opts, self.pz_mean,
-                                              self.pz_sigma,
-                                              batch_size,
-                                              sampling_mode='all_mixtures')
-            data_ids = l_train_size + np.random.choice(u_train_size,
-                                                       batch_size,
+            data_ids = np.random.choice(train_size, batch_size,
                                                        replace=False)
-            u_batch_images = data.data[data_ids].astype(np.float32)
-            u_batch_mix_noise = sample_pz(opts, self.pz_mean,
+            batch_images = data.data[data_ids].astype(np.float32)
+            batch_mix_noise = sample_pz(opts, self.pz_mean,
                                               self.pz_sigma,
                                               batch_size,
                                               sampling_mode='all_mixtures')
             [_, pre_loss] = self.sess.run(
                                 [self.pre_opt, self.pre_loss],
-                                feed_dict={self.l_points: l_batch_images,
-                                           self.l_sample_mix_noise: l_batch_mix_noise,
-                                           self.u_points: u_batch_images,
-                                           self.u_sample_mix_noise: u_batch_mix_noise,
+                                feed_dict={self.points: batch_images,
+                                           self.sample_mix_noise: batch_mix_noise,
                                            self.is_training: True})
         logging.error('Pretraining the encoder done.')
         logging.error ('Loss after %d iterations: %.3f' % (steps_max,pre_loss))
@@ -340,14 +247,8 @@ class WAE(object):
         utils.create_dir(opts['method'])
         work_dir = os.path.join(opts['method'],opts['work_dir'])
 
-        # Split data set
-        full_train_size = data.num_points
-        l_train_size = max(int(full_train_size*opts['lu_split']),opts['min_u_size'])
-        u_train_size = full_train_size-l_train_size
-        debug_str = 'Total:%d, Unlabelled:%d, Labelled:%d' % (
-                    full_train_size, u_train_size, l_train_size)
-        logging.error(debug_str)
-        print('')
+        # data set size
+        train_size = data.num_points
 
         # Init sess and load trained weights if needed
         if opts['use_trained']:
@@ -361,7 +262,7 @@ class WAE(object):
                 self.pretrain_encoder(data)
                 print('')
 
-        batches_num = int(max(l_train_size,u_train_size)/opts['batch_size'])
+        batches_num = int(train_size/opts['batch_size'])
         npics = opts['plot_num_pics']
         fixed_noise = sample_pz(opts, self.pz_mean, self.pz_sigma,
                                                         opts['plot_num_pics'],
@@ -371,14 +272,9 @@ class WAE(object):
         kl_gau, kl_dis  = [], []
         decay, counter = 1., 0
         if opts['method']=='swae':
-            alpha = opts['alpha']
-            l_lmbda = opts['l_lambda']
-            l_beta = opts['l_beta']
-            u_lmbda = opts['u_lambda']
-            u_beta = opts['u_beta']
+            lmbda = opts['lambda']
         else:
-            assert False, 'to implement VAE'
-            wae_lmbda = 1
+            lmbda = 1.
         wait = 0
         for epoch in range(opts['epoch_num']):
             # Update learning rate if necessary
@@ -397,76 +293,45 @@ class WAE(object):
             ##### TRAINING LOOP #####
             for it in range(batches_num):
                 # Sample batches of data points and Pz noise
-                data_ids = np.random.choice(l_train_size,
-                                                        opts['batch_size'],
-                                                        replace=True)
-                l_batch_images = data.data[data_ids].astype(np.float32)
-                l_batch_labels = data.labels[data_ids].astype(np.float32)
-                l_batch_mix_noise = sample_pz(opts, self.pz_mean,
-                                                        self.pz_sigma,
-                                                        opts['batch_size'],
-                                                        sampling_mode='all_mixtures')
-                data_ids = l_train_size + np.random.choice(u_train_size,
-                                                       opts['batch_size'],
-                                                       replace=False)
-                u_batch_images = data.data[data_ids].astype(np.float32)
-                u_batch_labels = data.labels[data_ids].astype(np.float32)
-                u_batch_mix_noise = sample_pz(opts, self.pz_mean,
+                data_ids = np.random.choice(train_size, opts['batch_size'],
+                                                        replace=False)
+                batch_images = data.data[data_ids].astype(np.float32)
+                batch_mix_noise = sample_pz(opts, self.pz_mean,
                                                         self.pz_sigma,
                                                         opts['batch_size'],
                                                         sampling_mode='all_mixtures')
                 # Feeding dictionary
-                feed_dict={self.l_points: l_batch_images,
-                           self.l_labels: l_batch_labels,
-                           self.l_sample_mix_noise: l_batch_mix_noise,
-                           self.u_points: u_batch_images,
-                           self.u_sample_mix_noise: u_batch_mix_noise,
+                feed_dict={self.points: batch_images,
+                           self.sample_mix_noise: batch_mix_noise,
                            self.lr_decay: decay,
-                           self.alpha: alpha,
-                           self.l_lmbd: l_lmbda,
-                           self.l_beta: l_beta,
-                           self.u_lmbd: u_lmbda,
-                           self.u_beta: u_beta,
+                           self.lmbd: lmbda,
                            self.is_training: True}
                 # Update encoder and decoder
                 if opts['method']=='swae':
-                    outputs = self.sess.run([self.swae_opt, self.objective,
-                                                        self.l_loss_reconstruct,
-                                                        self.l_cont_penalty,
-                                                        self.l_disc_penalty,
-                                                        self.u_loss_reconstruct,
-                                                        self.u_cont_penalty,
-                                                        self.u_disc_penalty,
-                                                        self.probs],
+                    [_, loss, loss_rec, loss_match] = self.sess.run([self.swae_opt,
+                                                        self.objective,
+                                                        self.loss_reconstruct,
+                                                        self.match_penalty],
                                              feed_dict=feed_dict)
-
-                    loss = outputs[1]
-                    l_loss_rec, l_loss_match, l_loss_xent = outputs[2:5]
-                    u_loss_rec, u_loss_match, u_loss_xent = outputs[5:8]
-                    probs_labels = outputs[-1]
                 elif opts['method']=='vae':
-                    assert False, 'to implement VAE'
-                    [_, loss, loss_rec, loss_match, enc_mw, kl_g, kl_d] = self.sess.run(
+                    [_, loss, loss_rec, loss_match, kl_g, kl_d] = self.sess.run(
                                                         [self.swae_opt,
                                                          self.objective,
                                                          self.loss_reconstruct,
-                                                         self.penalty,
-                                                         self.enc_mixweight,
+                                                         self.match_penalty,
                                                          self.kl_g,
                                                          self.kl_d],
                                                         feed_dict=feed_dict)
                     kl_gau.append(kl_g)
                     kl_dis.append(kl_d)
                 losses.append(loss)
-                losses_rec.append([l_loss_rec,u_loss_rec])
-                losses_match.append([l_loss_match,u_loss_match])
-                losses_xent.append([l_loss_xent,u_loss_xent])
-                #mean_probs += get_mean_probs(u_batch_labels,probs_labels) / batches_num
+                losses_rec.append(loss_rec)
+                losses_match.append(loss_match)
                 ##### TESTING LOOP #####
                 if counter % opts['print_every'] == 0:
                     now = time.time()
                     test_size = np.shape(data.test_data)[0]
-                    te_size = max(int(test_size*0.1),opts['batch_size'])
+                    te_size = max(int(test_size*0.2),opts['batch_size'])
                     te_batches_num = int(te_size/opts['batch_size'])
                     tr_size = test_size - te_size
                     tr_batches_num = int(tr_size/opts['batch_size'])
@@ -475,88 +340,75 @@ class WAE(object):
                     for it_ in range(tr_batches_num):
                         # Sample batches of data points
                         data_ids = te_size + np.random.choice(tr_size,
-                                                       opts['batch_size'],
-                                                       replace=False)
+                                                        opts['batch_size'],
+                                                        replace=True)
                         batch_images = data.test_data[data_ids].astype(np.float32)
                         batch_labels = data.test_labels[data_ids].astype(np.float32)
-                        probs_train = self.sess.run(self.probs,
-                                                        feed_dict={self.u_points:batch_images,
-                                                                   self.is_training:False})
-                        mean_prob = get_mean_probs(batch_labels,probs_train)
+                        pi_train = self.sess.run(self.pi, feed_dict={
+                                                        self.points:batch_images,
+                                                        self.is_training:False})
+                        mean_prob = get_mean_probs(batch_labels,pi_train)
                         mean_probs += mean_prob / tr_batches_num
                     # Determine clusters given mean probs
                     labelled_clusters = relabelling_mask_from_probs(mean_probs)
                     # Test accuracy & loss
-                    u_loss_rec_test, l_loss_rec_test = 0., 0.
-                    u_acc_test = 0.
+                    loss_rec_test = 0.
+                    acc_test = 0.
                     for it_ in range(te_batches_num):
                         # Sample batches of data points
                         data_ids =  np.random.choice(te_size,
                                                         opts['batch_size'],
-                                                        replace=False)
+                                                        replace=True)
                         batch_images = data.test_data[data_ids].astype(np.float32)
                         batch_labels = data.test_labels[data_ids].astype(np.float32)
-                        [ulr, llr, probs_test] = self.sess.run(
-                                                        [self.u_loss_reconstruct,
-                                                         self.l_loss_reconstruct,
-                                                         self.probs],
-                                                        feed_dict={self.l_points:batch_images,
-                                                                   self.l_labels:batch_labels,
-                                                                   self.u_points:batch_images,
+                        [l, pi_test] = self.sess.run([self.loss_reconstruct,
+                                                         self.pi],
+                                                        feed_dict={self.points:batch_images,
                                                                    self.is_training:False})
                         # Computing accuracy
-                        u_acc = accuracy(batch_labels, probs_test, labelled_clusters)
-                        u_acc_test += u_acc / te_batches_num
-                        u_loss_rec_test += ulr / te_batches_num
-                        l_loss_rec_test += llr / te_batches_num
+                        acc = accuracy(batch_labels, pi_test, labelled_clusters)
+                        acc_test += acc / te_batches_num
+                        loss_rec_test += l / te_batches_num
 
                     # Auto-encoding unlabeled test images
-                    [rec_pics_test, encoded, labeling, probs_pics_test] = self.sess.run(
+                    [decoded_test, encoded, p_test] = self.sess.run(
                                                         [self.reconstructed_point,
                                                          self.encoded_point,
-                                                         self.labels_reconstructed,
-                                                         self.probs],
-                                                        feed_dict={self.l_points:data.test_data[:npics],
-                                                                   self.u_points:data.test_data[:npics],
+                                                         self.pi],
+                                                        feed_dict={self.points:data.test_data[:npics],
                                                                    self.is_training:False})
-                    pi0 = self.sess.run(self.pi0,feed_dict={})
                     # Auto-encoding training images
-                    [rec_pics_train, probs_pics_train] = self.sess.run(
+                    [decoded_train, p_train] = self.sess.run(
                                                         [self.reconstructed_point,
-                                                         self.probs],
-                                                        feed_dict={self.u_points:data.data[l_train_size:l_train_size+npics],
+                                                         self.pi],
+                                                        feed_dict={self.points:data.data[200:200+npics],
                                                                    self.is_training:False})
 
                     # Random samples generated by the model
                     sample_gen = self.sess.run(self.decoded,
-                                                        feed_dict={self.u_points:data.data[l_train_size:l_train_size+npics],
+                                                        feed_dict={self.points:data.data[200:200+npics],
                                                                    self.sample_noise: fixed_noise,
                                                                    self.is_training: False})
+
+                    # Prior parameter
+                    pi0 = self.sess.run(self.pi0,feed_dict={})
+
                     # Printing various loss values
                     debug_str = 'EPOCH: %d/%d, BATCH:%d/%d' % (
-                                epoch + 1, opts['epoch_num'],
-                                it + 1, batches_num)
+                                                        epoch + 1, opts['epoch_num'],
+                                                        it + 1, batches_num)
                     logging.error(debug_str)
                     debug_str = 'TRAIN LOSS=%.3f, TEST ACC=%.2f' % (
-                                                    losses[-1],
-                                                    100*u_acc_test)
+                                                        losses[-1],
+                                                        100*acc_test)
                     logging.error(debug_str)
-                    debug_str = 'TEST REC(L/U)=%.3f/%.3f, TRAIN REC(L/U)=%.3f/%.3f' % (
-                                                        opts['alpha']*l_loss_rec_test,
-                                                        u_loss_rec_test,
-                                                        opts['alpha']*losses_rec[-1][0],
-                                                        losses_rec[-1][1])
+                    debug_str = 'TEST REC=%.3f, TRAIN REC=%.3f' % (
+                                                        loss_rec_test,
+                                                        losses_rec[-1])
                     logging.error(debug_str)
-                    debug_str = 'MATCH(L/U)=%.3f/%.3f, XENT(L/U)=%.3f/%.3f' % (
-                                                        opts['l_lambda']*opts['alpha']*losses_match[-1][0],
-                                                        opts['u_lambda']*losses_match[-1][1],
-                                                        opts['l_beta']*opts['alpha']*losses_xent[-1][0],
-                                                        opts['u_beta']*losses_xent[-1][1])
+                    debug_str = 'MATCH=%.3f' % (opts['lambda']*losses_match[-1])
                     logging.error(debug_str)
                     debug_str = 'Clusters ID: %s' % (str(labelled_clusters))
-                    logging.error(debug_str)
-                    labs = np.argmax(labeling,axis=-1)
-                    debug_str = 'Labelling: %s' % (str(labs))
                     logging.error(debug_str)
                     debug_str = 'Priors: %s' % (np.array2string(pi0,precision=3))
                     logging.error(debug_str)
@@ -565,12 +417,12 @@ class WAE(object):
                     #logging.error('Saving images..')
                     save_train(opts, data.data[:npics], data.test_data[:npics],                 # images
                                      data.test_labels[:npics],                                  # labels
-                                     rec_pics_test[:npics], rec_pics_test[:npics],              # reconstructions
-                                     probs_pics_train, probs_pics_test,                         # mixweights
+                                     decoded_train[:npics], decoded_test[:npics],               # reconstructions
+                                     p_train, p_test,                                           # mixweights
                                      encoded,                                                   # encoded points
                                      fixed_noise,                                               # prior samples
                                      sample_gen,                                                # samples
-                                     losses, losses_rec, losses_match, losses_xent,             # loses
+                                     losses, losses_rec, losses_match,                          # loses
                                      kl_gau, kl_dis,                                            # KL terms
                                      work_dir,                                                  # working directory
                                      'res_e%04d_mb%05d.png' % (epoch, it))                      # filename

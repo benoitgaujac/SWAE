@@ -6,33 +6,18 @@ from math import ceil
 
 import pdb
 
-def label_encoder(opts, inputs, reuse=False, is_training=False):
-    with tf.variable_scope("encoder", reuse=reuse):
-        logits = encoder(opts, inputs, opts['e_lab_arch'], opts['e_lab_nlayers'],
-                                                          opts['e_lab_nfilters'],
-                                                          opts['nclasses'],
-                                                          1,
-                                                          'lab_params',
-                                                          opts['batch_norm'],
-                                                          reuse,
-                                                          is_training)
-        # probs = ops.softmax(probs[0],axis=-1)
-        # return probs
-        return logits[0]
 
 def cat_encoder(opts, inputs, reuse=False, is_training=False):
     with tf.variable_scope("encoder", reuse=reuse):
         pi = encoder(opts, inputs, opts['e_cat_arch'], opts['e_cat_nlayers'],
                                                        opts['e_cat_nfilters'],
                                                        opts['nmixtures'],
-                                                       opts['nclasses'],
+                                                       1,
                                                        'cat_params',
                                                        opts['batch_norm'],
                                                        reuse,
                                                        is_training)
-        pi = tf.stack(pi,axis=1)
-        # pi = ops.softmax(pi,axis=-1)
-        return pi
+        return pi[0]
 
 def gaussian_encoder(opts, inputs, reuse=False, is_training=False):
     with tf.variable_scope('encoder', reuse=reuse):
@@ -125,24 +110,6 @@ def continuous_decoder(opts, noise, reuse=False, is_training=True):
                                                opts['batch_norm'],
                                                reuse,
                                                is_training)
-    return outputs, logits
-
-def discrete_decoder(opts, noise, reuse=False, is_training=True):
-    with tf.variable_scope('generator/disc_gen', reuse=reuse):
-        outputs, logits = [], []
-        for i in range(opts["nmixtures"]):
-            input = tf.expand_dims(noise[:,i],axis=0)
-            _, logit = decoder(opts, input, 'mlp', opts['g_disc_nlayers'],
-                                                opts['g_disc_nfilters'],
-                                                [opts['nclasses']],
-                                                'mix%d' % i,
-                                                opts['batch_norm'],
-                                                reuse,
-                                                is_training)
-            outputs.append(ops.softmax(logit,axis=-1))
-            logits.append(logit)
-    outputs = tf.concat(outputs,axis=0)
-    logits = tf.concat(logits,axis=0)
     return outputs, logits
 
 def decoder(opts, inputs, archi, num_layers, num_units, output_shape,

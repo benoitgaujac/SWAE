@@ -83,11 +83,20 @@ def get_nearest(opts,means_list,mean):
     return nearest
 
 
-def init_cat_prior(opts):
+def init_learnable_cat_prior(opts):
     """
     Initialize parameters of discrete distribution
     """
     with tf.variable_scope('prior'):
-        mean_param = tf.get_variable("pi0", [opts['nmixtures']], initializer=cat_initializer)
-    logits = tf.nn.softmax(mean_param)
-    return logits
+        logits = tf.get_variable("pi0", [opts['nmixtures']], initializer=cat_initializer)
+    mean_params = tf.nn.softmax(logits)
+    return mean_params
+
+def init_cat_prior(opts):
+    """
+    Initialize parameters of discrete distribution
+    """
+    mean_params = tf.constant(1/opts['nmixtures'], shape=[opts['nmixtures']],
+                                                            dtype=tf.float32,
+                                                            name='pi0')
+    return mean_params

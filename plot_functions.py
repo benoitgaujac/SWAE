@@ -19,7 +19,7 @@ def save_train(opts, sample_train, sample_test,
                      encoded,
                      samples_prior,
                      samples,
-                     losses, losses_rec, losses_match, losses_xent,
+                     losses, losses_rec, losses_match,
                      kl_gau, kl_dis,
                      work_dir,
                      filename):
@@ -204,13 +204,9 @@ def save_train(opts, sample_train, sample_test,
     y = np.log(losses[::x_step])
     plt.plot(x, y, linewidth=3, color='black', label='loss')
 
-    l = np.array(losses_rec)[:,0]
-    y = np.log(l[::x_step] * opts['alpha'])
-    plt.plot(x, y, linewidth=2, color='red', linestyle=':', label='lrec')
-
-    l = np.array(losses_rec)[:,1]
+    l = np.array(losses_rec)
     y = np.log(l[::x_step])
-    plt.plot(x, y, linewidth=2, color='red', label='urec')
+    plt.plot(x, y, linewidth=2, color='red', label='rec')
 
     if len(kl_gau)>0:
         y = np.log(np.abs(losses_match[::x_step]))
@@ -219,21 +215,9 @@ def save_train(opts, sample_train, sample_test,
         y = np.log(kl_gau[::x_step])
         plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='log(cont KL)')
     else:
-        l = np.array(losses_match)[:,0]
-        y = np.log(opts['l_lambda']*opts['alpha']*np.abs(l[::x_step]))
-        plt.plot(x, y, linewidth=2, color='blue', linestyle=':', label='|lMMD|)')
-
-        l = np.array(losses_match)[:,1]
-        y = np.log(opts['u_lambda']*np.abs(l[::x_step]))
-        plt.plot(x, y, linewidth=2, color='blue', label='|uMMD|')
-
-        l = np.array(losses_xent)[:,0]
-        y = np.log(opts['l_beta']*opts['alpha']*np.abs(l[::x_step]))
-        plt.plot(x, y, linewidth=2, color='green', linestyle=':', label='|lKL|')
-
-        l = np.array(losses_xent)[:,1]
-        y = np.log(opts['u_beta']*np.abs(l[::x_step]))
-        plt.plot(x, y, linewidth=2, color='green', label='|uKL|')
+        l = np.array(losses_match)
+        y = np.log(opts['lambda']*np.abs(l[::x_step]))
+        plt.plot(x, y, linewidth=2, color='blue', label='|MMD|')
 
     if len(kl_dis)>0:
         y = np.log(kl_dis[::x_step])
@@ -262,11 +246,11 @@ def save_train(opts, sample_train, sample_test,
         np.savez(os.path.join(save_path,name),
                     test_data=sample_test,
                     rec_test=rec_test,
-                    mw=enc_mw_test,
+                    probs_test=probs_test,
+                    probs_train=probs_train,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
                     loss_match=np.array(losses_match[::x_step]),
-                    loss_xent=np.array(losses_xent[::x_step]),
                     kl_cont=np.array(kl_gau[::x_step]),
                     kl_disc=np.array(kl_dis[::x_step]))
     else:
@@ -277,8 +261,7 @@ def save_train(opts, sample_train, sample_test,
                     probs_train=probs_train,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
-                    loss_match=np.array(np.array(losses_match[::x_step])),
-                    loss_xent=np.array(np.array(losses_xent[::x_step])))
+                    loss_match=np.array(np.array(losses_match[::x_step])))
 
 def save_vizu(opts, data_train, data_test,              # images
                     label_test,                         # labels
