@@ -446,7 +446,7 @@ class WAE(object):
                     debug_str = 'TRAIN LOSS=%.3f' % (losses[-1])
                     logging.error(debug_str)
                     debug_str = 'ACC=%.2f, BLUR=%.3f ' % (100*accuracies[-1],
-                                                        blurr_vals[-1])
+                                                        mean_blurr[-1])
                     logging.error(debug_str)
                     if opts['method']=='swae':
                         debug_str = 'TEST REC=%.3f, TRAIN REC=%.3f, '\
