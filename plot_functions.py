@@ -174,8 +174,8 @@ def save_train(opts, sample_train, sample_test,
                                 metric='correlation').fit_transform(np.concatenate((encoded,samples_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
-                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
-                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
+                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
+                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
     plt.scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
                             color='navy', s=10, marker='*',label='Pz')
@@ -272,7 +272,7 @@ def save_train(opts, sample_train, sample_test,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
                     loss_rec_test=np.array(loss_rec_test),
-                    loss_vae=np.array(losses_VAE[::x_step]),
+                    loss_vae=np.array(losses_vae[::x_step]),
                     loss_match=np.array(np.array(losses_match[::x_step])),
                     fid=np.array(blurr_vals),
                     acc=np.array(accuracies))

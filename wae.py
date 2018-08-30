@@ -64,20 +64,26 @@ class WAE(object):
         self.reconstructed, self.logits_reconstructed = self.decoder(
                                                         self.mixtures_encoded,
                                                         False)
-        self.vae_reconstructed = tf.distributions.Bernoulli(logits=self.logits_reconstructed,
-                                                        dtype=tf.float32)
+        flat_logits = tf.reshape(self.logits_reconstructed,[-1])
+        log_probs = tf.stack([flat_logits,tf.log(1.-tf.exp(flat_logits))],axis=-1)
+        flat_vae_reconstructed = tf.multinomial(logits=log_probs,
+                                                        num_samples=1)
+        self.vae_reconstructed = tf.reshape(flat_vae_reconstructed,
+                                                        tf.shape(self.reconstructed))
         # --- Reconstructing inputs (only for visualization)
-        idx = tf.reshape(tf.multinomial(tf.nn.log_softmax(logit),1),[-1])
+        idx = tf.reshape(tf.multinomial(tf.nn.log_softmax(logits),1),[-1])
         mix_idx = tf.stack([range,idx],axis=-1)
         self.encoded_point = tf.gather_nd(self.mixtures_encoded,mix_idx)
         self.reconstructed_point = tf.gather_nd(self.reconstructed,mix_idx)
         self.vae_reconstructed = tf.gather_nd(self.vae_reconstructed,mix_idx)
 
         # --- Sampling from model (only for generation)
-        self.decoded, self.decoded_logits = self.decoder(self.sample_noise,
+        self.decoded, self.logits_decoded = self.decoder(self.sample_noise,
                                                         True)
-        self.vae_decoded = tf.distributions.Bernoulli(logits=self.decoded_logits,
-                                                        dtype=tf.float32)
+        flat_logits = tf.reshape(self.logits_decoded,[-1])
+        log_probs = tf.stack([flat_logits,tf.log(1.-tf.exp(flat_logits))],axis=-1)
+        flat_vae_decoded = tf.multinomial(logits=log_probs, num_samples=1)
+        self.vae_decoded = tf.reshape(flat_vae_decoded, tf.shape(self.decoded))
         # --- Objectives, losses, penalties, pretraining
         # Compute reconstruction cost
         self.loss_reconstruct = reconstruction_loss(opts, self.pi,
@@ -241,7 +247,6 @@ class WAE(object):
 
     def compute_blurriness(self):
         images = self.points
-        sample_size = tf.shape(self.points)[0]
         # First convert to greyscale
         if self.data_shape[-1] > 1:
             # We have RGB
@@ -366,7 +371,7 @@ class WAE(object):
                     tr_size = test_size - te_size
                     tr_batches_num = int(tr_size/opts['batch_size'])
                     # Determine clusters ID
-                    mean_probs = np.zeros((10,10))
+                    mean_probs = np.zeros((opts['nclasses'],opts['nmixtures']))
                     for it_ in range(tr_batches_num):
                         # Sample batches of data points
                         data_ids = te_size + np.random.choice(tr_size,
@@ -377,10 +382,10 @@ class WAE(object):
                         pi_train = self.sess.run(self.pi, feed_dict={
                                                         self.points:batch_images,
                                                         self.is_training:False})
-                        mean_prob = get_mean_probs(batch_labels,pi_train)
+                        mean_prob = get_mean_probs(opts,batch_labels,pi_train)
                         mean_probs += mean_prob / tr_batches_num
                     # Determine clusters given mean probs
-                    labelled_clusters = relabelling_mask_from_probs(mean_probs)
+                    labelled_clusters = relabelling_mask_from_probs(opts, mean_probs)
                     # Test accuracy & loss
                     test_rec = 0.
                     acc_test = 0.
@@ -420,8 +425,9 @@ class WAE(object):
                                                         feed_dict={self.points:data.data[200:200+npics],
                                                                    self.sample_noise: fixed_noise,
                                                                    self.is_training: False})
+                    flat_samples = np.reshape(sample_gen,[-1]+self.data_shape)
                     gen_blurr = self.sess.run(self.blurriness,
-                                                        feed_dict={self.points: sample_gen})
+                                                        feed_dict={self.points: flat_samples})
                     blurr_vals.append(np.min(gen_blurr))
 
 
@@ -526,10 +532,10 @@ class WAE(object):
                                   feed_dict={self.sample_points: batch_images,
                                              self.is_training: False})
 
-            mean_prob = get_mean_probs(batch_labels,prob)
+            mean_prob = get_mean_probs(opts,batch_labels,prob)
             mean_probs += mean_prob / tr_batches_num
         # Determine clusters given mean probs
-        labelled_clusters = relabelling_mask_from_probs(mean_probs)
+        labelled_clusters = relabelling_mask_from_probs(opts, mean_probs)
         logging.error('Clusters ID:')
         print(labelled_clusters)
 

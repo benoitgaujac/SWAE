@@ -1,7 +1,7 @@
 import sys
 import time
 import os
-from math import sqrt, cos, sin, pi
+from math import sqrt, cos, sin, pi, ceil
 import numpy as np
 import tensorflow as tf
 
@@ -35,7 +35,7 @@ def sample_pz(opts, means, covs, num=100, sampling_mode='one_mixture'):
         mixture = np.random.randint(opts['nmixtures'],size=num)
         noise = noises[np.arange(num),mixture]
     elif sampling_mode == 'per_mixture':
-        samples_per_mixture = int(num / opts['nmixtures'])
+        samples_per_mixture = ceil(num / opts['nmixtures'])
         # class_i = np.repeat(np.arange(opts['nmixtures']),samples_per_mixture,axis=0)
         # mixture = np.zeros([num,],dtype='int32')
         # mixture[(num % opts['nmixtures']):] = class_i

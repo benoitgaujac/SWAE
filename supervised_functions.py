@@ -16,10 +16,10 @@ def accuracy(labels, probs, clusters_id=None):
         correct_prediction = (preds==labels)
     return np.mean(correct_prediction)
 
-def get_mean_probs(labels,probs):
+def get_mean_probs(opts,labels,probs):
     mean_probs = []
     num_pics = np.shape(probs)[0]
-    for i in range(10):
+    for i in range(opts['nclasses']):
         prob = [probs[k] for k in range(num_pics) if labels[k]==i]
         prob = np.mean(np.stack(prob,axis=0),axis=0)
         mean_probs.append(prob)
@@ -29,12 +29,14 @@ def get_mean_probs(labels,probs):
     cluster_to_digit = relabelling_mask_from_probs(mean_probs)
     return cluster_to_digit
 
-def relabelling_mask_from_probs(mean_probs):
+def relabelling_mask_from_probs(opts, mean_probs):
+    if opts['nmixtures']>1:
+        assert opts['nmixtures']>=opts['nclasses'],\
+        'Need more mixtures than classes to make accuracy'
     probs_copy = mean_probs.copy()
-    nmixtures = np.shape(mean_probs)[-1]
     k_vals = []
-    min_prob = np.zeros(nmixtures)
-    mask = np.arange(10)
+    min_prob = np.zeros(opts['nmixtures'])
+    mask = np.arange(opts['nmixtures'])
     while np.amax(probs_copy) > 0.:
         max_probs = np.amax(probs_copy,axis=-1)
         digit_idx = np.argmax(max_probs)
@@ -43,17 +45,19 @@ def relabelling_mask_from_probs(mean_probs):
         k_val = k_val_sort[i]
         while k_val in k_vals:
             i -= 1
+            if i < -opts['nclasses']:
+                break
             k_val = k_val_sort[i]
         k_vals.append(k_val)
         mask[k_val] = digit_idx
         probs_copy[digit_idx] = min_prob
     return mask
 
-def relabelling_mask_from_entropy(mean_probs, entropies):
+def relabelling_mask_from_entropy(opts, mean_probs, entropies):
     k_vals = []
     max_entropy_state = np.ones(len(entropies))/len(entropies)
     max_entropy = scistats.entropy(max_entropy_state)
-    mask = np.arange(10)
+    mask = np.arange(opts['nmixtures'])
     while np.amin(entropies) < max_entropy:
         digit_idx = np.argmin(entropies)
         k_val_sort = np.argsort(mean_probs[digit_idx])
