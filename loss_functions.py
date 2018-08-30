@@ -191,7 +191,7 @@ def wae_recons_loss(opts, pi, x1, x2):
     # Compute loss
     loss = tf.multiply(cont_cost, pi)
     loss = tf.reduce_sum(loss,axis=-1)
-    loss = .05 * tf.reduce_mean(loss) #coef: .2 for L2 and L1, .05 for L2sqr,
+    loss = 1. * tf.reduce_mean(loss) #coef: .2 for L2 and L1, .05 for L2sqr,
     return loss
 
 
