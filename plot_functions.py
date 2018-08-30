@@ -22,7 +22,7 @@ def save_train(opts, sample_train, sample_test,
                      losses, losses_match,
                      losses_rec, loss_rec_test, losses_vae,
                      kl_gau, kl_dis,
-                     blurr_vals,
+                     mean_blurr, true_blurr,
                      accuracies,
                      work_dir,
                      filename):
@@ -174,8 +174,8 @@ def save_train(opts, sample_train, sample_test,
                                 metric='correlation').fit_transform(np.concatenate((encoded,samples_prior),axis=0))
 
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
-                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
-                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
+                #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
+                c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     plt.colorbar()
     plt.scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
                             color='navy', s=10, marker='*',label='Pz')
@@ -261,7 +261,8 @@ def save_train(opts, sample_train, sample_test,
                     loss_match=np.array(losses_match[::x_step]),
                     kl_cont=np.array(kl_gau[::x_step]),
                     kl_disc=np.array(kl_dis[::x_step]),
-                    fid=np.array(blurr_vals),
+                    mean_fid=np.array(mean_blurr),
+                    true_fid=np.array(true_blurr),
                     acc=np.array(accuracies))
     else:
         np.savez(os.path.join(save_path,name),
@@ -274,7 +275,8 @@ def save_train(opts, sample_train, sample_test,
                     loss_rec_test=np.array(loss_rec_test),
                     loss_vae=np.array(losses_vae[::x_step]),
                     loss_match=np.array(np.array(losses_match[::x_step])),
-                    fid=np.array(blurr_vals),
+                    mean_fid=np.array(mean_blurr),
+                    true_fid=np.array(true_blurr),
                     acc=np.array(accuracies))
 
 def save_vizu(opts, data_train, data_test,              # images
