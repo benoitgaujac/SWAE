@@ -19,8 +19,11 @@ def save_train(opts, sample_train, sample_test,
                      encoded,
                      samples_prior,
                      samples,
-                     losses, losses_rec, losses_match, losses_VAE,
+                     losses, losses_match,
+                     losses_rec, loss_rec_test, losses_vae,
                      kl_gau, kl_dis,
+                     blurr_vals,
+                     accuracies,
                      work_dir,
                      filename):
 
@@ -254,9 +257,12 @@ def save_train(opts, sample_train, sample_test,
                     probs_train=probs_train,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
+                    loss_rec_test=np.array(loss_rec_test),
                     loss_match=np.array(losses_match[::x_step]),
                     kl_cont=np.array(kl_gau[::x_step]),
-                    kl_disc=np.array(kl_dis[::x_step]))
+                    kl_disc=np.array(kl_dis[::x_step]),
+                    fid=np.array(blurr_vals),
+                    acc=np.array(accuracies))
     else:
         np.savez(os.path.join(save_path,name),
                     test_data=sample_test,
@@ -265,8 +271,11 @@ def save_train(opts, sample_train, sample_test,
                     probs_train=probs_train,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
+                    loss_rec_test=np.array(loss_rec_test),
                     loss_vae=np.array(losses_VAE[::x_step]),
-                    loss_match=np.array(np.array(losses_match[::x_step])))
+                    loss_match=np.array(np.array(losses_match[::x_step])),
+                    fid=np.array(blurr_vals),
+                    acc=np.array(accuracies))
 
 def save_vizu(opts, data_train, data_test,              # images
                     label_test,                         # labels

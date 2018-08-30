@@ -48,13 +48,14 @@ config_mnist['mmd_kernel'] = 'IMQ' # RBF, IMQ
 config_mnist['zdim'] = 8
 config_mnist['nmixtures'] = 1
 config_mnist['nclasses'] = 10
-config_mnist['sigma_prior'] = 1.
-config_mnist['prior_threshold'] = sqrt(6. * config_mnist['sigma_prior'] / config_mnist['zdim'])
+config_mnist['sigma_prior'] = .1
+coef = 2. * config_mnist['sigma_prior'] / config_mnist['zdim'] / 3.
+config_mnist['prior_threshold'] = coef * 3.**2 
 config_mnist['pz_scale'] = 1.
 
 # NN set up
 config_mnist['conv_filters_dim'] = 3
-config_mnist['init_std'] = 0.099999
+config_mnist['init_std'] = 0.0099999
 config_mnist['init_bias'] = 0.0
 
 config_mnist['e_means'] = 'learnable'

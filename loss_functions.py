@@ -22,7 +22,7 @@ def matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
         kl_g, kl_d, match_loss = wae_matching_penalty(opts, pi0, pi,
                                                         samples_pz, samples_qz)
     elif opts['method']=='vae':
-        kl_g, kl_d, match_loss = vae_matching_penalty(opts, pi,
+        kl_g, kl_d, match_loss = vae_matching_penalty(opts, pi0, pi,
                                                         encoded_mean, encoded_logsigma,
                                                         pz_mean, pz_sigma)
     else:
@@ -30,7 +30,7 @@ def matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
     return kl_g, kl_d, match_loss
 
 
-def vae_matching_penalty(opts, pi, encoded_mean, encoded_logsigma,
+def vae_matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
                                                 pz_mean, pz_sigma):
     """
     Compute the VAE's matching penalty
@@ -45,7 +45,7 @@ def vae_matching_penalty(opts, pi, encoded_mean, encoded_logsigma,
     kl_g = tf.reduce_mean(kl_g)
     # Discrete KL
     eps = 1e-10
-    kl_d = tf.log(eps+pi) + tf.log(tf.cast(opts['nmixtures'],dtype=tf.float32))
+    kl_d = tf.log(eps+pi) - tf.log(pi0)
     kl_d = tf.multiply(kl_d,pi)
     kl_d = tf.reduce_sum(kl_d,axis=-1)
     kl_d = tf.reduce_mean(kl_d)

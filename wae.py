@@ -52,10 +52,10 @@ class WAE(object):
         self.pz_mean, self.pz_sigma = init_gaussian_prior(opts)
         self.pi0 = init_cat_prior(opts)
         # --- Encoding inputs
-        logit, self.enc_mean, self.enc_logSigma = self.encoder(
+        logits, self.enc_mean, self.enc_logSigma = self.encoder(
                                                         self.points,
                                                         False)
-        self.pi = ops.softmax(logit,axis=-1)
+        self.pi = ops.softmax(logits,axis=-1)
         # --- Sampling from encoded MoG prior
         self.mixtures_encoded = sample_mixtures(opts, self.enc_mean,
                                                         tf.exp(self.enc_logSigma),
@@ -64,22 +64,26 @@ class WAE(object):
         self.reconstructed, self.logits_reconstructed = self.decoder(
                                                         self.mixtures_encoded,
                                                         False)
+        self.vae_reconstructed = tf.distributions.Bernoulli(logits=self.logits_reconstructed,
+                                                        dtype=tf.float32)
         # --- Reconstructing inputs (only for visualization)
         idx = tf.reshape(tf.multinomial(tf.nn.log_softmax(logit),1),[-1])
         mix_idx = tf.stack([range,idx],axis=-1)
         self.encoded_point = tf.gather_nd(self.mixtures_encoded,mix_idx)
         self.reconstructed_point = tf.gather_nd(self.reconstructed,mix_idx)
-        self.reconstructed_logit = tf.gather_nd(self.logits_reconstructed,mix_idx)
+        self.vae_reconstructed = tf.gather_nd(self.vae_reconstructed,mix_idx)
 
         # --- Sampling from model (only for generation)
         self.decoded, self.decoded_logits = self.decoder(self.sample_noise,
                                                         True)
+        self.vae_decoded = tf.distributions.Bernoulli(logits=self.decoded_logits,
+                                                        dtype=tf.float32)
         # --- Objectives, losses, penalties, pretraining
         # Compute reconstruction cost
         self.loss_reconstruct = reconstruction_loss(opts, self.pi,
                                                         self.points,
                                                         self.reconstructed)
-        self.VAE_reconstruct = vae_recons_loss(opts, self.pi,
+        self.wae_log_reconstruct = vae_recons_loss(opts, self.pi,
                                                         self.points,
                                                         self.reconstructed)
         # Compute matching penalty cost
@@ -90,7 +94,8 @@ class WAE(object):
                                                         self.sample_mix_noise, self.mixtures_encoded)
         # Compute Unlabeled obj
         self.objective = self.loss_reconstruct + self.lmbd * self.match_penalty
-
+        # FID score
+        self.blurriness = self.compute_blurriness()
         # Pre Training
         self.pretrain_loss()
 
@@ -234,6 +239,22 @@ class WAE(object):
         logging.error('Pretraining the encoder done.')
         logging.error ('Loss after %d iterations: %.3f' % (steps_max,pre_loss))
 
+    def compute_blurriness(self):
+        images = self.points
+        sample_size = tf.shape(self.points)[0]
+        # First convert to greyscale
+        if self.data_shape[-1] > 1:
+            # We have RGB
+            images = tf.image.rgb_to_grayscale(images)
+        # Next convolve with the Laplace filter
+        lap_filter = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        lap_filter = lap_filter.reshape([3, 3, 1, 1])
+        conv = tf.nn.conv2d(images, lap_filter,
+                            strides=[1, 1, 1, 1], padding='VALID')
+        _, lapvar = tf.nn.moments(conv, axes=[1, 2, 3])
+        return lapvar
+
+
     def train(self, data, MODEL_DIR, WEIGHTS_FILE):
         """
         Train MoG model with chosen method
@@ -271,8 +292,16 @@ class WAE(object):
                                                         opts['plot_num_pics'],
                                                         sampling_mode = 'per_mixture')
         self.start_time = time.time()
+
+        # Compute bluriness of real data
+        real_blurr = self.sess.run(self.blurriness, feed_dict={
+                                                        self.points: data.data[:npics]})
+        logging.error('Real pictures sharpness = %.5f' % np.min(real_blurr))
+        print('')
+
         losses, losses_rec, losses_match, losses_VAE = [], [], [], []
         kl_gau, kl_dis  = [], []
+        loss_rec_test, accuracies, blurr_vals = [], [], []
         decay, counter = 1., 0
         wait = 0
         for epoch in range(opts['epoch_num']):
@@ -310,7 +339,7 @@ class WAE(object):
                     [_, loss, loss_rec, loss_vae, loss_match] = self.sess.run([self.swae_opt,
                                                         self.objective,
                                                         self.loss_reconstruct,
-                                                        self.VAE_reconstruct,
+                                                        self.wae_log_reconstruct,
                                                         self.match_penalty],
                                                         feed_dict=feed_dict)
                     losses_VAE.append(loss_vae)
@@ -353,7 +382,7 @@ class WAE(object):
                     # Determine clusters given mean probs
                     labelled_clusters = relabelling_mask_from_probs(mean_probs)
                     # Test accuracy & loss
-                    loss_rec_test = 0.
+                    test_rec = 0.
                     acc_test = 0.
                     for it_ in range(te_batches_num):
                         # Sample batches of data points
@@ -369,8 +398,9 @@ class WAE(object):
                         # Computing accuracy
                         acc = accuracy(batch_labels, pi_test, labelled_clusters)
                         acc_test += acc / te_batches_num
-                        loss_rec_test += l / te_batches_num
-
+                        test_rec += l / te_batches_num
+                    accuracies.append(acc_test)
+                    loss_rec_test.append(test_rec)
                     # Auto-encoding unlabeled test images
                     [decoded_test, encoded, p_test] = self.sess.run(
                                                         [self.reconstructed_point,
@@ -390,6 +420,10 @@ class WAE(object):
                                                         feed_dict={self.points:data.data[200:200+npics],
                                                                    self.sample_noise: fixed_noise,
                                                                    self.is_training: False})
+                    gen_blurr = self.sess.run(self.blurriness,
+                                                        feed_dict={self.points: sample_gen})
+                    blurr_vals.append(np.min(gen_blurr))
+
 
                     # Prior parameter
                     pi0 = self.sess.run(self.pi0,feed_dict={})
@@ -399,12 +433,13 @@ class WAE(object):
                                                         epoch + 1, opts['epoch_num'],
                                                         it + 1, batches_num)
                     logging.error(debug_str)
-                    debug_str = 'TRAIN LOSS=%.3f, TEST ACC=%.2f' % (
-                                                        losses[-1],
-                                                        100*acc_test)
+                    debug_str = 'TRAIN LOSS=%.3f' % (losses[-1])
+                    logging.error(debug_str)
+                    debug_str = 'ACC=%.2f, BLUR=%.3f ' % (100*accuracies[-1],
+                                                        blurr_vals[-1])
                     logging.error(debug_str)
                     debug_str = 'TEST REC=%.3f, TRAIN REC=%.3f' % (
-                                                        loss_rec_test,
+                                                        loss_rec_test[-1],
                                                         losses_rec[-1])
                     logging.error(debug_str)
                     debug_str = 'MATCH=%.3f' % (opts['lambda']*losses_match[-1])
@@ -416,15 +451,18 @@ class WAE(object):
                     print('')
                     # Making plots
                     #logging.error('Saving images..')
-                    save_train(opts, data.data[200:200+npics], data.test_data[:npics],                 # images
+                    save_train(opts, data.data[200:200+npics], data.test_data[:npics],          # images
                                      data.test_labels[:npics],                                  # labels
                                      decoded_train[:npics], decoded_test[:npics],               # reconstructions
                                      p_train, p_test,                                           # mixweights
                                      encoded,                                                   # encoded points
                                      fixed_noise,                                               # prior samples
                                      sample_gen,                                                # samples
-                                     losses, losses_rec, losses_match, losses_VAE,              # loses
+                                     losses, losses_match,                                      # losses
+                                     losses_rec, loss_rec_test, losses_VAE,                     # rec losses
                                      kl_gau, kl_dis,                                            # KL terms
+                                     blurr_vals,                                                # FID score
+                                     accuracies,                                                # acc
                                      work_dir,                                                  # working directory
                                      'res_e%04d_mb%05d.png' % (epoch, it))                      # filename
 

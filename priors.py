@@ -75,9 +75,9 @@ def get_nearest(opts,means_list,mean):
     if len(means_list)==0:
         return opts['prior_threshold']
     else:
-        nearest = np.sqrt(np.sum(np.square(means_list[0]-mean)))
+        nearest = np.sum(np.square(means_list[0]-mean))
         for e in means_list[1:]:
-            dist = np.sqrt(np.sum(np.square(e-mean)))
+            dist = np.sum(np.square(e-mean))
             if dist<nearest:
                 nearest = dist
     return nearest
