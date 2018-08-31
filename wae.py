@@ -62,21 +62,12 @@ class WAE(object):
                                                         sample_size,'tensorflow')
         # --- Decoding encoded points (i.e. reconstruct)
         self.reconstructed, _ = self.decoder(self.mixtures_encoded,False)
-        #self.reconstructed, self.logits_reconstructed = self.decoder(self.mixtures_encoded,
-        #                                                False)
-        # flat_logits = tf.reshape(self.logits_reconstructed,[-1])
-        # log_probs = tf.stack([flat_logits,tf.log(1.-tf.exp(flat_logits))],axis=-1)
-        # flat_vae_reconstructed = tf.multinomial(logits=log_probs,
-        #                                                 num_samples=1)
-        # self.vae_reconstructed = tf.reshape(flat_vae_reconstructed,
-        #                                                 tf.shape(self.reconstructed))
+
         # --- Reconstructing inputs (only for visualization)
         idx = tf.reshape(tf.multinomial(tf.nn.log_softmax(logits),1),[-1])
         mix_idx = tf.stack([range,idx],axis=-1)
         self.encoded_point = tf.gather_nd(self.mixtures_encoded,mix_idx)
         self.reconstructed_point = tf.gather_nd(self.reconstructed,mix_idx)
-        #self.vae_reconstructed = tf.gather_nd(self.vae_reconstructed,mix_idx)
-
         # --- Sampling from model (only for generation)
         self.decoded, self.logits_decoded = self.decoder(self.sample_noise,
                                                         True)
@@ -84,6 +75,7 @@ class WAE(object):
         log_probs = tf.stack([flat_logits,tf.log(1.-tf.exp(flat_logits))],axis=-1)
         flat_vae_decoded = tf.multinomial(logits=log_probs, num_samples=1)
         self.vae_decoded = tf.reshape(flat_vae_decoded, tf.shape(self.decoded))
+
         # --- Objectives, losses, penalties, pretraining
         # Compute reconstruction cost
         self.loss_reconstruct = reconstruction_loss(opts, self.pi,
