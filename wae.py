@@ -170,8 +170,9 @@ class WAE(object):
         else:
             self.swae_opt = opt.minimize(loss=self.objective, var_list=ae_vars)
         # Pretraining optimizer
-        pre_opt = self.optimizer(0.001)
-        self.pre_opt = pre_opt.minimize(loss=self.pre_loss, var_list=encoder_vars+prior_vars)
+        if opts['e_pretrain']:
+            pre_opt = self.optimizer(0.001)
+            self.pre_opt = pre_opt.minimize(loss=self.pre_loss, var_list=encoder_vars+prior_vars)
 
     def encoder(self, input_points, reuse=False):
         ## Categorical encoding
@@ -179,7 +180,7 @@ class WAE(object):
                                                     is_training=self.is_training)
         ## Gaussian encoding
         if self.opts['e_means']=='fixed':
-            sample_size = tf.shape(self.points,out_type=tf.int64)[0]            
+            sample_size = tf.shape(self.points,out_type=tf.int64)[0]
             eps = tf.zeros([tf.cast(sample_size, dtype=tf.int32), self.opts['nmixtures'],
                                                     self.opts['zdim']],dtype=tf.float32)
             enc_mean = self.pz_mean + eps
