@@ -96,31 +96,29 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
     distances = square_dist(opts, sample_qz, norms_qz, sample_pz, norms_pz)
 
     if kernel == 'RBF':
-        assert False, 'To implement'
         # Median heuristic for the sigma^2 of Gaussian kernel
         sigma2_k = tf.nn.top_k(
             tf.reshape(distances, [-1]), half_size).values[half_size - 1]
         sigma2_k += tf.nn.top_k(
             tf.reshape(distances_qz, [-1]), half_size).values[half_size - 1]
-
-        if opts['verbose']:
-            sigma2_k = tf.Print(sigma2_k, [sigma2_k], 'Kernel width:')
-
         # First 2 terms of the MMD
-        self.res1 = tf.exp( - distances_qz / 2. / sigma2_k)
-        self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixweight))
-        self.res1 = tf.multiply(tf.transpose(self.res1),tf.transpose(self.enc_mixweight))
-        self.res1 += tf.exp( - distances_pz / 2. / sigma2_k) / (opts['nmixtures']*opts['nmixtures'])
+        res1_qz = tf.exp( - distances_qz / 2. / sigma2_k)
+        shpe = [-1,opts['nmixtures']]
+        res1_qz = tf.multiply(res1_qz, tf.reshape(pi,shpe+[1,1]))
+        res1_qz = tf.multiply(res1_qz, tf.reshape(pi,[1,1]+shpe))
+        res1_pz = tf.exp( - distances_pz / 2. / sigma2_k)
+        res1_pz = tf.multiply(res1_pz,tf.reshape(pi0,[1,opts['nmixtures'],1,1]))
+        res1_pz = tf.multiply(res1_pz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
+        res1 = res1_qz + res1_pz
         # Correcting for diagonal terms
-        self.res1_diag = tf.diag_part(tf.reduce_sum(self.res1,axis=[1,2]))
-        self.res1 = (tf.reduce_sum(self.res1)\
-                - tf.reduce_sum(self.res1_diag)) / (nf * nf - nf)
+        res1_diag = tf.trace(tf.reduce_sum(res1,axis=[1,-1]))
+        res1 = (tf.reduce_sum(res1) - res1_diag) / (nf * nf - nf)
         # Cross term of the MMD
-        self.res2 = tf.exp( - distances / 2. / sigma2_k)
-        self.res2 =  tf.multiply(tf.transpose(self.res2),tf.transpose(self.enc_mixweight))
-        self.res2 = tf.transpose(self.res2) / opts['nmixtures']
-        self.res2 = tf.reduce_sum(self.res2) * 2. / (nf * nf)
-        stat = self.res1 - self.res2
+        res2 = tf.exp( - distances / 2. / sigma2_k)
+        res2 = tf.multiply(res2, tf.reshape(pi,shpe+[1,1]))
+        res2 = tf.multiply(res2,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
+        res2 = tf.reduce_sum(res2) / (nf * nf)
+        res = res1 - 2. * res2
     elif kernel == 'IMQ':
         # k(x, y) = C / (C + ||x - y||^2)
         Cbase = 2 * opts['zdim'] * sigma2_p
