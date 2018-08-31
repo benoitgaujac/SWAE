@@ -179,6 +179,7 @@ class WAE(object):
                                                     is_training=self.is_training)
         ## Gaussian encoding
         if self.opts['e_means']=='fixed':
+            sample_size = tf.shape(self.points,out_type=tf.int64)[0]            
             eps = tf.zeros([tf.cast(sample_size, dtype=tf.int32), self.opts['nmixtures'],
                                                     self.opts['zdim']],dtype=tf.float32)
             enc_mean = self.pz_mean + eps
