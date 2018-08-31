@@ -125,7 +125,7 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
         # k(x, y) = C / (C + ||x - y||^2)
         Cbase = 2 * opts['zdim'] * sigma2_p
         res = 0.
-        for scale in [.1, .2, .5, 1., 2., 5., 10.]:
+        for scale in [.1, .2, .5, 1., 2., 5., 10., 20., 50., 100.]:
             C = Cbase * scale
             # First 2 terms of the MMD
             res1_qz = C / (C + distances_qz)
