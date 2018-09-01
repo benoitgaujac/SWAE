@@ -184,14 +184,14 @@ class WAE(object):
             eps = tf.zeros([tf.cast(sample_size, dtype=tf.int32), self.opts['nmixtures'],
                                                     self.opts['zdim']],dtype=tf.float32)
             enc_mean = self.pz_mean + eps
-            enc_logSigma = self.opts['init_e_std']*tf.ones([
+            enc_logSigma = tf.log(self.opts['sigma_prior'])*tf.ones([
                                                     tf.cast(sample_size,dtype=tf.int32),
                                                     self.opts['nmixtures'],
                                                     self.opts['zdim']],dtype=tf.float32)
         elif self.opts['e_means']=='mean':
             enc_mean, _ = gaussian_encoder(opts, inputs=input_points, reuse=reuse,
                                                     is_training=self.is_training)
-            enc_logSigma = tf.exp(self.opts['init_e_std'])*tf.ones([
+            enc_logSigma = tf.log(self.opts['sigma_prior'])*tf.ones([
                                                     tf.cast(sample_size,dtype=tf.int32),
                                                     self.opts['nmixtures'],
                                                     self.opts['zdim']],dtype=tf.float32)

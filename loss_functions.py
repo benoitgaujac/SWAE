@@ -123,7 +123,8 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
         # k(x, y) = C / (C + ||x - y||^2)
         Cbase = 2 * opts['zdim'] * sigma2_p
         res = 0.
-        for scale in [.1, .2, .5, 1., 2., 5., 10., 20., 50., 100.]:
+        #for scale in [.1, .2, .5, 1., 2., 5., 10., 20., 50., 100.]:
+        for scale in [.1, .2, .5, 1.]:
             C = Cbase * scale
             # First 2 terms of the MMD
             res1_qz = C / (C + distances_qz)
@@ -143,6 +144,7 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             # Correcting for diagonal terms
             res1_diag = tf.trace(tf.reduce_sum(res1,axis=[1,-1]))
             res1 = (tf.reduce_sum(res1) - res1_diag) / (nf * nf - nf)
+            #res1 = tf.reduce_sum(res1)
             # Cross term of the MMD
             res2 = C / (C + distances)
             res2 = tf.multiply(res2, tf.reshape(pi,shpe+[1,1]))
