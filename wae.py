@@ -305,11 +305,11 @@ class WAE(object):
         wait = 0
         for epoch in range(opts['epoch_num']):
             # Update learning rate if necessary
-            if epoch == 30:
-                decay = decay / 2.
             if epoch == 50:
-                decay = decay / 5.
+                decay = decay / 2.
             if epoch == 100:
+                decay = decay / 5.
+            if epoch == 150:
                 decay = decay / 10.
             # Save the model
             if epoch > 0 and epoch % opts['save_every_epoch'] == 0:
