@@ -127,14 +127,16 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
         for scale in [.1, .2, .5, 1.]:
             C = Cbase * scale
             # First 2 terms of the MMD
-            res1_qz = C / (C + distances_qz)
+            res1_qz = tf.reduce_mean(C / (C + distances_qz),axis=[2,-1])
+            #res1_qz = C / (C + distances_qz)
             shpe = [-1,opts['nmixtures']]
             res1_qz = tf.multiply(res1_qz, tf.reshape(pi,shpe+[1,1]))
             res1_qz = tf.multiply(res1_qz, tf.reshape(pi,[1,1]+shpe))
             # res1_qz = tf.transpose( tf.multiply(tf.transpose(res1_qz),
             #                         tf.transpose(pi)))
             # res1_qz = tf.multiply(res1_qz, tf.transpose(pi))
-            res1_pz = (C / (C + distances_pz))
+            res1_pz = tf.reduce_mean((C / (C + distances_pz)),axis=[2,-1])
+            #res1_pz = (C / (C + distances_pz))
             res1_pz = tf.multiply(res1_pz,tf.reshape(pi0,[1,opts['nmixtures'],1,1]))
             res1_pz = tf.multiply(res1_pz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
             # res1_pz = tf.transpose( tf.multiply(tf.transpose(res1_pz),
@@ -144,9 +146,9 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             # Correcting for diagonal terms
             res1_diag = tf.trace(tf.reduce_sum(res1,axis=[1,-1]))
             res1 = (tf.reduce_sum(res1) - res1_diag) / (nf * nf - nf)
-            #res1 = tf.reduce_sum(res1)
             # Cross term of the MMD
-            res2 = C / (C + distances)
+            res2 = tf.reduce_mean(C / (C + distances),axis=[2,-1])
+            #res2 = C / (C + distances)
             res2 = tf.multiply(res2, tf.reshape(pi,shpe+[1,1]))
             res2 = tf.multiply(res2,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
             # res2 = tf.transpose( tf.multiply(tf.transpose(res2),
@@ -166,9 +168,11 @@ def square_dist(opts, sample_x, norms_x, sample_y, norms_y):
     Wrapper to compute square distance
     """
     dotprod = tf.tensordot(sample_x, sample_y, [[-1],[-1]])
-    shpe = [-1,opts['nmixtures']]
-    nx_reshpe = tf.reshape(norms_x,shpe+[1,1])
-    ny_reshpe = tf.reshape(norms_y,[1,1]+shpe)
+    shpe = [-1,opts['nmixtures'],opts['nsamples']]
+    nx_reshpe = tf.reshape(norms_x,shpe+[1,1,1])
+    ny_reshpe = tf.reshape(norms_y,[1,1,1]+shpe)
+    # nx_reshpe = tf.reshape(norms_x,shpe+[1,1])
+    # ny_reshpe = tf.reshape(norms_y,[1,1]+shpe)
     distances = nx_reshpe + ny_reshpe - 2. * dotprod
     return distances
 
@@ -194,7 +198,8 @@ def wae_recons_loss(opts, pi, x1, x2):
     # Data shape
     shpe = datashapes[opts['dataset']]
     # Continuous cost
-    cont_real = tf.expand_dims(x1,axis=1)
+    cont_real = tf.reshape(x1,[-1,1,1]+shpe)
+    #cont_real = tf.expand_dims(x1,axis=1)
     cont_recon = x2
     cont_cost = continous_cost(opts, cont_real, cont_recon)
     # Compute loss
@@ -206,14 +211,17 @@ def wae_recons_loss(opts, pi, x1, x2):
 def continous_cost(opts, x1, x2):
     if opts['cost'] == 'l2':
         # c(x,y) = ||x - y||_2
-        c = tf.reduce_sum(tf.square(x1 - x2), axis=[2,3,4])
+        c = tf.reduce_sum(tf.square(x1 - x2), axis=[3,4,5])
         c = tf.sqrt(1e-10 + c)
+        c = tf.reduce_mean(c,axis=-1)
     elif opts['cost'] == 'l2sq':
         # c(x,y) = ||x - y||_2^2
-        c = tf.reduce_sum(tf.square(x1 - x2), axis=[2,3,4])
+        c = tf.reduce_sum(tf.square(x1 - x2), axis=[3,4,5])
+        c = tf.reduce_mean(c,axis=-1)
     elif opts['cost'] == 'l1':
         # c(x,y) = ||x - y||_1
-        c = tf.reduce_sum(tf.abs(x1 - x2), axis=[2,3,4])
+        c = tf.reduce_sum(tf.abs(x1 - x2), axis=[3,4,5])
+        c = tf.reduce_mean(c,axis=-1)
     else:
         assert False, 'Unknown cost function %s' % opts['cost']
     return c

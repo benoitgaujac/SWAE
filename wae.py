@@ -61,15 +61,17 @@ class WAE(object):
                                                         tf.exp(self.enc_logSigma),
                                                         sample_size,'tensorflow')
         # --- Decoding encoded points (i.e. reconstruct)
-        self.reconstructed, _ = self.decoder(self.mixtures_encoded,False)
-
+        self.reconstructed, _ = self.decoder(self.mixtures_encoded,False,False)
         # --- Reconstructing inputs (only for visualization)
         idx = tf.reshape(tf.multinomial(tf.nn.log_softmax(logits),1),[-1])
         mix_idx = tf.stack([range,idx],axis=-1)
-        self.encoded_point = tf.gather_nd(self.mixtures_encoded,mix_idx)
-        self.reconstructed_point = tf.gather_nd(self.reconstructed,mix_idx)
+        self.encoded_point = tf.gather_nd(self.mixtures_encoded[:,:,0],mix_idx)
+        self.reconstructed_point = tf.gather_nd(self.reconstructed[:,:,0],mix_idx)
+        #self.encoded_point = tf.gather_nd(self.mixtures_encoded,mix_idx)
+        #self.reconstructed_point = tf.gather_nd(self.reconstructed,mix_idx)
         # --- Sampling from model (only for generation)
         self.decoded, self.logits_decoded = self.decoder(self.sample_noise,
+                                                        True,
                                                         True)
         flat_logits = tf.reshape(self.logits_decoded,[-1])
         log_probs = tf.stack([flat_logits,tf.log(1.-tf.exp(flat_logits))],axis=-1)
@@ -81,9 +83,10 @@ class WAE(object):
         self.loss_reconstruct = reconstruction_loss(opts, self.pi,
                                                         self.points,
                                                         self.reconstructed)
-        self.wae_log_reconstruct = vae_recons_loss(opts, self.pi,
-                                                        self.points,
-                                                        self.reconstructed)
+        # self.wae_log_reconstruct = vae_recons_loss(opts, self.pi,
+        #                                                 self.points,
+        #                                                 self.reconstructed)
+        self.wae_log_reconstruct = tf.zeros([1])
         # Compute matching penalty cost
         self.kl_g, self.kl_d, self.match_penalty= matching_penalty(opts,
                                                         self.pi0, self.pi,
@@ -109,8 +112,11 @@ class WAE(object):
                                     [None] + shape,
                                     name='points_ph')
         self.sample_mix_noise = tf.placeholder(tf.float32,
-                                    [None] + [opts['nmixtures'],opts['zdim']],
+                                    [None] + [opts['nmixtures'],opts['nsamples'],opts['zdim']],
                                     name='mix_noise_ph')
+        # self.sample_mix_noise = tf.placeholder(tf.float32,
+        #                             [None] + [opts['nmixtures'],opts['zdim']],
+        #                             name='mix_noise_ph')
         self.sample_noise = tf.placeholder(tf.float32,
                                     [None] + [opts['nmixtures'],opts['zdim']],
                                     name='noise_ph')
@@ -158,15 +164,17 @@ class WAE(object):
         # SWAE optimizer
         lr = opts['lr']
         opt = self.optimizer(lr, self.lr_decay)
-        encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder')
+        e_cat_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder/cat_params')
+        e_gaus_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder/gaus_params')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
         prior_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='prior')
         #ae_vars = encoder_vars + decoder_vars
         ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-        if opts['clip_grad']:
-            grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=ae_vars))
-            clip_grad, _ = tf.clip_by_global_norm(grad, opts['clip_norm'])
-            self.swae_opt = opt.apply_gradients(zip(clip_grad, var))
+        if opts['clip_grad_gauss']:
+            grad_gaus, var_gaus = zip(*opt.compute_gradients(loss=self.objective, var_list=e_gaus_vars))
+            clip_grad, _ = tf.clip_by_global_norm(grad_gaus, opts['clip_norm'])
+            grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=e_cat_vars+decoder_vars))
+            self.swae_opt = opt.apply_gradients(zip(grad+tuple(clip_grad), var+var_gaus))
         else:
             self.swae_opt = opt.minimize(loss=self.objective, var_list=ae_vars)
         # Pretraining optimizer
@@ -189,6 +197,7 @@ class WAE(object):
                                                     self.opts['nmixtures'],
                                                     self.opts['zdim']],dtype=tf.float32)
         elif self.opts['e_means']=='mean':
+            sample_size = tf.shape(self.points,out_type=tf.int64)[0]
             enc_mean, _ = gaussian_encoder(opts, inputs=input_points, reuse=reuse,
                                                     is_training=self.is_training)
             enc_logSigma = tf.log(self.opts['sigma_prior'])*tf.ones([
@@ -202,15 +211,21 @@ class WAE(object):
                                                     is_training=self.is_training)
         return logit, enc_mean, enc_logSigma
 
-    def decoder(self, encoded, reuse=False):
+    def decoder(self, encoded, decode_sample=False, reuse=False):
         noise = tf.reshape(encoded,[-1,self.opts['zdim']])
         recon, log = continuous_decoder(self.opts, noise=noise,
                                                         reuse=reuse,
                                                         is_training=self.is_training)
-        reconstructed = tf.reshape(recon,
-                        [-1,self.opts['nmixtures']]+self.data_shape)
-        logits = tf.reshape(log,
-                        [-1,self.opts['nmixtures']]+self.data_shape)
+        if decode_sample:
+            out_shape = [-1,self.opts['nmixtures']]+self.data_shape
+        else:
+            out_shape = [-1,self.opts['nmixtures'],self.opts['nsamples']]+self.data_shape
+        reconstructed = tf.reshape(recon,out_shape)
+        logits = tf.reshape(log,out_shape)
+        # reconstructed = tf.reshape(recon,
+        #                 [-1,self.opts['nmixtures'],self.opts['nsamples']]+self.data_shape)
+        # logits = tf.reshape(log,
+        #                 [-1,self.opts['nmixtures'],self.opts['nsamples']]+self.data_shape)
         return reconstructed, logits
 
     def pretrain_loss(self):

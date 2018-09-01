@@ -13,15 +13,22 @@ def sample_mixtures(opts, means, covs, num=100,typ='numpy'):
     means and covs
     """
     if typ =='tensorflow':
-        #mean = tf.expand_dims(means,axis=2)
-        #cov = tf.expand_dims(covs,axis=2)
-        eps = tf.random_normal([num,opts['nmixtures'],opts['zdim']],dtype=tf.float32)
-        noise = means + tf.multiply(eps,tf.sqrt(1e-8+covs))
+        mean = tf.expand_dims(means,axis=2)
+        cov = tf.expand_dims(covs,axis=2)
+        eps = tf.random_normal([num,opts['nmixtures'],opts['nsamples'],
+                                                        opts['zdim']],
+                                                        dtype=tf.float32)
+        noise = mean + tf.multiply(eps,tf.sqrt(1e-8+cov))
+        # eps = tf.random_normal([num,opts['nmixtures'],opts['zdim']],
+        #                                                 dtype=tf.float32)
+        #noise = means + tf.multiply(eps,tf.sqrt(1e-8+covs))
     elif typ =='numpy':
-        #mean = np.expand_dims(means,axis=1)
-        #cov = covs
-        eps = np.random.normal(0.,1.,(num, opts['nmixtures'],opts['zdim'])).astype(np.float32)
-        noise = means + np.multiply(eps,np.sqrt(1e-8+covs))
+        mean = np.expand_dims(means,axis=1)
+        eps = np.random.normal(0.,1.,(num, opts['nmixtures'],opts['nsamples'],
+                                                        opts['zdim'])).astype(np.float32)
+        noise = mean + np.multiply(eps,np.sqrt(1e-8+covs))
+        #eps = np.random.normal(0.,1.,(num, opts['nmixtures'],opts['zdim'])).astype(np.float32)
+        # noise = means + np.multiply(eps,np.sqrt(1e-8+covs))
     return noise
 
 
@@ -33,14 +40,12 @@ def sample_pz(opts, means, covs, num=100, sampling_mode='one_mixture'):
     noises = sample_mixtures(opts,means,covs,num)
     if sampling_mode == 'one_mixture':
         mixture = np.random.randint(opts['nmixtures'],size=num)
-        noise = noises[np.arange(num),mixture]
+        noise = noises[np.arange(num),mixture,0]
+        #noise = noises[np.arange(num),mixture]
     elif sampling_mode == 'per_mixture':
         samples_per_mixture = ceil(num / opts['nmixtures'])
-        # class_i = np.repeat(np.arange(opts['nmixtures']),samples_per_mixture,axis=0)
-        # mixture = np.zeros([num,],dtype='int32')
-        # mixture[(num % opts['nmixtures']):] = class_i
-        # noise = noises[np.arange(num),mixture]
-        noise = noises[:samples_per_mixture]
+        noise = noises[:samples_per_mixture,:,0]
+        #noise = noises[:samples_per_mixture]
     elif sampling_mode == 'all_mixtures':
         noise = noises
     else:
