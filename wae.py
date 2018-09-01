@@ -170,7 +170,7 @@ class WAE(object):
         prior_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='prior')
         #ae_vars = encoder_vars + decoder_vars
         ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-        if opts['clip_grad_gauss']:
+        if opts['clip_grad_cat']:
             grad_cat, var_cat = zip(*opt.compute_gradients(loss=self.objective, var_list=e_cat_vars))
             clip_grad, _ = tf.clip_by_global_norm(grad_gaus, opts['clip_norm'])
             grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=e_gaus_vars+decoder_vars))
