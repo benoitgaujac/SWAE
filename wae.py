@@ -172,7 +172,7 @@ class WAE(object):
         ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         if opts['clip_grad_cat']:
             grad_cat, var_cat = zip(*opt.compute_gradients(loss=self.objective, var_list=e_cat_vars))
-            clip_grad, _ = tf.clip_by_global_norm(grad_gaus, opts['clip_norm'])
+            clip_grad, _ = tf.clip_by_global_norm(grad_cat, opts['clip_norm'])
             grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=e_gaus_vars+decoder_vars))
             self.swae_opt = opt.apply_gradients(zip(grad+tuple(clip_grad), var+var_cat))
         else:
