@@ -19,7 +19,7 @@ config_mnist['data_dir'] = 'mnist'
 config_mnist['data_source_url'] = 'http://yann.lecun.com/exdb/mnist/'
 
 # Experiment set up
-config_mnist['train_dataset_size'] = 1000
+config_mnist['train_dataset_size'] = 500
 config_mnist['batch_size'] = 100
 config_mnist['epoch_num'] = 100
 config_mnist['method'] = 'swae' #vae, swae
@@ -57,20 +57,18 @@ config_mnist['prior_threshold'] = coef * 3.**2
 config_mnist['pz_scale'] = 1.
 
 # NN set up
+config_mnist['e_means'] = 'learnable'
 config_mnist['conv_filters_dim'] = 3
 config_mnist['init_std'] = 0.0099999
 config_mnist['init_bias'] = 0.0
 
-config_mnist['e_means'] = 'learnable'
-config_mnist['init_e_std'] = -2.0
-
 config_mnist['e_gaus_arch'] = 'mlp' # mlp, dcgan, ali, began
-config_mnist['e_gaus_nlayers'] = 2
+config_mnist['e_gaus_nlayers'] = 1
 config_mnist['e_gaus_nfilters'] = 16
 config_mnist['e_cat_arch'] = 'dcgan' # mlp, dcgan, ali, began
 config_mnist['e_cat_nlayers'] = 2
-config_mnist['e_cat_nfilters'] = 32
+config_mnist['e_cat_nfilters'] = 16
 
 config_mnist['g_cont_arch'] = 'dcgan' # mlp, dcgan, dcgan_mod, ali, began
 config_mnist['g_cont_nlayers'] = 2
-config_mnist['g_cont_nfilters'] = 32
+config_mnist['g_cont_nfilters'] = 16
