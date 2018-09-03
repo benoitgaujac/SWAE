@@ -197,7 +197,7 @@ class WAE(object):
         # Pretraining optimizer
         if opts['e_pretrain']:
             pre_opt = self.optimizer(0.001)
-            self.pre_opt = pre_opt.minimize(loss=self.pre_loss, var_list=encoder_vars+prior_vars)
+            self.pre_opt = pre_opt.minimize(loss=self.pre_loss, var_list=e_gaus_vars)
 
     def encoder(self, input_points, reuse=False):
         ## Categorical encoding
