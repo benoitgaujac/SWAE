@@ -337,11 +337,11 @@ class WAE(object):
         wait = 0
         for epoch in range(opts['epoch_num']):
             # Update learning rate if necessary
-            if epoch == 50:
+            if epoch == 10:
                 decay = decay / 2.
-            if epoch == 100:
+            if epoch == 20:
                 decay = decay / 5.
-            if epoch == 150:
+            if epoch == 50:
                 decay = decay / 10.
             # Save the model
             if epoch > 0 and epoch % opts['save_every_epoch'] == 0:
@@ -506,7 +506,8 @@ class WAE(object):
                                                         losses_rec[-1])
 
                     logging.error(debug_str)
-                    debug_str = 'MATCH=%.3f' % (opts['lambda']*losses_match[-1])
+                    debug_str = 'MATCH=%.3f' % (losses_match[-1])
+                    #debug_str = 'MATCH=%.3f' % (opts['lambda']*losses_match[-1])
                     logging.error(debug_str)
                     debug_str = 'Clusters ID: %s' % (str(labelled_clusters))
                     logging.error(debug_str)
