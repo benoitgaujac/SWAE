@@ -121,6 +121,7 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
         res = res1 - 2. * res2
     elif kernel == 'IMQ':
         # k(x, y) = C / (C + ||x - y||^2)
+        shpe = [-1,opts['nmixtures']]
         Cbase = 2 * opts['zdim'] * sigma2_p
         res = 0.
         base_scale = [1.,2.,5.]
@@ -129,35 +130,34 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
         for scale in scales:
             C = Cbase * scale
             # First 2 terms of the MMD
-            res1_qz = tf.reduce_mean(C / (C + distances_qz),axis=[2,-1])
-            #res1_qz = C / (C + distances_qz)
-            shpe = [-1,opts['nmixtures']]
-            res1_qz = tf.multiply(res1_qz, tf.reshape(pi,shpe+[1,1]))
+            K_qz = tf.reduce_sum(C / (C + distances_qz),axis=[2,-1])
+            res1_qz = tf.multiply(K_qz, tf.reshape(pi,shpe+[1,1]))
             res1_qz = tf.multiply(res1_qz, tf.reshape(pi,[1,1]+shpe))
-            # res1_qz = tf.transpose( tf.multiply(tf.transpose(res1_qz),
-            #                         tf.transpose(pi)))
-            # res1_qz = tf.multiply(res1_qz, tf.transpose(pi))
-            res1_pz = tf.reduce_mean((C / (C + distances_pz)),axis=[2,-1])
-            #res1_pz = (C / (C + distances_pz))
-            res1_pz = tf.multiply(res1_pz,tf.reshape(pi0,[1,opts['nmixtures'],1,1]))
+            K_pz = tf.reduce_sum(C / (C + distances_pz),axis=[2,-1])
+            res1_pz = tf.multiply(K_pz,tf.reshape(pi0,[1,opts['nmixtures'],1,1]))
             res1_pz = tf.multiply(res1_pz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
-            # res1_pz = tf.transpose( tf.multiply(tf.transpose(res1_pz),
-            #                         tf.expand_dims(pi0,axis=-1)))
-            # res1_pz = tf.multiply(res1_pz, tf.expand_dims(pi0,axis=-1))
-            res1 = res1_qz + res1_pz
+            res1 = (res1_qz + res1_pz) / (opts['nsamples'] * opts['nsamples'])
             # Correcting for diagonal terms
-            res1_diag = tf.trace(tf.reduce_sum(res1,axis=[1,-1]))
-            res1 = (tf.reduce_sum(res1) - res1_diag) / (nf * nf - nf)
+            diag = tf.trace(tf.reduce_sum(res1,axis=[1,-1]))
+            res1 = (tf.reduce_sum(res1) - diag) / (nf * nf - nf)
+            # unbiaised in case of more than one latent sample per obs
+            if opts['correct_for_extra_diagonal']:
+                assert opts['nsamples']>1, \
+                    'Num of latent samples must be superior to 1.'
+                K_qz = tf.trace(tf.transpose(C / (C + distances_qz),perm=[0,1,3,4,2,5]))
+                res1_qz = tf.multiply(K_qz, tf.reshape(pi,shpe+[1,1]))
+                res1_qz = tf.multiply(res1_qz, tf.reshape(pi,[1,1]+shpe))
+                K_pz = tf.trace(tf.transpose(C / (C + distances_qz),perm=[0,1,3,4,2,5]))
+                res1_pz = tf.multiply(K_pz,tf.reshape(pi0,[1,opts['nmixtures'],1,1]))
+                res1_pz = tf.multiply(res1_pz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
+                res1_corr = (res1_qz + res1_pz) / (opts['nsamples'] * opts['nsamples'] - opts['nsamples'])
+                diag_corr = tf.trace(tf.reduce_sum(res1_corr,axis=[1,-1]))
+                res1 += (diag * opts['nsamples']/(opts['nsamples']-1) \
+                                - diag_corr) / nf
             # Cross term of the MMD
             res2 = tf.reduce_mean(C / (C + distances),axis=[2,-1])
-            #res2 = C / (C + distances)
             res2 = tf.multiply(res2, tf.reshape(pi,shpe+[1,1]))
             res2 = tf.multiply(res2,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
-            # res2 = tf.transpose( tf.multiply(tf.transpose(res2),
-            #                         tf.transpose(pi)))
-            # res2 = tf.multiply(res2, tf.expand_dims(pi0,axis=-1))
-            # res2 =  tf.multiply(tf.transpose(res2),tf.transpose(self.enc_mixweight))
-            # res2 = tf.transpose(res2) / opts['nmixtures']
             res2 = tf.reduce_sum(res2) / (nf * nf)
             res += res1 - 2. * res2
     else:
@@ -187,7 +187,7 @@ def reconstruction_loss(opts, pi, x1, x2):
     if opts['method']=='swae':
         loss = wae_recons_loss(opts, pi, x1, x2)
     elif opts['method']=='vae':
-        loss = vae_recons_loss(opts, pi, x1, x2)
+        loss = vae_bernoulli_recons_loss(opts, pi, x1, x2)
     return loss
 
 
@@ -230,9 +230,10 @@ def continous_cost(opts, x1, x2):
     return c
 
 
-def vae_recons_loss(opts, pi, x1, x2):
+def vae_bernoulli_recons_loss(opts, pi, x1, x2):
     """
     Compute the VAE's reconstruction losses
+    with bernoulli observation model
     """
     real = tf.expand_dims(x1,axis=1)
     logit = x2

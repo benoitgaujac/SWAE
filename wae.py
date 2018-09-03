@@ -20,7 +20,7 @@ import ops
 import utils
 from priors import init_gaussian_prior, init_cat_prior
 from sampling_functions import sample_mixtures, sample_pz, generate_linespace
-from loss_functions import matching_penalty, reconstruction_loss, vae_recons_loss, moments_loss
+from loss_functions import matching_penalty, reconstruction_loss, vae_bernoulli_recons_loss, moments_loss
 from supervised_functions import accuracy, get_mean_probs, relabelling_mask_from_probs, one_hot
 from plot_functions import save_train, save_vizu
 from model_nn import cat_encoder, gaussian_encoder
