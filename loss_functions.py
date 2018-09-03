@@ -140,7 +140,6 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             # Correcting for diagonal terms
             diag = tf.trace(tf.reduce_sum(res1,axis=[1,-1]))
             res1 = (tf.reduce_sum(res1) - diag) / (nf * nf - nf)
-            """
             # unbiaised in case of more than one latent sample per obs
             if opts['correct_for_extra_diagonal']:
                 assert opts['nsamples']>1, \
@@ -155,7 +154,6 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
                 diag_corr = tf.trace(tf.reduce_sum(res1_corr,axis=[1,-1]))
                 res1 += (diag * opts['nsamples']/(opts['nsamples']-1) \
                                 - diag_corr) / nf
-            """
             # Cross term of the MMD
             res2 = tf.reduce_mean(C / (C + distances),axis=[2,-1])
             res2 = tf.multiply(res2, tf.reshape(pi,shpe+[1,1]))
