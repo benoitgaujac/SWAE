@@ -506,7 +506,7 @@ class WAE(object):
                                                         losses_rec[-1])
 
                     logging.error(debug_str)
-                    debug_str = 'MATCH=%.3f' % (losses_match[-1])
+                    debug_str = 'MATCH=%10.3e' % (losses_match[-1])
                     #debug_str = 'MATCH=%.3f' % (opts['lambda']*losses_match[-1])
                     logging.error(debug_str)
                     debug_str = 'Clusters ID: %s' % (str(labelled_clusters))
