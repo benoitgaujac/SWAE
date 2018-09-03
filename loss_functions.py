@@ -147,7 +147,7 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
                 K_qz = tf.trace(tf.transpose(C / (C + distances_qz),perm=[0,1,3,4,2,5]))
                 res1_qz = tf.multiply(K_qz, tf.reshape(pi,shpe+[1,1]))
                 res1_qz = tf.multiply(res1_qz, tf.reshape(pi,[1,1]+shpe))
-                K_pz = tf.trace(tf.transpose(C / (C + distances_qz),perm=[0,1,3,4,2,5]))
+                K_pz = tf.trace(tf.transpose(C / (C + distances_pz),perm=[0,1,3,4,2,5]))
                 res1_pz = tf.multiply(K_pz,tf.reshape(pi0,[1,opts['nmixtures'],1,1]))
                 res1_pz = tf.multiply(res1_pz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
                 res1_corr = (res1_qz + res1_pz) / (opts['nsamples'] * opts['nsamples'] - opts['nsamples'])
@@ -234,6 +234,20 @@ def vae_bernoulli_recons_loss(opts, pi, x1, x2):
     """
     Compute the VAE's reconstruction losses
     with bernoulli observation model
+    """
+    real = tf.expand_dims(x1,axis=1)
+    logit = x2
+    eps = 1e-10
+    l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
+    loss = tf.reduce_sum(l,axis=[2,3,4])
+    loss = tf.reduce_sum(tf.multiply(loss,pi))
+    loss = tf.reduce_mean(loss)
+    return -loss
+
+def vae_betabinomial_recons_loss(opts, pi, x1, x2):
+    """
+    Compute the VAE's reconstruction losses
+    with beta-binomial observation model
     """
     real = tf.expand_dims(x1,axis=1)
     logit = x2
