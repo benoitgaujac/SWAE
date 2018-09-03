@@ -252,7 +252,7 @@ class WAE(object):
 
     def pretrain_encoder(self, data):
         opts=self.opts
-        steps_max = 500
+        steps_max = 1000
         batch_size = opts['e_pretrain_sample_size']
         train_size = data.num_points
         for step in range(steps_max):
@@ -374,22 +374,22 @@ class WAE(object):
                                                         self.match_penalty],
                                                         feed_dict=feed_dict)
                     losses_VAE.append(loss_vae)
-                    # [max_dist, min_dist] = self.sess.run([self.Mdistances,self.mdistances],
-                    #                                     feed_dict=feed_dict)
-                    # print('')
-                    # debug_str = 'Max pz: %s' % (np.array2string(max_dist[:,0],precision=4))
-                    # logging.error(debug_str)
-                    # debug_str = 'min pz: %s' % (np.array2string(min_dist[:,0],precision=4))
-                    # logging.error(debug_str)
-                    # debug_str = 'Max qz: %s' % (np.array2string(max_dist[:,1],precision=4))
-                    # logging.error(debug_str)
-                    # debug_str = 'min qz: %s' % (np.array2string(min_dist[:,1],precision=4))
-                    # logging.error(debug_str)
-                    # debug_str = 'Max dist: %s' % (np.array2string(max_dist[:,-1],precision=4))
-                    # logging.error(debug_str)
-                    # debug_str = 'min dist: %s' % (np.array2string(min_dist[:,-1],precision=4))
-                    # logging.error(debug_str)
-                    # print('')
+                    [max_dist, min_dist] = self.sess.run([self.Mdistances,self.mdistances],
+                                                        feed_dict=feed_dict)
+                    print('')
+                    debug_str = 'Max pz: %s' % (np.array2string(max_dist[:,0],precision=4))
+                    logging.error(debug_str)
+                    debug_str = 'min pz: %s' % (np.array2string(min_dist[:,0],precision=4))
+                    logging.error(debug_str)
+                    debug_str = 'Max qz: %s' % (np.array2string(max_dist[:,1],precision=4))
+                    logging.error(debug_str)
+                    debug_str = 'min qz: %s' % (np.array2string(min_dist[:,1],precision=4))
+                    logging.error(debug_str)
+                    debug_str = 'Max dist: %s' % (np.array2string(max_dist[:,-1],precision=4))
+                    logging.error(debug_str)
+                    debug_str = 'min dist: %s' % (np.array2string(min_dist[:,-1],precision=4))
+                    logging.error(debug_str)
+                    print('')
                 elif opts['method']=='vae':
                     [_, loss, loss_rec, loss_match, kl_g, kl_d] = self.sess.run(
                                                         [self.swae_opt,
