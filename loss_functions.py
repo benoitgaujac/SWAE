@@ -1,7 +1,7 @@
 import sys
 import time
 import os
-from math import sqrt, cos, sin
+from math import sqrt, cos, sin, pow
 import numpy as np
 import tensorflow as tf
 
@@ -19,7 +19,7 @@ def matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
     pi: variational weights [batch,K]
     """
     if opts['method']=='swae':
-        kl_g, kl_d, match_loss = wae_matching_penalty(opts, pi0, pi,
+        kl_g, kl_d, match_loss, dpz, dqz, d = wae_matching_penalty(opts, pi0, pi,
                                                         samples_pz, samples_qz)
     elif opts['method']=='vae':
         kl_g, kl_d, match_loss = vae_matching_penalty(opts, pi0, pi,
@@ -27,7 +27,7 @@ def matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
                                                         pz_mean, pz_sigma)
     else:
         assert False, 'Unknown algo %s' % opts['method']
-    return kl_g, kl_d, match_loss
+    return kl_g, kl_d, match_loss, dpz, dqz, d
 
 
 def vae_matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
@@ -57,9 +57,9 @@ def wae_matching_penalty(opts, pi0, pi, samples_pz, samples_qz):
     Compute the WAE's matching penalty
     (add here other penalty if any)
     """
-    cont_penalty = mmd_penalty(opts, pi0, pi, samples_pz, samples_qz)
+    cont_penalty, dpz, dqz, d = mmd_penalty(opts, pi0, pi, samples_pz, samples_qz)
 
-    return None, None, cont_penalty
+    return None, None, cont_penalty, dpz, dqz, d
 
 
 def mmd_penalty(opts, pi0, pi, sample_pz, sample_qz):
@@ -69,12 +69,12 @@ def mmd_penalty(opts, pi0, pi, sample_pz, sample_qz):
     pi: variational weights [batch,K]
     """
     # Compute MMD
-    MMD = mmd(opts, pi0, pi, sample_pz, sample_qz)
+    MMD, dpz, dqz, d = mmd(opts, pi0, pi, sample_pz, sample_qz)
     if opts['sqrt_MMD']:
         MMD_penalty = tf.exp(tf.log(MMD+1e-8)/2.)
     else:
         MMD_penalty = MMD
-    return MMD_penalty
+    return MMD_penalty, dpz, dqz, d
 
 
 def mmd(opts, pi0, pi, sample_pz, sample_qz):
@@ -123,8 +123,10 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
         # k(x, y) = C / (C + ||x - y||^2)
         Cbase = 2 * opts['zdim'] * sigma2_p
         res = 0.
+        base_scale = [1.,2.,5.]
+        scales = [base_scale[i]*pow(10.,j) for j in range(-2,3) for i in range(len(base_scale))]
         #for scale in [.1, .2, .5, 1., 2., 5., 10., 20., 50., 100.]:
-        for scale in [.1, .2, .5, 1.]:
+        for scale in scales:
             C = Cbase * scale
             # First 2 terms of the MMD
             res1_qz = tf.reduce_mean(C / (C + distances_qz),axis=[2,-1])
@@ -160,7 +162,8 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             res += res1 - 2. * res2
     else:
         raise ValueError('%s Unknown kernel' % kernel)
-    return res
+    #return res
+    return res, distances_pz, distances_qz, distances
 
 
 def square_dist(opts, sample_x, norms_x, sample_y, norms_y):

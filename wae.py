@@ -88,11 +88,19 @@ class WAE(object):
         #                                                 self.reconstructed)
         self.wae_log_reconstruct = tf.zeros([1])
         # Compute matching penalty cost
-        self.kl_g, self.kl_d, self.match_penalty= matching_penalty(opts,
+        self.kl_g, self.kl_d, self.match_penalty, dpz, dqz, d= matching_penalty(opts,
                                                         self.pi0, self.pi,
                                                         self.enc_mean, self.enc_logSigma,
                                                         self.pz_mean, self.pz_sigma,
                                                         self.sample_mix_noise, self.mixtures_encoded)
+        Mdpz = tf.reduce_max(dpz,axis=[0,2,3,4,-1])
+        mdpz = tf.reduce_min(dpz,axis=[0,2,3,4,-1])
+        Mdqz = tf.reduce_max(dqz,axis=[0,2,3,4,-1])
+        mdqz = tf.reduce_min(dqz,axis=[0,2,3,4,-1])
+        Md = tf.reduce_max(d,axis=[0,2,3,4,-1])
+        md = tf.reduce_min(d,axis=[0,2,3,4,-1])
+        self.Mdistances = tf.stack([Mdpz, Mdqz, Md],axis=-1)
+        self.mdistances = tf.stack([mdpz, mdqz, md],axis=-1)
         # Compute Unlabeled obj
         self.objective = self.loss_reconstruct + self.lmbd * self.match_penalty
         # FID score
@@ -168,15 +176,24 @@ class WAE(object):
         e_gaus_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='encoder/gaus_params')
         decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
         prior_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='prior')
-        #ae_vars = encoder_vars + decoder_vars
-        ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        #ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         if opts['clip_grad_cat']:
-            grad_cat, var_cat = zip(*opt.compute_gradients(loss=self.objective, var_list=e_cat_vars))
+        # Clipping gradient if necessary
+            grad_cat, var_cat = zip(*opt.compute_gradients(loss=self.objective,
+                                                    var_list=e_cat_vars))
             clip_grad, _ = tf.clip_by_global_norm(grad_cat, opts['clip_norm'])
-            grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=e_gaus_vars+decoder_vars))
+            grad, var = zip(*opt.compute_gradients(loss=self.objective,
+                                                    var_list=e_gaus_vars+decoder_vars))
             self.swae_opt = opt.apply_gradients(zip(grad+tuple(clip_grad), var+var_cat))
+        elif opts['different_lr_cat']:
+        # Different lr for cat if necessary
+            opt_cat = self.optimizer(opts['lr_cat'], self.lr_decay)
+            grad_cat, var_cat = zip(*opt_cat.compute_gradients(loss=self.objective, var_list=e_cat_vars))
+            grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=e_gaus_vars+decoder_vars))
+            self.swae_opt = opt.apply_gradients(zip(grad+tuple(grad_cat), var+var_cat))
         else:
-            self.swae_opt = opt.minimize(loss=self.objective, var_list=ae_vars)
+            self.swae_opt = opt.minimize(loss=self.objective, var_list=e_cat_vars+e_gaus_vars+decoder_vars)
+
         # Pretraining optimizer
         if opts['e_pretrain']:
             pre_opt = self.optimizer(0.001)
@@ -357,6 +374,22 @@ class WAE(object):
                                                         self.match_penalty],
                                                         feed_dict=feed_dict)
                     losses_VAE.append(loss_vae)
+                    # [max_dist, min_dist] = self.sess.run([self.Mdistances,self.mdistances],
+                    #                                     feed_dict=feed_dict)
+                    # print('')
+                    # debug_str = 'Max pz: %s' % (np.array2string(max_dist[:,0],precision=4))
+                    # logging.error(debug_str)
+                    # debug_str = 'min pz: %s' % (np.array2string(min_dist[:,0],precision=4))
+                    # logging.error(debug_str)
+                    # debug_str = 'Max qz: %s' % (np.array2string(max_dist[:,1],precision=4))
+                    # logging.error(debug_str)
+                    # debug_str = 'min qz: %s' % (np.array2string(min_dist[:,1],precision=4))
+                    # logging.error(debug_str)
+                    # debug_str = 'Max dist: %s' % (np.array2string(max_dist[:,-1],precision=4))
+                    # logging.error(debug_str)
+                    # debug_str = 'min dist: %s' % (np.array2string(min_dist[:,-1],precision=4))
+                    # logging.error(debug_str)
+                    # print('')
                 elif opts['method']=='vae':
                     [_, loss, loss_rec, loss_match, kl_g, kl_d] = self.sess.run(
                                                         [self.swae_opt,
