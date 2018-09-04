@@ -345,7 +345,7 @@ class WAE(object):
             for it in range(batches_num):
                 # Sample batches of data points and Pz noise
                 data_ids = np.random.choice(train_size, opts['batch_size'],
-                                                        replace=False)
+                                                        replace=True)
                 batch_images = data.data[data_ids].astype(np.float32)
                 batch_mix_noise = sample_pz(opts, self.pz_mean,
                                                         self.pz_sigma,
