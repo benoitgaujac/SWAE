@@ -10,7 +10,7 @@ from datahandler import datashapes
 
 import pdb
 
-def matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
+def matching_penalty(opts, pi0, pi, encoded_mean, encoded_sigma,
                                             pz_mean, pz_sigma,
                                             samples_pz, samples_qz):
     """
@@ -19,37 +19,15 @@ def matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
     pi: variational weights [batch,K]
     """
     if opts['method']=='swae':
-        kl_g, kl_d, match_loss, dpz, dqz, d = wae_matching_penalty(opts, pi0, pi,
+        kl_g, kl_d, match_loss = wae_matching_penalty(opts, pi0, pi,
                                                         samples_pz, samples_qz)
     elif opts['method']=='vae':
         kl_g, kl_d, match_loss = vae_matching_penalty(opts, pi0, pi,
-                                                        encoded_mean, encoded_logsigma,
+                                                        encoded_mean, encoded_sigma,
                                                         pz_mean, pz_sigma)
     else:
         assert False, 'Unknown algo %s' % opts['method']
-    return kl_g, kl_d, match_loss, dpz, dqz, d
-
-
-def vae_matching_penalty(opts, pi0, pi, encoded_mean, encoded_logsigma,
-                                                pz_mean, pz_sigma):
-    """
-    Compute the VAE's matching penalty
-    """
-    # Continuous KL
-    kl_g = tf.exp(encoded_logsigma) / pz_sigma\
-            + tf.square(pz_mean - encoded_mean) / pz_sigma\
-            - 1. + tf.log(pz_sigma) - encoded_logsigma
-    kl_g = 0.5 * tf.reduce_sum(kl_g,axis=-1)
-    kl_g = tf.multiply(kl_g,pi)
-    kl_g = tf.reduce_sum(kl_g,axis=-1)
-    kl_g = tf.reduce_mean(kl_g)
-    # Discrete KL
-    eps = 1e-10
-    kl_d = tf.log(eps+pi) - tf.log(pi0)
-    kl_d = tf.multiply(kl_d,pi)
-    kl_d = tf.reduce_sum(kl_d,axis=-1)
-    kl_d = tf.reduce_mean(kl_d)
-    return kl_g, kl_d, kl_g + kl_d
+    return kl_g, kl_d, match_loss
 
 
 def wae_matching_penalty(opts, pi0, pi, samples_pz, samples_qz):
@@ -57,9 +35,9 @@ def wae_matching_penalty(opts, pi0, pi, samples_pz, samples_qz):
     Compute the WAE's matching penalty
     (add here other penalty if any)
     """
-    cont_penalty, dpz, dqz, d = mmd_penalty(opts, pi0, pi, samples_pz, samples_qz)
+    cont_penalty = mmd_penalty(opts, pi0, pi, samples_pz, samples_qz)
 
-    return None, None, cont_penalty, dpz, dqz, d
+    return None, None, cont_penalty
 
 
 def mmd_penalty(opts, pi0, pi, sample_pz, sample_qz):
@@ -69,12 +47,12 @@ def mmd_penalty(opts, pi0, pi, sample_pz, sample_qz):
     pi: variational weights [batch,K]
     """
     # Compute MMD
-    MMD, dpz, dqz, d = mmd(opts, pi0, pi, sample_pz, sample_qz)
+    MMD = mmd(opts, pi0, pi, sample_pz, sample_qz)
     if opts['sqrt_MMD']:
         MMD_penalty = tf.exp(tf.log(MMD+1e-8)/2.)
     else:
         MMD_penalty = MMD
-    return MMD_penalty, dpz, dqz, d
+    return MMD_penalty
 
 
 def mmd(opts, pi0, pi, sample_pz, sample_qz):
@@ -165,7 +143,7 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
     else:
         raise ValueError('%s Unknown kernel' % kernel)
     #return res
-    return res, distances_pz, distances_qz, distances
+    return res
 
 
 def square_dist(opts, sample_x, norms_x, sample_y, norms_y):
@@ -180,6 +158,28 @@ def square_dist(opts, sample_x, norms_x, sample_y, norms_y):
     # ny_reshpe = tf.reshape(norms_y,[1,1]+shpe)
     distances = nx_reshpe + ny_reshpe - 2. * dotprod
     return distances
+
+
+def vae_matching_penalty(opts, pi0, pi, encoded_mean, encoded_sigma,
+                                                pz_mean, pz_sigma):
+    """
+    Compute the VAE's matching penalty
+    """
+    # Continuous KL
+    kl_g = encoded_sigma / pz_sigma \
+            + tf.square(pz_mean - encoded_mean) / pz_sigma - 1. \
+            + tf.log(pz_sigma) - tf.log(encoded_sigma)
+    kl_g = 0.5 * tf.reduce_sum(kl_g,axis=-1)
+    kl_g = tf.multiply(kl_g,pi)
+    kl_g = tf.reduce_sum(kl_g,axis=-1)
+    kl_g = tf.reduce_mean(kl_g)
+    # Discrete KL
+    eps = 1e-10
+    kl_d = tf.log(eps+pi) - tf.log(pi0)
+    kl_d = tf.multiply(kl_d,pi)
+    kl_d = tf.reduce_sum(kl_d,axis=-1)
+    kl_d = tf.reduce_mean(kl_d)
+    return kl_g, kl_d, kl_g + kl_d
 
 
 def reconstruction_loss(opts, pi, x1, x2):
@@ -198,38 +198,30 @@ def wae_recons_loss(opts, pi, x1, x2):
     Compute the WAE's reconstruction losses
     pi: weights
     x1: image data             [batch,im_dim]
-    x2: image reconstruction   [batch,K,im_dim]
+    x2: image reconstruction   [batch,K,S,im_dim]
     """
     # Data shape
     shpe = datashapes[opts['dataset']]
-    # Continuous cost
-    cont_real = tf.reshape(x1,[-1,1,1]+shpe)
-    #cont_real = tf.expand_dims(x1,axis=1)
-    cont_recon = x2
-    cont_cost = continous_cost(opts, cont_real, cont_recon)
-    # Compute loss
-    loss = tf.reduce_sum(tf.multiply(cont_cost, pi),axis=-1)
-    loss = 1. * tf.reduce_mean(loss) #coef: .2 for L2 and L1, .05 for L2sqr,
-    return loss
-
-
-def continous_cost(opts, x1, x2):
+    data = tf.reshape(x1,[-1,1,1]+shpe)
     if opts['cost'] == 'l2':
         # c(x,y) = ||x - y||_2
-        c = tf.reduce_sum(tf.square(x1 - x2), axis=[3,4,5])
-        c = tf.sqrt(1e-10 + c)
-        c = tf.reduce_mean(c,axis=-1)
+        cost = tf.reduce_sum(tf.square(data - x2), axis=[3,4,5])
+        cost = tf.sqrt(1e-10 + cost)
+        cost = tf.reduce_mean(cost,axis=-1)
     elif opts['cost'] == 'l2sq':
         # c(x,y) = ||x - y||_2^2
-        c = tf.reduce_sum(tf.square(x1 - x2), axis=[3,4,5])
-        c = tf.reduce_mean(c,axis=-1)
+        cost = tf.reduce_sum(tf.square(data - x2), axis=[3,4,5])
+        cost = tf.reduce_mean(cost,axis=-1)
     elif opts['cost'] == 'l1':
         # c(x,y) = ||x - y||_1
-        c = tf.reduce_sum(tf.abs(x1 - x2), axis=[3,4,5])
-        c = tf.reduce_mean(c,axis=-1)
+        cost = tf.reduce_sum(tf.abs(data - x2), axis=[3,4,5])
+        cost = tf.reduce_mean(cost,axis=-1)
     else:
         assert False, 'Unknown cost function %s' % opts['cost']
-    return c
+    # Compute loss
+    loss = tf.reduce_sum(tf.multiply(cost, pi),axis=-1)
+    loss = 1. * tf.reduce_mean(loss) #coef: .2 for L2 and L1, .05 for L2sqr,
+    return loss
 
 
 def vae_bernoulli_recons_loss(opts, pi, x1, x2):
@@ -237,12 +229,14 @@ def vae_bernoulli_recons_loss(opts, pi, x1, x2):
     Compute the VAE's reconstruction losses
     with bernoulli observation model
     """
-    real = tf.expand_dims(x1,axis=1)
+    data_shape = datashapes[opts['dataset']]
+    real = tf.reshape(x1,shape=[-1,1,1] + data_shape)
     logit = x2
     eps = 1e-10
     l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
-    loss = tf.reduce_sum(l,axis=[2,3,4])
-    loss = tf.reduce_sum(tf.multiply(loss,pi))
+    loss = tf.reduce_sum(l,axis=[-3,-2,-1])
+    loss = tf.reduce_mean(loss,axis=-1)
+    loss = tf.reduce_sum(tf.multiply(loss,pi),axis=-1)
     loss = tf.reduce_mean(loss)
     return -loss
 
@@ -252,7 +246,8 @@ def vae_betabinomial_recons_loss(opts, pi, x1, x2):
     with beta-binomial observation model
     """
     real = tf.expand_dims(x1,axis=1)
-    logit = x2
+    alpha, beta = tf.split(mean_params,2,axis=-1)
+
     eps = 1e-10
     l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
     loss = tf.reduce_sum(l,axis=[2,3,4])
