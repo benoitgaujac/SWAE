@@ -56,10 +56,10 @@ class WAE(object):
                                                         self.points,
                                                         False)
         self.pi = ops.softmax(logits,axis=-1)
-        self.enc_Sigma = tf.nn.softplus(enc_logSigma)
+        self.enc_sigma = tf.nn.softplus(enc_logSigma)
         # --- Sampling from encoded MoG prior
         self.mixtures_encoded = sample_mixtures(opts,   self.enc_mean,
-                                                        self.enc_Sigma,
+                                                        self.enc_sigma,
                                                         sample_size,'tensorflow')
         # --- Decoding encoded points (i.e. reconstruct)
         self.reconstructed, _ = self.decoder(self.mixtures_encoded,False,False)
@@ -91,7 +91,7 @@ class WAE(object):
         # Compute matching penalty cost
         self.kl_g, self.kl_d, self.match_penalty = matching_penalty(opts,
                                                         self.pi0, self.pi,
-                                                        self.enc_mean, self.enc_Sigma,
+                                                        self.enc_mean, self.enc_sigma,
                                                         self.pz_mean, self.pz_sigma,
                                                         self.sample_mix_noise, self.mixtures_encoded)
         # Compute Unlabeled obj
@@ -144,7 +144,7 @@ class WAE(object):
         # tf.add_to_collection('is_training_ph', self.is_training)
         # if self.enc_mean is not None:
         #     tf.add_to_collection('encoder_mean', self.enc_mean)
-        #     tf.add_to_collection('encoder_var', self.enc_Sigma)
+        #     tf.add_to_collection('encoder_var', self.enc_sigma)
         # tf.add_to_collection('encoder', self.encoded_point)
         # tf.add_to_collection('decoder', self.decoded)
         #tf.add_to_collection('lambda', self.lmbd)
