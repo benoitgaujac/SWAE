@@ -202,8 +202,10 @@ def wae_recons_loss(opts, pi, x1, x2):
     """
     # Data shape
     shpe = datashapes[opts['dataset']]
-    data = tf.reshape(contrast_norm(x1),[-1,1,1]+shpe)
-    x2 = contrast_norm(x2)
+    data = tf.reshape(x1,[-1,1,1]+shpe)
+    # Normilize the contrast
+    # data = tf.reshape(contrast_norm(x1),[-1,1,1]+shpe)
+    # x2 = contrast_norm(x2)
     if opts['cost'] == 'l2':
         # c(x,y) = ||x - y||_2
         cost = tf.reduce_sum(tf.square(data - x2), axis=[-3,-2,-1])
