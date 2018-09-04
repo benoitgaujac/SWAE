@@ -319,7 +319,7 @@ class WAE(object):
         # Compute bluriness of real data
         real_blurr = self.sess.run(self.blurriness, feed_dict={
                                                         self.points: data.data[:npics]})
-        logging.error('Real pictures sharpness = %.5f' % np.min(real_blurr))
+        logging.error('Real pictures sharpness = %10.4e' % np.min(real_blurr))
         print('')
 
         losses, losses_rec, losses_match, losses_VAE = [], [], [], []
@@ -467,7 +467,7 @@ class WAE(object):
                     logging.error(debug_str)
                     debug_str = 'TRAIN LOSS=%.3f' % (losses[-1])
                     logging.error(debug_str)
-                    debug_str = 'ACC=%.2f, BLUR=%.3f ' % (100*accuracies[-1],
+                    debug_str = 'ACC=%.2f, BLUR=%10.4e' % (100*accuracies[-1],
                                                         mean_blurr[-1])
                     logging.error(debug_str)
                     if opts['method']=='swae':

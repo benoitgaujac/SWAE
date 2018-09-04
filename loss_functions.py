@@ -206,16 +206,16 @@ def wae_recons_loss(opts, pi, x1, x2):
     x2 = contrast_norm(x2)
     if opts['cost'] == 'l2':
         # c(x,y) = ||x - y||_2
-        cost = tf.reduce_sum(tf.square(data - x2), axis=[3,4,5])
+        cost = tf.reduce_sum(tf.square(data - x2), axis=[-3,-2,-1])
         cost = tf.sqrt(1e-10 + cost)
         cost = tf.reduce_mean(cost,axis=-1)
     elif opts['cost'] == 'l2sq':
         # c(x,y) = ||x - y||_2^2
-        cost = tf.reduce_sum(tf.square(data - x2), axis=[3,4,5])
+        cost = tf.reduce_sum(tf.square(data - x2), axis=[-3,-2,-1])
         cost = tf.reduce_mean(cost,axis=-1)
     elif opts['cost'] == 'l1':
         # c(x,y) = ||x - y||_1
-        cost = tf.reduce_sum(tf.abs(data - x2), axis=[3,4,5])
+        cost = tf.reduce_sum(tf.abs(data - x2), axis=[-3,-2,-1])
         cost = tf.reduce_mean(cost,axis=-1)
     else:
         assert False, 'Unknown cost function %s' % opts['cost']
@@ -255,7 +255,7 @@ def vae_betabinomial_recons_loss(opts, pi, x1, x2):
 
     eps = 1e-10
     l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
-    loss = tf.reduce_sum(l,axis=[2,3,4])
+    loss = tf.reduce_sum(l,axis=[-3,-2,-1])
     loss = tf.reduce_sum(tf.multiply(loss,pi))
     loss = tf.reduce_mean(loss)
     return -loss
