@@ -7,7 +7,7 @@ import tensorflow as tf
 
 import pdb
 
-cat_initializer = tf.random_normal_initializer(mean=0.0, stddev=.1, dtype=tf.float32)
+cat_initializer = tf.random_normal_initializer(mean=0.0, stddev=.1, dtype=tf.float64)
 
 
 def init_gaussian_prior(opts):

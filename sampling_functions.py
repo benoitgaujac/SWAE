@@ -7,7 +7,7 @@ import tensorflow as tf
 
 import pdb
 
-def sample_mixtures(opts, means, covs, num=100,typ='numpy'):
+def sample_mixtures(opts, means, covs, batch_size=100, samples_size=1, typ='numpy'):
     """
     Sample noise from gaussian distribution with parameters
     means and covs
@@ -15,35 +15,35 @@ def sample_mixtures(opts, means, covs, num=100,typ='numpy'):
     if typ =='tensorflow':
         mean = tf.expand_dims(means,axis=2)
         cov = tf.expand_dims(covs,axis=2)
-        eps = tf.random_normal([num,opts['nmixtures'],opts['nsamples'],
+        eps = tf.random_normal([batch_size,opts['nmixtures'],samples_size,
                                                         opts['zdim']],
                                                         dtype=tf.float32)
         noise = mean + tf.multiply(eps,tf.sqrt(1e-8+cov))
-        # eps = tf.random_normal([num,opts['nmixtures'],opts['zdim']],
+        # eps = tf.random_normal([batch_size,opts['nmixtures'],opts['zdim']],
         #                                                 dtype=tf.float32)
         #noise = means + tf.multiply(eps,tf.sqrt(1e-8+covs))
     elif typ =='numpy':
         mean = np.expand_dims(means,axis=1)
-        eps = np.random.normal(0.,1.,(num, opts['nmixtures'],opts['nsamples'],
+        eps = np.random.normal(0.,1.,(batch_size, opts['nmixtures'],samples_size,
                                                         opts['zdim'])).astype(np.float32)
         noise = mean + np.multiply(eps,np.sqrt(1e-8+covs))
-        #eps = np.random.normal(0.,1.,(num, opts['nmixtures'],opts['zdim'])).astype(np.float32)
+        #eps = np.random.normal(0.,1.,(batch_size, opts['nmixtures'],opts['zdim'])).astype(np.float32)
         # noise = means + np.multiply(eps,np.sqrt(1e-8+covs))
     return noise
 
 
-def sample_pz(opts, means, covs, num=100, sampling_mode='one_mixture'):
+def sample_pz(opts, means, covs, batch_size=100, sampling_mode='one_mixture'):
     """
     Sample prior noise according to sampling_mode
     """
     noise = None
-    noises = sample_mixtures(opts,means,covs,num)
+    noises = sample_mixtures(opts,means,covs,batch_size,1,'numpy')
     if sampling_mode == 'one_mixture':
-        mixture = np.random.randint(opts['nmixtures'],size=num)
-        noise = noises[np.arange(num),mixture,0]
-        #noise = noises[np.arange(num),mixture]
+        mixture = np.random.randint(opts['nmixtures'],size=batch_size)
+        noise = noises[np.arange(batch_size),mixture,0]
+        #noise = noises[np.arange(batch_size),mixture]
     elif sampling_mode == 'per_mixture':
-        samples_per_mixture = ceil(num / opts['nmixtures'])
+        samples_per_mixture = ceil(batch_size / opts['nmixtures'])
         noise = noises[:samples_per_mixture,:,0]
         #noise = noises[:samples_per_mixture]
     elif sampling_mode == 'all_mixtures':
