@@ -19,7 +19,7 @@ def matching_penalty(opts, pi0, pi, encoded_mean, encoded_sigma,
     pi: variational weights [batch,K]
     """
     if opts['method']=='swae':
-        kl_g, kl_d, match_loss = wae_matching_penalty(opts, pi0, pi,
+        kl_g, kl_d, match_loss, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list = wae_matching_penalty(opts, pi0, pi,
                                                         samples_pz, samples_qz)
     elif opts['method']=='vae':
         kl_g, kl_d, match_loss = vae_matching_penalty(opts, pi0, pi,
@@ -27,7 +27,7 @@ def matching_penalty(opts, pi0, pi, encoded_mean, encoded_sigma,
                                                         pz_mean, pz_sigma)
     else:
         assert False, 'Unknown algo %s' % opts['method']
-    return kl_g, kl_d, match_loss
+    return kl_g, kl_d, match_loss, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list
 
 
 def wae_matching_penalty(opts, pi0, pi, samples_pz, samples_qz):
@@ -35,9 +35,9 @@ def wae_matching_penalty(opts, pi0, pi, samples_pz, samples_qz):
     Compute the WAE's matching penalty
     (add here other penalty if any)
     """
-    cont_penalty = mmd_penalty(opts, pi0, pi, samples_pz, samples_qz)
+    cont_penalty, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list = mmd_penalty(opts, pi0, pi, samples_pz, samples_qz)
 
-    return None, None, cont_penalty
+    return None, None, cont_penalty, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list
 
 
 def mmd_penalty(opts, pi0, pi, sample_pz, sample_qz):
@@ -47,12 +47,12 @@ def mmd_penalty(opts, pi0, pi, sample_pz, sample_qz):
     pi: variational weights [batch,K]
     """
     # Compute MMD
-    MMD = mmd(opts, pi0, pi, sample_pz, sample_qz)
+    MMD, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list = mmd(opts, pi0, pi, sample_pz, sample_qz)
     if opts['sqrt_MMD']:
         MMD_penalty = tf.exp(tf.log(MMD+1e-8)/2.)
     else:
         MMD_penalty = MMD
-    return MMD_penalty
+    return MMD_penalty, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list
 
 
 def mmd(opts, pi0, pi, sample_pz, sample_qz):
@@ -76,7 +76,7 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
     n = tf.cast(n, tf.int32)
     nf = tf.cast(n, tf.float32)
     half_size = tf.cast((n * n - n) / 2,tf.int32)
-    ns = tf.cast(opts['nmixtures'], tf.float32)
+    ns = tf.cast(opts['nsamples'], tf.float32)
 
     norms_pz = tf.reduce_sum(tf.square(sample_pz), axis=-1, keepdims=False)
     norms_qz = tf.reduce_sum(tf.square(sample_qz), axis=-1, keepdims=False)
@@ -113,74 +113,90 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
         shpe = [-1,opts['nmixtures']]
         Cbase = 2 * opts['zdim'] * sigma2_p
         res = 0.
+        res_list = []
         base_scale = [1.,2.,5.]
-        scales = [base_scale[i]*pow(10.,j) for j in range(-2,3) for i in range(len(base_scale))]
+        #scales = [base_scale[i]*pow(10.,j) for j in range(-2,3) for i in range(len(base_scale))]
+        scales = [base_scale[i]*pow(10.,j) for j in range(2,-3,-1) for i in range(len(base_scale)-1,-1,-1)]
         #for scale in [.1, .2, .5, 1., 2., 5., 10., 20., 50., 100.]:
         for scale in scales:
             C = Cbase * scale
             # First 2 terms of the MMD
             # pz term
-            K_pz = tf.reduce_sum(C / (C + distances_pz),axis=[2,-1])
+            K_pz = tf.reduce_mean(C / (C + distances_pz),axis=[2,-1])
             K_pz = tf.multiply(K_pz,tf.reshape(pi0,[1,opts['nmixtures'],1,1]))
             K_pz = tf.multiply(K_pz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
             res1_pz = tf.reduce_sum(K_pz)
             res1_pz /= (nf * nf)
-            K_pz_trace_K = tf.trace(tf.transpose(K_pz,perm=[0,2,1,3]))
-            res2_pz = tf.reduce_sum(K_pz_trace_K)
+            res2_pz = tf.trace(tf.reduce_sum(K_pz,axis=[0,2]))
             res2_pz /= ((nf * nf - nf) * nf)
-            res3_pz = tf.trace(K_pz_trace_K)
+            res3_pz = tf.trace(tf.trace(tf.transpose(K_pz,perm=[0,2,1,3])))
             res3_pz /= (nf * nf - nf)
             res_pz = res1_pz + res2_pz - res3_pz
+            # K_pz_trace_K = tf.trace(tf.transpose(K_pz,perm=[0,2,1,3]))
+            # res2_pz = tf.reduce_sum(K_pz_trace_K)
+            # res2_pz /= ((nf * nf - nf) * nf)
+            # res3_pz = tf.trace(K_pz_trace_K)
+            # res3_pz /= (nf * nf - nf)
+            # res_pz = res1_pz + res2_pz - res3_pz
             # qz term
-            K_qz = tf.reduce_sum(C / (C + distances_qz),axis=[2,-1])
+            K_qz = tf.reduce_mean(C / (C + distances_qz),axis=[2,-1])
             K_qz = tf.multiply(K_qz, tf.reshape(pi,shpe+[1,1]))
             K_qz = tf.multiply(K_qz, tf.reshape(pi,[1,1]+shpe))
+            K_qz = tf.reduce_sum(K_qz,axis=[1,3])
             res1_qz = tf.reduce_sum(K_qz)
-            res1_qz /= (ns * ns)
-            res1_qz /= (nf * nf - nf)
-            res1_qz *= (N - 1.) / N
-            K_qz_trace_batch = tf.trace(tf.transpose(K_qz,perm=[1,3,0,2]))
-            res2_qz = tf.reduce_sum(K_qz_trace_batch)
-            res2_qz /= (ns * ns)
-            res2_qz *= (ns - N) / ((nf * nf - nf) * N)
-            res3_qz = tf.trace(K_qz_trace_batch)
-            res3_qz /= ((ns * ns - ns) * ns)
-            K_qz_diag = tf.trace(tf.transpose(C / (C + distances_qz),perm=[0,1,3,4,2,5]))
-            K_qz_diag = tf.multiply(K_qz_diag, tf.reshape(pi,shpe+[1,1]))
-            K_qz_diag = tf.multiply(K_qz_diag, tf.reshape(pi,[1,1]+shpe))
-            res4_qz = tf.trace(tf.trace(tf.transpose(K_qz_diag,perm=[1,3,0,2])))
-            res4_qz /= (ns * ns - ns)
-            res4_qz /= nf
-            res4_qz /= N
-            res_qz = res1_qz + res2_qz + res3_qz - res4_qz
+            #res1_qz /= (ns * ns)
+            #res1_qz /= (nf * nf - nf)
+            #res1_qz *= (N - 1.) / N
+            res2_qz = tf.trace(K_qz)
+            #res2_qz /= (ns * ns)
+            #res2_qz /= (nf * nf - nf)
+            res_qz = res1_qz - res2_qz
+            res_qz /= (nf * nf - nf)
+            # K_qz_trace_batch = tf.trace(tf.transpose(K_qz,perm=[1,3,0,2]))
+            # res2_qz = tf.reduce_sum(K_qz_trace_batch)
+            # res2_qz /= (ns * ns)
+            # res2_qz /= (nf * nf - nf)
+            #res2_qz *= (N - 1.) / N
+            # res2_qz *= (ns - N) / ((nf * nf - nf) * N)
+            # res3_qz = tf.trace(K_qz_trace_batch)
+            # res3_qz /= ((ns * ns - ns) * ns)
+            # K_qz_diag = tf.trace(tf.transpose(C / (C + distances_qz),perm=[0,1,3,4,2,5]))
+            # K_qz_diag = tf.multiply(K_qz_diag, tf.reshape(pi,shpe+[1,1]))
+            # K_qz_diag = tf.multiply(K_qz_diag, tf.reshape(pi,[1,1]+shpe))
+            # res4_qz = tf.trace(tf.trace(tf.transpose(K_qz_diag,perm=[1,3,0,2])))
+            # res4_qz /= (ns * ns - ns)
+            # res4_qz /= nf
+            # res4_qz /= N
+            # res_qz = res1_qz + res2_qz + res3_qz - res4_qz
             # Cross term of the MMD
-            K_pzqz = tf.reduce_mean(C / (C + distances),axis=[2,-1])
-            res_pzqz = tf.multiply(K_pzqz, tf.reshape(pi,shpe+[1,1]))
-            res_pzqz = tf.multiply(res_pzqz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
-            res_pzqz = tf.reduce_sum(res_pzqz) / (nf * nf)
-            res += (res_pz + res_qz) - 2. * res_pzqz
+            K_qzpz = tf.reduce_mean(C / (C + distances),axis=[2,-1])
+            res_qzpz = tf.multiply(K_qzpz, tf.reshape(pi,shpe+[1,1]))
+            res_qzpz = tf.multiply(res_qzpz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
+            res_qzpz = tf.reduce_sum(res_qzpz) / (nf * nf)
+            res_list.append(res_pz + res_qz - 2. * res_qzpz)
+            res += res_pz + res_qz - 2. * res_qzpz
     else:
         raise ValueError('%s Unknown kernel' % kernel)
     #return res
-    return res
+    res_list = tf.stack(res_list)
+    return res, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list
 
 
 def square_dist(opts, sample_x, norms_x, sample_y, norms_y):
     """
     Wrapper to compute square distance
     """
-    sample_x_shape = tf.shape(sample_x)
-    nx_reshape = tf.reshape(norms_x,tf.concat([sample_x_shape[:3],
+    norms_x_shape = tf.shape(norms_x)
+    nx_reshape = tf.reshape(norms_x,tf.concat([norms_x_shape,
                                               tf.constant([1,1,1])],
                                               axis=-1))
-    sample_y_shape = tf.shape(sample_y)
+    norms_y_shape = tf.shape(norms_y)
     ny_reshape = tf.reshape(norms_y,tf.concat([tf.constant([1,1,1]),
-                                              sample_y_shape[:3]],
+                                              norms_y_shape],
                                               axis=-1))
     dotprod = tf.tensordot(sample_x, sample_y, [[-1],[-1]])
-    # nx_reshpe = tf.reshape(norms_x,shpe+[1,1])
-    # ny_reshpe = tf.reshape(norms_y,[1,1]+shpe)
     distances = nx_reshape + ny_reshape - 2. * dotprod
+    #return tf.nn.relu(distances)
     return distances
 
 
