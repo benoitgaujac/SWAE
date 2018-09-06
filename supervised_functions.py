@@ -21,7 +21,10 @@ def get_mean_probs(opts,labels,probs):
     num_pics = np.shape(probs)[0]
     for i in range(opts['nclasses']):
         prob = [probs[k] for k in range(num_pics) if labels[k]==i]
-        prob = np.mean(np.stack(prob,axis=0),axis=0)
+        if prob==[]:
+            prob = np.zeros(np.shape(probs)[1])
+        else:
+            prob = np.mean(np.stack(prob,axis=0),axis=0)
         mean_probs.append(prob)
     mean_probs = np.stack(mean_probs,axis=0)
     return mean_probs
