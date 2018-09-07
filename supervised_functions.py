@@ -27,10 +27,10 @@ def get_mean_probs(opts,labels,probs):
             prob = np.mean(np.stack(prob,axis=0),axis=0)
         mean_probs.append(prob)
     mean_probs = np.stack(mean_probs,axis=0)
-    #return mean_probs
+    return mean_probs
 
-    cluster_to_digit = relabelling_mask_from_probs(mean_probs)
-    return cluster_to_digit
+    # cluster_to_digit = relabelling_mask_from_probs(mean_probs)
+    # return cluster_to_digit
 
 def relabelling_mask_from_probs(opts, mean_probs):
     if opts['nmixtures']>1:
