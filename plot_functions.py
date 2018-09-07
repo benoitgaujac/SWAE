@@ -153,15 +153,16 @@ def save_train(opts, sample_train, sample_test,
         mean_probs.append(probs)
     mean_probs = np.stack(mean_probs,axis=0)
     # # entropy
+    # entropies = calculate_row_entropy(mean_probs)
     cluster_to_digit = relabelling_mask_from_probs(opts,mean_probs)
     digit_to_cluster = np.argsort(cluster_to_digit)
-    mean_probs = mean_probs[::-1,digit_to_cluster]
+    mean_probs = mean_probs[cluster_to_digit]
     ax = plt.subplot(gs[1, 0])
     plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
     plt.text(0.47, 1., 'Test means probs',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
     #plt.yticks(np.arange(10),relab_mask)
-    plt.xticks(np.arange(10))
+    plt.xticks(np.arange(10),digit_to_cluster)
 
     # ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])
