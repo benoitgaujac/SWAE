@@ -444,7 +444,7 @@ def save_vizu(opts, data_train, data_test,              # images
     # entropy
     #entropies = calculate_row_entropy(mean_probs)
     #cluster_to_digit = relabelling_mask_from_entropy(mean_probs, entropies)
-    cluster_to_digit = relabelling_mask_from_probs(mean_probs)
+    cluster_to_digit = relabelling_mask_from_probs(opts,mean_probs)
     digit_to_cluster = np.argsort(cluster_to_digit)
     mean_probs = mean_probs[::-1,digit_to_cluster]
     fig = plt.figure(figsize=(fig_width, fig_height))
