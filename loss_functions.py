@@ -196,8 +196,8 @@ def square_dist(opts, sample_x, norms_x, sample_y, norms_y):
                                               axis=-1))
     dotprod = tf.tensordot(sample_x, sample_y, [[-1],[-1]])
     distances = nx_reshape + ny_reshape - 2. * dotprod
-    #return tf.nn.relu(distances)
-    return distances
+    #return distances
+    return tf.nn.relu(distances)
 
 
 def vae_matching_penalty(opts, pi0, pi, encoded_mean, encoded_sigma,
