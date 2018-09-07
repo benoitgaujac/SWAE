@@ -280,6 +280,33 @@ class WAE(object):
         _, lapvar = tf.nn.moments(conv, axes=[1, 2, 3])
         return lapvar
 
+    def compute_FID(self):
+        # Path to inception model and stats for training set
+        inception_path = '../inception'
+        inception_model = os.path.join(inception_path, 'classify_image_graph_def.pb')
+        trained_stats = os.path.join(inception_path, 'fid_stats.npz')
+        # Load trained stats
+        f = np.load(trained_stats)
+        trained_m, trained_s = f['mu'][:], f['sigma'][:]
+        f.close()
+
+
+        images = self.points
+
+        # Convert to greyscale
+        if self.data_shape[-1] == 1:
+            # We have greyscale
+            images = tf.image.grayscale_to_rgb(images)
+        # Create inception graph
+        fid.create_inception_graph(inception_path)
+        lap_filter = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+        lap_filter = lap_filter.reshape([3, 3, 1, 1])
+        conv = tf.nn.conv2d(images, lap_filter,
+                            strides=[1, 1, 1, 1], padding='VALID')
+        _, lapvar = tf.nn.moments(conv, axes=[1, 2, 3])
+        return lapvar
+
+
     def train(self, data, MODEL_DIR, WEIGHTS_FILE):
         """
         Train MoG model with chosen method
