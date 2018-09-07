@@ -74,7 +74,7 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             assert False, 'data_set_size unknown. To implement'
     n = utils.get_batch_size(sample_qz)
     n = tf.cast(n, tf.int32)
-    nf = tf.cast(n, tf.float32)
+    nb = tf.cast(n, tf.float32)
     half_size = tf.cast((n * n - n) / 2,tf.int32)
     ns = tf.cast(opts['nsamples'], tf.float32)
 
@@ -101,12 +101,12 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
         res1 = res1_qz + res1_pz
         # Correcting for diagonal terms
         res1_diag = tf.trace(tf.reduce_sum(res1,axis=[1,-1]))
-        res1 = (tf.reduce_sum(res1) - res1_diag) / (nf * nf - nf)
+        res1 = (tf.reduce_sum(res1) - res1_diag) / (nb * nb - nb)
         # Cross term of the MMD
         res2 = tf.exp( - distances / 2. / sigma2_k)
         res2 = tf.multiply(res2, tf.reshape(pi,shpe+[1,1]))
         res2 = tf.multiply(res2,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
-        res2 = tf.reduce_sum(res2) / (nf * nf)
+        res2 = tf.reduce_sum(res2) / (nb * nb)
         res = res1 - 2. * res2
     elif kernel == 'IMQ':
         # k(x, y) = C / (C + ||x - y||^2)
@@ -126,17 +126,17 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             K_pz = tf.multiply(K_pz,tf.reshape(pi0,[1,opts['nmixtures'],1,1]))
             K_pz = tf.multiply(K_pz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
             res1_pz = tf.reduce_sum(K_pz)
-            res1_pz /= (nf * nf)
+            res1_pz /= (nb * nb)
             res2_pz = tf.trace(tf.reduce_sum(K_pz,axis=[0,2]))
-            res2_pz /= ((nf * nf - nf) * nf)
+            res2_pz /= ((nb * nb - nb) * nb)
             res3_pz = tf.trace(tf.trace(tf.transpose(K_pz,perm=[0,2,1,3])))
-            res3_pz /= (nf * nf - nf)
+            res3_pz /= (nb * nb - nb)
             res_pz = res1_pz + res2_pz - res3_pz
             # K_pz_trace_K = tf.trace(tf.transpose(K_pz,perm=[0,2,1,3]))
             # res2_pz = tf.reduce_sum(K_pz_trace_K)
-            # res2_pz /= ((nf * nf - nf) * nf)
+            # res2_pz /= ((nb * nb - nb) * nb)
             # res3_pz = tf.trace(K_pz_trace_K)
-            # res3_pz /= (nf * nf - nf)
+            # res3_pz /= (nb * nb - nb)
             # res_pz = res1_pz + res2_pz - res3_pz
             # qz term
             K_qz = tf.reduce_mean(C / (C + distances_qz),axis=[2,-1])
@@ -145,19 +145,19 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             K_qz = tf.reduce_sum(K_qz,axis=[1,3])
             res1_qz = tf.reduce_sum(K_qz)
             #res1_qz /= (ns * ns)
-            #res1_qz /= (nf * nf - nf)
+            #res1_qz /= (nb * nb - nb)
             #res1_qz *= (N - 1.) / N
             res2_qz = tf.trace(K_qz)
             #res2_qz /= (ns * ns)
-            #res2_qz /= (nf * nf - nf)
+            #res2_qz /= (nb * nb - nb)
             res_qz = res1_qz - res2_qz
-            res_qz /= (nf * nf - nf)
+            res_qz /= (nb * nb - nb)
             # K_qz_trace_batch = tf.trace(tf.transpose(K_qz,perm=[1,3,0,2]))
             # res2_qz = tf.reduce_sum(K_qz_trace_batch)
             # res2_qz /= (ns * ns)
-            # res2_qz /= (nf * nf - nf)
+            # res2_qz /= (nb * nb - nb)
             #res2_qz *= (N - 1.) / N
-            # res2_qz *= (ns - N) / ((nf * nf - nf) * N)
+            # res2_qz *= (ns - N) / ((nb * nb - nb) * N)
             # res3_qz = tf.trace(K_qz_trace_batch)
             # res3_qz /= ((ns * ns - ns) * ns)
             # K_qz_diag = tf.trace(tf.transpose(C / (C + distances_qz),perm=[0,1,3,4,2,5]))
@@ -165,14 +165,14 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             # K_qz_diag = tf.multiply(K_qz_diag, tf.reshape(pi,[1,1]+shpe))
             # res4_qz = tf.trace(tf.trace(tf.transpose(K_qz_diag,perm=[1,3,0,2])))
             # res4_qz /= (ns * ns - ns)
-            # res4_qz /= nf
+            # res4_qz /= nb
             # res4_qz /= N
             # res_qz = res1_qz + res2_qz + res3_qz - res4_qz
             # Cross term of the MMD
             K_qzpz = tf.reduce_mean(C / (C + distances),axis=[2,-1])
             res_qzpz = tf.multiply(K_qzpz, tf.reshape(pi,shpe+[1,1]))
             res_qzpz = tf.multiply(res_qzpz,tf.reshape(pi0,[1,1,1,opts['nmixtures']]))
-            res_qzpz = tf.reduce_sum(res_qzpz) / (nf * nf)
+            res_qzpz = tf.reduce_sum(res_qzpz) / (nb * nb)
             res_list.append(res_pz + res_qz - 2. * res_qzpz)
             res += res_pz + res_qz - 2. * res_qzpz
     else:
