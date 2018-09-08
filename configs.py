@@ -45,7 +45,7 @@ config_mnist['cost'] = 'l2sq' #l2, l2sq, l1, l2sq_wrong
 config_mnist['sqrt_MMD'] = False #use true MMD estimator or square estimator
 config_mnist['mmd_kernel'] = 'IMQ' # RBF, IMQ
 config_mnist['lambda'] = 350.
-config_mnist['lambda_schedule'] == 'adaptive' #  adaptive, constant
+config_mnist['lambda_schedule'] = 'adaptive' #  adaptive, constant
 
 # Model set up
 config_mnist['zdim'] = 9
