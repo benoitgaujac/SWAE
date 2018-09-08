@@ -22,7 +22,7 @@ def save_train(opts, sample_train, sample_test,
                      losses, losses_match,
                      losses_rec, loss_rec_test, losses_vae,
                      kl_gau, kl_dis,
-                     mean_blurr, true_blurr,
+                     mean_blurr, true_blurr, fid_scores,
                      accuracies,
                      work_dir,
                      filename):
@@ -154,15 +154,20 @@ def save_train(opts, sample_train, sample_test,
     mean_probs = np.stack(mean_probs,axis=0)
     # # entropy
     # entropies = calculate_row_entropy(mean_probs)
+
     cluster_to_digit = relabelling_mask_from_probs(opts,mean_probs)
     digit_to_cluster = np.argsort(cluster_to_digit)
-    mean_probs = mean_probs[cluster_to_digit]
+    mean_probs = mean_probs[::-1,cluster_to_digit]
     ax = plt.subplot(gs[1, 0])
     plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
-    plt.text(0.47, 1., 'Test means probs',
+    # plt.text(0.47, 1., 'Test means probs',
+    #        ha="center", va="bottom", size=20, transform=ax.transAxes)
+    plt.text(0.47, 1., '$\mathrm{\mathbb{E}}_x q_D(k\vert{X})$',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
     #plt.yticks(np.arange(10),relab_mask)
-    plt.xticks(np.arange(10),digit_to_cluster)
+    #plt.xticks(np.arange(10),digit_to_cluster)
+    plt.yticks(np.arange(10),np.arange(10)[::-1])
+    plt.xticks(np.arange(10))
 
     # ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])
@@ -227,10 +232,6 @@ def save_train(opts, sample_train, sample_test,
         y = np.log(opts['lambda']*np.abs(l[::x_step]))
         plt.plot(x, y, linewidth=2, color='blue', label='|MMD|')
 
-        # l = np.array(losses_VAE)
-        # y = np.log(l[::x_step])
-        # plt.plot(x, y, linewidth=2, color='red', linestyle=(0, (5, 10)), label='VAE rec')
-
     plt.grid(axis='y')
     plt.legend(loc='lower left')
     plt.text(0.47, 1., 'Loss curves', ha="center", va="bottom",
@@ -262,8 +263,9 @@ def save_train(opts, sample_train, sample_test,
                     loss_match=np.array(losses_match[::x_step]),
                     kl_cont=np.array(kl_gau[::x_step]),
                     kl_disc=np.array(kl_dis[::x_step]),
-                    mean_fid=np.array(mean_blurr),
-                    true_fid=np.array(true_blurr),
+                    mean_blurr=np.array(mean_blurr),
+                    true_blurr=np.array(true_blurr),
+                    fid=np.array(true_blurr),
                     acc=np.array(accuracies))
     else:
         np.savez(os.path.join(save_path,name),
@@ -276,8 +278,9 @@ def save_train(opts, sample_train, sample_test,
                     loss_rec_test=np.array(loss_rec_test),
                     loss_vae=np.array(losses_vae[::x_step]),
                     loss_match=np.array(np.array(losses_match[::x_step])),
-                    mean_fid=np.array(mean_blurr),
-                    true_fid=np.array(true_blurr),
+                    mean_blurr=np.array(mean_blurr),
+                    true_blurr=np.array(true_blurr),
+                    fid=np.array(true_blurr),
                     acc=np.array(accuracies))
 
 def save_vizu(opts, data_train, data_test,              # images

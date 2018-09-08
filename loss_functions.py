@@ -243,9 +243,6 @@ def wae_recons_loss(opts, pi, x1, x2):
     # Data shape
     shpe = datashapes[opts['dataset']]
     data = tf.reshape(x1,[-1,1,1]+shpe)
-    # Normilize the contrast
-    # data = tf.reshape(contrast_norm(x1),[-1,1,1]+shpe)
-    # x2 = contrast_norm(x2)
     if opts['cost'] == 'l2':
         # c(x,y) = ||x - y||_2
         cost = tf.reduce_sum(tf.square(data - x2), axis=[-3,-2,-1])
@@ -290,32 +287,36 @@ def vae_bernoulli_recons_loss(opts, pi, x1, x2):
     return -loss
 
 
-def vae_betabinomial_recons_loss(opts, pi, x1, x2):
-    """
-    Compute the VAE's reconstruction losses
-    with beta-binomial observation model
-    """
-    real = tf.expand_dims(x1,axis=1)
-    alpha, beta = tf.split(mean_params,2,axis=-1)
-
-    eps = 1e-10
-    l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
-    loss = tf.reduce_sum(l,axis=[-3,-2,-1])
-    loss = tf.reduce_sum(tf.multiply(loss,pi))
-    loss = tf.reduce_mean(loss)
-    return -loss
+# def vae_betabinomial_recons_loss(opts, pi, x1, x2):
+#     """
+#     Compute the VAE's reconstruction losses
+#     with beta-binomial observation model
+#     """
+#     real = tf.expand_dims(x1,axis=1)
+#     alpha, beta = tf.split(mean_params,2,axis=-1)
+#
+#     eps = 1e-10
+#     l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
+#     loss = tf.reduce_sum(l,axis=[-3,-2,-1])
+#     loss = tf.reduce_sum(tf.multiply(loss,pi))
+#     loss = tf.reduce_mean(loss)
+#     return -loss
 
 
 def moments_loss(prior_samples, model_samples):
     # Matching the first 2 moments (mean and covariance)
     # Means
-    qz_means = tf.reduce_mean(model_samples, axis=0, keepdims=True)
-    pz_mean = tf.reduce_mean(prior_samples, axis=0, keepdims=True)
+    #qz_means = tf.reduce_mean(model_samples, axis=0, keepdims=True)
+    qz_means = tf.reduce_mean(model_samples, axis=[0,2], keepdims=True)
+    #pz_mean = tf.reduce_mean(prior_samples, axis=0, keepdims=True)
+    pz_mean = tf.reduce_mean(prior_samples, axis=[0,2], keepdims=True)
     mean_loss = tf.reduce_sum(tf.square(qz_means - pz_mean),axis=-1)
     mean_loss = tf.reduce_mean(mean_loss)
     # Covariances
-    qz_covs = tf.reduce_mean(tf.square(model_samples-qz_means),axis=0)
-    pz_cov = tf.reduce_mean(tf.square(prior_samples-pz_mean),axis=0)
+    qz_covs = tf.reduce_mean(tf.square(model_samples-qz_means),axis=[0,2])
+    pz_cov = tf.reduce_mean(tf.square(prior_samples-pz_mean),axis=[0,2])
+    # qz_covs = tf.reduce_mean(tf.square(model_samples-qz_means),axis=0)
+    # pz_cov = tf.reduce_mean(tf.square(prior_samples-pz_mean),axis=0)
     cov_loss = tf.reduce_sum(tf.square(qz_covs - pz_cov),axis=-1)
     cov_loss = tf.reduce_mean(cov_loss)
     # Loss

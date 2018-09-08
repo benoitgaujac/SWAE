@@ -8,6 +8,8 @@ Wasserstein Auto-Encoder models
 """
 
 import sys
+sys.path.append('../TTUR')
+sys.path.append('../inception')
 import time
 import os
 import logging
@@ -18,6 +20,7 @@ import tensorflow as tf
 
 import ops
 import utils
+import fid
 from priors import init_gaussian_prior, init_cat_prior
 from sampling_functions import sample_mixtures, sample_pz, generate_linespace
 from loss_functions import matching_penalty, reconstruction_loss, vae_bernoulli_recons_loss, moments_loss
@@ -26,6 +29,11 @@ from plot_functions import save_train, save_vizu
 from model_nn import cat_encoder, gaussian_encoder
 from model_nn import continuous_decoder
 from datahandler import datashapes
+
+# Path to inception model and stats for training set
+inception_path = '../inception'
+inception_model = os.path.join(inception_path, 'classify_image_graph_def.pb')
+layername = 'FID_Inception_Net/pool_3:0'
 
 import pdb
 
@@ -89,7 +97,6 @@ class WAE(object):
         self.wae_log_reconstruct = vae_bernoulli_recons_loss(opts, self.pi,
                                                         self.points,
                                                         self.reconstructed)
-        # self.wae_log_reconstruct = tf.zeros([1])
         # Compute matching penalty cost
         self.kl_g, self.kl_d, self.match_penalty, self.distances_pz, self.distances_qz, self.distances, self.K_pz, self.K_qz, self.K_qzpz, self.res_list = matching_penalty(opts,
                                                         self.pi0, self.pi,
@@ -98,8 +105,15 @@ class WAE(object):
                                                         self.sample_mix_noise, self.mixtures_encoded)
         # Compute Unlabeled obj
         self.objective = self.loss_reconstruct + self.lmbd * self.match_penalty
+
         # FID score
         self.blurriness = self.compute_blurriness()
+        self.inception_graph = tf.Graph()
+        self.inception_sess = tf.Session(graph=self.inception_graph)
+        with self.inception_graph.as_default():
+            self.create_inception_graph()
+        self.inception_layer = self._get_inception_layer()
+
         # Pre Training
         self.pretrain_loss()
 
@@ -123,6 +137,9 @@ class WAE(object):
         self.sample_noise = tf.placeholder(tf.float32,
                                     [None] + [opts['nmixtures'],opts['zdim']],
                                     name='noise_ph')
+        # place holders for FID score
+        # self.mu_ref =
+        # self.sigma_ref =
         # placeholders fo logistic regression
         self.preds = tf.placeholder(tf.float32, [None, 10], name='predictions') # discrete probabilities
         self.y = tf.placeholder(tf.float32, [None, 10],name='labels') # 0-9 digits recognition => 10 classes
@@ -175,10 +192,10 @@ class WAE(object):
         if opts['clip_grad_cat']:
         # Clipping gradient if necessary
             grad_cat, var_cat = zip(*opt.compute_gradients(loss=self.objective,
-                                                    var_list=e_cat_vars))
+                                                        var_list=e_cat_vars))
             clip_grad, _ = tf.clip_by_global_norm(grad_cat, opts['clip_norm'])
             grad, var = zip(*opt.compute_gradients(loss=self.objective,
-                                                    var_list=e_gaus_vars+decoder_vars))
+                                                        var_list=e_gaus_vars+decoder_vars))
             self.swae_opt = opt.apply_gradients(zip(grad+tuple(clip_grad), var+var_cat))
         elif opts['different_lr_cat']:
         # Different lr for cat if necessary
@@ -280,31 +297,30 @@ class WAE(object):
         _, lapvar = tf.nn.moments(conv, axes=[1, 2, 3])
         return lapvar
 
-    def compute_FID(self):
-        # Path to inception model and stats for training set
-        inception_path = '../inception'
-        inception_model = os.path.join(inception_path, 'classify_image_graph_def.pb')
-        trained_stats = os.path.join(inception_path, 'fid_stats.npz')
-        # Load trained stats
-        f = np.load(trained_stats)
-        trained_m, trained_s = f['mu'][:], f['sigma'][:]
-        f.close()
-
-
-        images = self.points
-
-        # Convert to greyscale
-        if self.data_shape[-1] == 1:
-            # We have greyscale
-            images = tf.image.grayscale_to_rgb(images)
+    def create_inception_graph(self):
         # Create inception graph
-        fid.create_inception_graph(inception_path)
-        lap_filter = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
-        lap_filter = lap_filter.reshape([3, 3, 1, 1])
-        conv = tf.nn.conv2d(images, lap_filter,
-                            strides=[1, 1, 1, 1], padding='VALID')
-        _, lapvar = tf.nn.moments(conv, axes=[1, 2, 3])
-        return lapvar
+        with tf.gfile.FastGFile( inception_model, 'rb') as f:
+            graph_def = tf.GraphDef()
+            graph_def.ParseFromString( f.read())
+            _ = tf.import_graph_def( graph_def, name='FID_Inception_Net')
+
+    def _get_inception_layer(self):
+        # Get inception activation layer (and reshape for batching)
+        pool3 = self.inception_sess.graph.get_tensor_by_name(layername)
+        ops = pool3.graph.get_operations()
+        for op_idx, op in enumerate(ops):
+            for o in op.outputs:
+                shape = o.get_shape()
+                if shape._dims != []:
+                  shape = [s.value for s in shape]
+                  new_shape = []
+                  for j, s in enumerate(shape):
+                    if s == 1 and j == 0:
+                      new_shape.append(None)
+                    else:
+                      new_shape.append(s)
+                  o.__dict__['_shape_val'] = tf.TensorShape(new_shape)
+        return pool3
 
 
     def train(self, data, MODEL_DIR, WEIGHTS_FILE):
@@ -338,33 +354,37 @@ class WAE(object):
                 self.pretrain_encoder(data)
                 print('')
 
+        # Set up for training
         batches_num = int(train_size/opts['batch_size'])
         npics = opts['plot_num_pics']
         fixed_noise = sample_pz(opts, self.pz_mean, self.pz_sigma,
                                                         opts['plot_num_pics'],
                                                         sampling_mode = 'per_mixture')
-        self.start_time = time.time()
 
+        # Load inception mean samples for train set
+        trained_stats = os.path.join(inception_path, 'fid_stats.npz')
+        # Load trained stats
+        f = np.load(trained_stats)
+        self.mu_train, self.sigma_train = f['mu'][:], f['sigma'][:]
+        f.close()
         # Compute bluriness of real data
         real_blurr = self.sess.run(self.blurriness, feed_dict={
                                                         self.points: data.data[:npics]})
         logging.error('Real pictures sharpness = %10.4e' % np.min(real_blurr))
         print('')
 
-        losses, losses_rec, losses_match, losses_VAE = [], [], [], []
+        # Init all monitoring variables
+        losses = []
+        losses_rec, loss_rec_test, losses_VAE = [], [], []
+        losses_match = []
         kl_gau, kl_dis  = [], []
-        loss_rec_test, accuracies, mean_blurr, true_blurr = [], [], [], []
+        accuracies, mean_blurr, true_blurr, fid_scores = [], [], [], []
         decay, counter = 1., 0
-        wait = 0
+        wait, wait_lambda = 0, 0
+        wae_lambda = opts['lambda']
+        self.start_time = time.time()
         for epoch in range(opts['epoch_num']):
-            # Update learning rate if necessary
-            if epoch == 10:
-                decay = decay / 2.
-            if epoch == 20:
-                decay = decay / 5.
-            if epoch == 50:
-                decay = decay / 10.
-            # Save the model
+            # Saver
             if epoch > 0 and epoch % opts['save_every_epoch'] == 0:
                 self.saver.save(self.sess, os.path.join(
                                                         work_dir,'checkpoints',
@@ -384,7 +404,7 @@ class WAE(object):
                 feed_dict={self.points: batch_images,
                            self.sample_mix_noise: batch_mix_noise,
                            self.lr_decay: decay,
-                           self.lmbd: opts['lambda'],
+                           self.lmbd: wae_lambda,
                            self.is_training: True}
                 # Update encoder and decoder
                 if opts['method']=='swae':
@@ -398,7 +418,6 @@ class WAE(object):
                     #                             self.K_qzpz,
                     #                             self.res_list],
                     #                             feed_dict=feed_dict)
-                    # pdb.set_trace()
                     # print(loss_match)
                     # print(dp)
                     # print(dq)
@@ -488,18 +507,35 @@ class WAE(object):
                                                         feed_dict={self.points:data.data[200:200+npics],
                                                                    self.sample_noise: fixed_noise,
                                                                    self.is_training: False})
+
+                    # Compute FID score
                     flat_samples = np.reshape(sample_gen,[-1]+self.data_shape)
                     gen_blurr = self.sess.run(self.blurriness,
                                                         feed_dict={self.points: flat_samples})
                     mean_blurr.append(np.min(gen_blurr))
+                    # First convert to greyscale
+                    if np.shape(flat_samples)[-1] == 1:
+                        # We have RGB
+                        flat_samples = self.sess.run(tf.image.grayscale_to_rgb(flat_samples))
+                    preds_incep = self.inception_sess.run(self.inception_layer,
+                                  feed_dict={'FID_Inception_Net/ExpandDims:0': flat_samples})
+                    preds_incep = preds_incep.reshape((npics,-1))
+                    mu_gen = np.mean(preds_incep, axis=0)
+                    sigma_gen = np.cov(preds_incep, rowvar=False)
+                    fid_score = fid.calculate_frechet_distance(mu_gen,
+                                                        sigma_gen,
+                                                        self.mu_train,
+                                                        self.sigma_train,
+                                                        eps=1e-6)
+                    fid_scores.append(fid_score)
                     if opts['method']=='vae':
                         true_sample_gen = self.sess.run(self.vae_decoded,
-                                                            feed_dict={self.points:data.data[200:200+npics],
-                                                                       self.sample_noise: fixed_noise,
-                                                                       self.is_training: False})
+                                                        feed_dict={self.points:data.data[200:200+npics],
+                                                                   self.sample_noise: fixed_noise,
+                                                                   self.is_training: False})
                         flat_samples = np.reshape(true_sample_gen,[-1]+self.data_shape)
                         gen_blurr = self.sess.run(self.blurriness,
-                                                            feed_dict={self.points: flat_samples})
+                                                        feed_dict={self.points: flat_samples})
                         true_blurr.append(np.min(gen_blurr))
 
                     # Prior parameter
@@ -512,8 +548,10 @@ class WAE(object):
                     logging.error(debug_str)
                     debug_str = 'TRAIN LOSS=%.3f' % (losses[-1])
                     logging.error(debug_str)
-                    debug_str = 'ACC=%.2f, BLUR=%10.4e' % (100*accuracies[-1],
-                                                        mean_blurr[-1])
+                    debug_str = 'ACC=%.2f, BLUR=%10.4e, FID=%10.4e' % (
+                                                        100*accuracies[-1],
+                                                        mean_blurr[-1],
+                                                        fid_scores[-1])
                     logging.error(debug_str)
                     if opts['method']=='swae':
                         debug_str = 'TEST REC=%.3f, TRAIN REC=%.3f, '\
@@ -528,7 +566,6 @@ class WAE(object):
 
                     logging.error(debug_str)
                     debug_str = 'MATCH=%10.3e' % (losses_match[-1])
-                    #debug_str = 'MATCH=%.3f' % (opts['lambda']*losses_match[-1])
                     logging.error(debug_str)
                     debug_str = 'Clusters ID: %s' % (str(labelled_clusters))
                     logging.error(debug_str)
@@ -536,7 +573,6 @@ class WAE(object):
                     logging.error(debug_str)
                     print('')
                     # Making plots
-                    #logging.error('Saving images..')
                     save_train(opts, data.data[200:200+npics], data.test_data[:npics],          # images
                                      data.test_labels[:npics],                                  # labels
                                      decoded_train[:npics], decoded_test[:npics],               # reconstructions
@@ -547,24 +583,38 @@ class WAE(object):
                                      losses, losses_match,                                      # losses
                                      losses_rec, loss_rec_test, losses_VAE,                     # rec losses
                                      kl_gau, kl_dis,                                            # KL terms
-                                     mean_blurr, true_blurr,                                    # FID score
+                                     mean_blurr, true_blurr, fid_scores,                         # FID score
                                      accuracies,                                                # acc
                                      work_dir,                                                  # working directory
                                      'res_e%04d_mb%05d.png' % (epoch, it))                      # filename
 
                 # Update learning rate if necessary and counter
-                # First 30 epochs do nothing
-                if epoch >= 30:
-                    # If no significant progress was made in last 10 epochs
+                # First 20 epochs do nothing
+                if epoch >= 20:
+                    # If no significant progress was made in last 2 epochs
                     # then decrease the learning rate.
-                    if loss < min(losses[-20 * batches_num:]):
+                    if loss < min(losses[-10 * batches_num:]):
                         wait = 0
                     else:
                         wait += 1
-                    if wait > 10 * batches_num:
+                    if wait > 2 * batches_num:
                         decay = max(decay  / 1.4, 1e-6)
                         logging.error('Reduction in lr: %f' % decay)
+                        print('')
                         wait = 0
+                # Update regularizer if necessary
+                if opts['lambda_schedule'] == 'adaptive':
+                    if wait_lambda >= 999 and len(losses_rec) > 0:
+                        last_rec = losses_rec[-1]
+                        last_match = losses_match[-1]
+                        wae_lambda = 0.95 * wae_lambda + \
+                                     0.05 * last_rec / abs(last_match)
+                        logging.error('Lambda updated to %f' % wae_lambda)
+                        print('')
+                        wait_lambda = 0
+                    else:
+                        wait_lambda += 1
+
                 counter += 1
 
         # # Save the final model
