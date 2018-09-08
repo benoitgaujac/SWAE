@@ -607,8 +607,8 @@ class WAE(object):
                     if wait_lambda >= 999 and len(losses_rec) > 0:
                         last_rec = losses_rec[-1]
                         last_match = losses_match[-1]
-                        wae_lambda = 0.95 * wae_lambda + \
-                                     0.05 * last_rec / abs(last_match)
+                        wae_lambda = 0.98 * wae_lambda + \
+                                     0.02 * last_rec / abs(last_match)
                         logging.error('Lambda updated to %f' % wae_lambda)
                         print('')
                         wait_lambda = 0
