@@ -27,7 +27,7 @@ def matching_penalty(opts, pi0, pi, encoded_mean, encoded_sigma,
                                                         pz_mean, pz_sigma)
     else:
         assert False, 'Unknown algo %s' % opts['method']
-    return kl_g, kl_d, match_loss, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list
+    return kl_g, kl_d, match_loss#, distances_pz, distances_qz, distances, K_pz, K_qz, K_qzpz, res_list
 
 
 def wae_matching_penalty(opts, pi0, pi, samples_pz, samples_qz):

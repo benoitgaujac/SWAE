@@ -98,7 +98,8 @@ class WAE(object):
                                                         self.points,
                                                         self.reconstructed)
         # Compute matching penalty cost
-        self.kl_g, self.kl_d, self.match_penalty, self.distances_pz, self.distances_qz, self.distances, self.K_pz, self.K_qz, self.K_qzpz, self.res_list = matching_penalty(opts,
+        #self.kl_g, self.kl_d, self.match_penalty, self.distances_pz, self.distances_qz, self.distances, self.K_pz, self.K_qz, self.K_qzpz, self.res_list = matching_penalty(opts,
+        self.kl_g, self.kl_d, self.match_penalty = matching_penalty(opts,
                                                         self.pi0, self.pi,
                                                         self.enc_mean, self.enc_sigma,
                                                         self.pz_mean, self.pz_sigma,
