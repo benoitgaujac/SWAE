@@ -254,7 +254,7 @@ def save_train(opts, sample_train, sample_test,
     if len(kl_gau)>0:
         np.savez(os.path.join(save_path,name),
                     test_data=sample_test,
-                    test_label=sample_test,
+                    test_label=label_test,
                     rec_test=rec_test,
                     probs_test=mean_probs,
                     loss=np.array(losses[::x_step]),
@@ -265,12 +265,12 @@ def save_train(opts, sample_train, sample_test,
                     kl_disc=np.array(kl_dis[::x_step]),
                     mean_blurr=np.array(mean_blurr),
                     true_blurr=np.array(true_blurr),
-                    fid=np.array(true_blurr),
+                    fid=np.array(fid_scores),
                     acc=np.array(accuracies))
     else:
         np.savez(os.path.join(save_path,name),
                     test_data=sample_test,
-                    test_label=sample_test,
+                    test_label=label_test,
                     rec_test=rec_test,
                     probs_test=mean_probs,
                     loss=np.array(losses[::x_step]),
@@ -280,7 +280,7 @@ def save_train(opts, sample_train, sample_test,
                     loss_match=np.array(np.array(losses_match[::x_step])),
                     mean_blurr=np.array(mean_blurr),
                     true_blurr=np.array(true_blurr),
-                    fid=np.array(true_blurr),
+                    fid=np.array(fid_scores),
                     acc=np.array(accuracies))
 
 def save_vizu(opts, data_train, data_test,              # images
