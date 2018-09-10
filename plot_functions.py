@@ -15,7 +15,7 @@ import pdb
 def save_train(opts, sample_train, sample_test,
                      label_test,
                      rec_train, rec_test,
-                     probs_train, probs_test,
+                     mean_probs, probs_train, probs_test,
                      encoded,
                      samples_prior,
                      samples,
@@ -152,7 +152,6 @@ def save_train(opts, sample_train, sample_test,
     #     probs = np.mean(np.stack(probs,axis=0),axis=0)
     #     mean_probs.append(probs)
     # mean_probs = np.stack(mean_probs,axis=0)
-    mean_probs = probs_test
     # # entropy
     # entropies = calculate_row_entropy(mean_probs)
 
