@@ -7,7 +7,7 @@ config_mnist = {}
 # Outputs set up
 config_mnist['verbose'] = False
 config_mnist['save_every_epoch'] = 1000
-config_mnist['print_every'] = 300 #2400
+config_mnist['print_every'] = 2 #2400
 config_mnist['work_dir'] = 'results_mnist'
 config_mnist['plot_num_pics'] = 100
 config_mnist['plot_num_cols'] = 10
@@ -19,7 +19,7 @@ config_mnist['data_dir'] = 'mnist'
 config_mnist['data_source_url'] = 'http://yann.lecun.com/exdb/mnist/'
 
 # Experiment set up
-config_mnist['train_dataset_size'] = -1
+config_mnist['train_dataset_size'] = 1000
 config_mnist['batch_size'] = 50
 config_mnist['epoch_num'] = 100
 config_mnist['method'] = 'swae' #vae, swae
@@ -34,7 +34,7 @@ config_mnist['lr'] = 0.0005
 config_mnist['lr_adv'] = 0.0008
 config_mnist['clip_grad_cat'] = False
 config_mnist['clip_norm'] = 1.
-config_mnist['different_lr_cat'] = False
+config_mnist['different_lr_cat'] = True
 config_mnist['lr_cat'] = 0.00001
 config_mnist['batch_norm'] = True
 config_mnist['batch_norm_eps'] = 1e-05
@@ -42,8 +42,9 @@ config_mnist['batch_norm_decay'] = 0.9
 
 # Objective set up
 config_mnist['cost'] = 'l2sq' #l2, l2sq, l1, l2sq_wrong
-config_mnist['sqrt_MMD'] = False #use true MMD estimator or square estimator
+config_mnist['sqrt_MMD'] = False #use MMD estimator or square MMD estimator
 config_mnist['mmd_kernel'] = 'IMQ' # RBF, IMQ
+config_mnist['MMDpp'] = True #MMD++ as in https://github.com/tolstikhin/wae/blob/master/improved_wae.py
 config_mnist['lambda'] = 350.
 config_mnist['lambda_schedule'] = 'adaptive' #  adaptive, constant
 
@@ -66,10 +67,10 @@ config_mnist['init_bias'] = 0.0
 config_mnist['e_gaus_arch'] = 'mlp' # mlp, dcgan, ali, began
 config_mnist['e_gaus_nlayers'] = 2
 config_mnist['e_gaus_nfilters'] = 32
-config_mnist['e_cat_arch'] = 'dcgan' # mlp, dcgan, ali, began
-config_mnist['e_cat_nlayers'] = 3
+config_mnist['e_cat_arch'] = 'mlp' # mlp, dcgan, ali, began
+config_mnist['e_cat_nlayers'] = 2
 config_mnist['e_cat_nfilters'] = 32
 
-config_mnist['g_cont_arch'] = 'dcgan_mod' # mlp, dcgan, dcgan_mod, ali, began
-config_mnist['g_cont_nlayers'] = 3
-config_mnist['g_cont_nfilters'] = 64
+config_mnist['g_cont_arch'] = 'mlp' # mlp, dcgan, dcgan_mod, ali, began
+config_mnist['g_cont_nlayers'] = 2
+config_mnist['g_cont_nfilters'] = 32

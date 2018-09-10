@@ -142,16 +142,27 @@ def mmd(opts, pi0, pi, sample_pz, sample_qz):
             K_qz = tf.reduce_mean(C / (C + distances_qz),axis=[2,-1])
             K_qz = tf.multiply(K_qz, tf.reshape(pi,shpe+[1,1]))
             K_qz = tf.multiply(K_qz, tf.reshape(pi,[1,1]+shpe))
-            K_qz = tf.reduce_sum(K_qz,axis=[1,3])
+            #K_qz = tf.reduce_sum(K_qz,axis=[1,3])
             res1_qz = tf.reduce_sum(K_qz)
             #res1_qz /= (ns * ns)
             #res1_qz /= (nb * nb - nb)
             #res1_qz *= (N - 1.) / N
-            res2_qz = tf.trace(K_qz)
+            res2_qz = tf.trace(tf.reduce_sum(K_qz,axis=[1,3]))
             #res2_qz /= (ns * ns)
             #res2_qz /= (nb * nb - nb)
             res_qz = res1_qz - res2_qz
             res_qz /= (nb * nb - nb)
+            if opts['MMDpp']:
+                res_qz *= (N - 1.) / N
+                res3_qz = tf.trace(tf.reduce_sum(K_qz,axis=[1,3]))
+                res4_qz = tf.trace(tf.trace(tf.transpose(K_qz,perm=[0,2,1,3])))
+                res4_qz /= (ns - 1.)
+                K_qz_diag = tf.trace(tf.transpose(C / (C + distances_qz),perm=[0,1,3,4,2,5]))
+                K_qz_diag = tf.multiply(K_qz_diag, tf.reshape(pi,shpe+[1,1]))
+                K_qz_diag = tf.multiply(K_qz_diag, tf.reshape(pi,[1,1]+shpe))
+                res5_qz = tf.trace(tf.trace(tf.transpose(K_qz,perm=[0,2,1,3])))
+                res5_qz /= (ns * ns - ns)
+                res_qz += (res3_qz + res4_qz - res5_qz) / N / nb
             # K_qz_trace_batch = tf.trace(tf.transpose(K_qz,perm=[1,3,0,2]))
             # res2_qz = tf.reduce_sum(K_qz_trace_batch)
             # res2_qz /= (ns * ns)
