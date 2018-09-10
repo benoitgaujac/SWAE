@@ -13,10 +13,11 @@ config_mnist['plot_num_pics'] = 100
 config_mnist['plot_num_cols'] = 10
 
 # Data set up
-config_mnist['dataset'] = 'mnist'
+config_mnist['dataset'] = 'zalando'
+config_mnist['data_dir'] = 'zalando'
 config_mnist['input_normalize_sym'] = False
-config_mnist['data_dir'] = 'mnist'
-config_mnist['data_source_url'] = 'http://yann.lecun.com/exdb/mnist/'
+config_mnist['MNIST_data_source_url'] = 'http://yann.lecun.com/exdb/mnist/'
+config_mnist['Zalando_data_source_url'] = 'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/'
 
 # Experiment set up
 config_mnist['train_dataset_size'] = 1000

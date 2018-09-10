@@ -23,6 +23,7 @@ import pdb
 
 datashapes = {}
 datashapes['mnist'] = [28, 28, 1]
+datashapes['zalando'] = [28, 28, 1]
 datashapes['cifar10'] = [32, 32, 3]
 datashapes['celebA'] = [64, 64, 3]
 datashapes['grassli'] = [64, 64, 3]
@@ -40,10 +41,18 @@ def maybe_download(opts):
     data_path = os.path.join(DATA_DIRECTORY, opts['data_dir'])
     if not tf.gfile.Exists(data_path):
         tf.gfile.MakeDirs(data_path)
-    maybe_download_file(data_path,'train-images-idx3-ubyte.gz',opts['data_source_url'])
-    maybe_download_file(data_path,'train-labels-idx1-ubyte.gz',opts['data_source_url'])
-    maybe_download_file(data_path,'t10k-images-idx3-ubyte.gz',opts['data_source_url'])
-    maybe_download_file(data_path,'t10k-labels-idx1-ubyte.gz',opts['data_source_url'])
+    if opts['dataset']=='mnist':
+        maybe_download_file(data_path,'train-images-idx3-ubyte.gz',opts['MNIST_data_source_url'])
+        maybe_download_file(data_path,'train-labels-idx1-ubyte.gz',opts['MNIST_data_source_url'])
+        maybe_download_file(data_path,'t10k-images-idx3-ubyte.gz',opts['MNIST_data_source_url'])
+        maybe_download_file(data_path,'t10k-labels-idx1-ubyte.gz',opts['MNIST_data_source_url'])
+    elif opts['dataset']=='zalando':
+        maybe_download_file(data_path,'train-images-idx3-ubyte.gz',opts['Zalando_data_source_url'])
+        maybe_download_file(data_path,'train-labels-idx1-ubyte.gz',opts['Zalando_data_source_url'])
+        maybe_download_file(data_path,'t10k-images-idx3-ubyte.gz',opts['Zalando_data_source_url'])
+        maybe_download_file(data_path,'t10k-labels-idx1-ubyte.gz',opts['Zalando_data_source_url'])
+    else:
+        assert False, 'Unknow dataset'
 
     return data_path
 
@@ -334,7 +343,7 @@ class DataHandler(object):
 
         """
 
-        logging.debug('Loading GMM dataset...')
+        logging.error('Loading GMM dataset...')
         # First we choose parameters of gmm and thus seed
         modes_num = opts["gmm_modes_num"]
         np.random.seed(opts["random_seed"])
@@ -368,13 +377,13 @@ class DataHandler(object):
         self.data = Data(opts, X)
         self.num_points = len(X)
 
-        logging.debug('Loading GMM dataset done!')
+        logging.error('Loading GMM dataset done!')
 
     def _load_guitars(self, opts):
         """Load data from Thomann files.
 
         """
-        logging.debug('Loading Guitars dataset')
+        logging.error('Loading Guitars dataset')
         data_dir = os.path.join('./', 'thomann')
         X = None
         files = utils.listdir(data_dir)
@@ -395,13 +404,13 @@ class DataHandler(object):
         self.data = Data(opts, X/255.)
         self.num_points = len(X)
 
-        logging.debug('Loading Done.')
+        logging.error('Loading Done.')
 
     def _load_dsprites(self, opts):
         """Load data from dsprites dataset
 
         """
-        logging.debug('Loading dsprites')
+        logging.error('Loading dsprites')
         data_dir = _data_dir(opts)
         data_file = os.path.join(data_dir, 'dsprites.npz')
         X = np.load(data_file)['imgs']
@@ -419,18 +428,18 @@ class DataHandler(object):
         self.test_data = Data(opts, X[-test_size:])
         self.num_points = len(self.data)
 
-        logging.debug('Loading Done.')
+        logging.error('Loading Done.')
 
     def _load_mnist(self, opts, zalando=False, modified=False):
         """Load data from MNIST or ZALANDO files.
 
         """
         if zalando:
-            logging.debug('Loading Fashion MNIST')
+            logging.error('Loading Fashion MNIST')
         elif modified:
-            logging.debug('Loading modified MNIST')
+            logging.error('Loading modified MNIST')
         else:
-            logging.debug('Loading MNIST')
+            logging.error('Loading MNIST')
         data_dir = _data_dir(opts)
         # pylint: disable=invalid-name
         # Let us use all the bad variable names!
@@ -519,13 +528,13 @@ class DataHandler(object):
         self.test_labels = y[-test_size:]
         self.num_points = len(self.data)
 
-        logging.debug('Loading Done.')
+        logging.error('Loading Done.')
 
     def _load_mnist3(self, opts):
         """Load data from MNIST files.
 
         """
-        logging.debug('Loading 3-digit MNIST')
+        logging.error('Loading 3-digit MNIST')
         data_dir = _data_dir(opts)
         # pylint: disable=invalid-name
         # Let us use all the bad variable names!
@@ -584,14 +593,14 @@ class DataHandler(object):
         self.labels = y3
         self.num_points = num
 
-        logging.debug('Training set JS=%.4f' % utils.js_div_uniform(y3))
-        logging.debug('Loading Done.')
+        logging.error('Training set JS=%.4f' % utils.js_div_uniform(y3))
+        logging.error('Loading Done.')
 
     def _load_cifar(self, opts):
         """Load CIFAR10
 
         """
-        logging.debug('Loading CIFAR10 dataset')
+        logging.error('Loading CIFAR10 dataset')
 
         num_train_samples = 50000
         data_dir = _data_dir(opts)
@@ -631,12 +640,12 @@ class DataHandler(object):
         self.test_labels = y[-1000:]
         self.num_points = len(self.data)
 
-        logging.debug('Loading Done.')
+        logging.error('Loading Done.')
 
     def _load_celebA(self, opts):
         """Load CelebA
         """
-        logging.debug('Loading CelebA dataset')
+        logging.error('Loading CelebA dataset')
 
         num_samples = 202599
 
@@ -659,13 +668,13 @@ class DataHandler(object):
         self.labels = np.array(self.num_points * [0])
         self.test_labels = np.array(test_size * [0])
 
-        logging.debug('Loading Done.')
+        logging.error('Loading Done.')
 
     def _load_grassli(self, opts):
         """Load grassli
 
         """
-        logging.debug('Loading grassli dataset')
+        logging.error('Loading grassli dataset')
 
         data_dir = _data_dir(opts)
         X = np.load(utils.o_gfile((data_dir, 'grassli.npy'), 'rb')) / 255.
@@ -683,4 +692,4 @@ class DataHandler(object):
         self.test_data = Data(opts, X[-test_size:])
         self.num_points = len(self.data)
 
-        logging.debug('Loading Done.')
+        logging.error('Loading Done.')
