@@ -577,7 +577,7 @@ class WAE(object):
                     save_train(opts, data.data[200:200+npics], data.test_data[:npics],          # images
                                      data.test_labels[:npics],                                  # labels
                                      decoded_train[:npics], decoded_test[:npics],               # reconstructions
-                                     p_train, p_test,                                           # mixweights
+                                     mean_probs, p_train, p_test,                               # mixweights
                                      encoded,                                                   # encoded points
                                      fixed_noise,                                               # prior samples
                                      sample_gen,                                                # samples
