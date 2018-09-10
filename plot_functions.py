@@ -146,12 +146,13 @@ def save_train(opts, sample_train, sample_test,
         ax.axes.set_aspect(1)
 
     ### Then the mean mixtures plots
-    mean_probs = []
-    for i in range(10):
-        probs = [probs_test[k] for k in range(num_pics) if label_test[k]==i]
-        probs = np.mean(np.stack(probs,axis=0),axis=0)
-        mean_probs.append(probs)
-    mean_probs = np.stack(mean_probs,axis=0)
+    # mean_probs = []
+    # for i in range(10):
+    #     probs = [probs_test[k] for k in range(num_pics) if label_test[k]==i]
+    #     probs = np.mean(np.stack(probs,axis=0),axis=0)
+    #     mean_probs.append(probs)
+    # mean_probs = np.stack(mean_probs,axis=0)
+    mean_probs = probs_test
     # # entropy
     # entropies = calculate_row_entropy(mean_probs)
 
@@ -256,6 +257,7 @@ def save_train(opts, sample_train, sample_test,
                     test_data=sample_test,
                     test_label=label_test,
                     rec_test=rec_test,
+                    samples = samples,
                     probs_test=mean_probs,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
@@ -272,6 +274,7 @@ def save_train(opts, sample_train, sample_test,
                     test_data=sample_test,
                     test_label=label_test,
                     rec_test=rec_test,
+                    samples = samples,
                     probs_test=mean_probs,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
