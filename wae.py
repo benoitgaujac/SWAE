@@ -78,8 +78,6 @@ class WAE(object):
         mix_idx = tf.stack([range,idx],axis=-1)
         self.encoded_point = tf.gather_nd(self.mixtures_encoded[:,:,0],mix_idx)
         self.reconstructed_point = tf.gather_nd(self.reconstructed[:,:,0],mix_idx)
-        #self.encoded_point = tf.gather_nd(self.mixtures_encoded,mix_idx)
-        #self.reconstructed_point = tf.gather_nd(self.reconstructed,mix_idx)
         # --- Sampling from model (only for generation)
         self.decoded, self.logits_decoded = self.decoder(self.sample_noise,
                                                         True,
@@ -202,8 +200,10 @@ class WAE(object):
         # Different lr for cat if necessary
             opt_cat = self.optimizer(opts['lr_cat'], self.lr_decay)
             grad_cat, var_cat = zip(*opt_cat.compute_gradients(loss=self.objective, var_list=e_cat_vars))
+            opt_cat_apply_grad = opt_cat.apply_gradients(zip(grad_cat, var_cat))
             grad, var = zip(*opt.compute_gradients(loss=self.objective, var_list=e_gaus_vars+decoder_vars))
-            self.swae_opt = opt.apply_gradients(zip(grad+tuple(grad_cat), var+var_cat))
+            opt_apply_grad = opt.apply_gradients(zip(grad, var))
+            self.swae_opt = tf.group(opt_cat_apply_grad,opt_apply_grad)
         else:
             self.swae_opt = opt.minimize(loss=self.objective, var_list=e_cat_vars+e_gaus_vars+decoder_vars)
 
@@ -627,130 +627,209 @@ class WAE(object):
         #                      global_step=counter)
 
 
-    # def test(self, data, MODEL_DIR, WEIGHTS_FILE):
-    #     """
-    #     Test trained MoG model with chosen method
-    #     """
-    #     opts = self.opts
-    #     # Load trained weights
-    #     MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
-    #     if not tf.gfile.IsDirectory(MODEL_PATH):
-    #         raise Exception("model doesn't exist")
-    #     WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
-    #     if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
-    #         raise Exception("weights file doesn't exist")
-    #     self.saver.restore(self.sess, WEIGHTS_PATH)
-    #     # Set up
-    #     batch_size = 100
-    #     tr_batches_num = int(data.num_points / batch_size)
-    #     train_size = data.num_points
-    #     te_batches_num = int(np.shape(data.test_data)[0] / batch_size)
-    #     test_size = np.shape(data.test_data)[0]
-    #     debug_str = 'test data size: %d' % (np.shape(data.test_data)[0])
-    #     logging.error(debug_str)
-    #
-    #     ### Compute probs
-    #     # Iterate over batches
-    #     logging.error('Determining clusters ID using training..')
-    #     mean_probs = np.zeros((10,10))
-    #     for it in range(tr_batches_num):
-    #         # Sample batches of data points and Pz noise
-    #         data_ids = np.random.choice(train_size,
-    #                             opts['batch_size'],
-    #                             replace=False)
-    #         batch_images = data.data[data_ids].astype(np.float32)
-    #         batch_labels = data.labels[data_ids].astype(np.float32)
-    #         prob = self.sess.run(self.enc_mixweight,
-    #                               feed_dict={self.sample_points: batch_images,
-    #                                          self.is_training: False})
-    #
-    #         mean_prob = get_mean_probs(opts,batch_labels,prob)
-    #         mean_probs += mean_prob / tr_batches_num
-    #     # Determine clusters given mean probs
-    #     labelled_clusters = relabelling_mask_from_probs(opts, mean_probs)
-    #     logging.error('Clusters ID:')
-    #     print(labelled_clusters)
-    #
-    #     ### Accuracy
-    #     logging.error('Computing losses & accuracy..')
-    #     # Training accuracy & loss
-    #     acc_tr = 0.
-    #     loss_rec_tr, loss_match_tr = 0., 0.
-    #     for it in range(tr_batches_num):
-    #         # Sample batches of data points and Pz noise
-    #         data_ids = np.random.choice(train_size,
-    #                                     batch_size,
-    #                                     replace=False)
-    #         batch_images = data.data[data_ids].astype(np.float32)
-    #         batch_labels = data.labels[data_ids].astype(np.float32)
-    #         # Accuracy
-    #         probs = self.sess.run(self.enc_mixweight,
-    #                               feed_dict={self.sample_points: batch_images,
-    #                                          self.is_training: False})
-    #         acc = accuracy(batch_labels,probs,labelled_clusters)
-    #         acc_tr += acc / tr_batches_num
-    #         # loss
-    #         batch_mix_noise = sample_pz(opts, self.pz_mean,
-    #                                           self.pz_cov,
-    #                                           batch_size,
-    #                                           sampling_mode='all_mixtures')
-    #         [loss_rec, loss_match] = self.sess.run(
-    #                                             [self.loss_reconstruct,
-    #                                              self.penalty],
-    #                                             feed_dict={self.sample_points: batch_images,
-    #                                                        self.sample_mix_noise: batch_mix_noise,
-    #                                                        self.is_training: False})
-    #         loss_rec_tr += loss_rec / tr_batches_num
-    #         loss_match_tr += loss_match / tr_batches_num
-    #
-    #     # Testing acc
-    #     acc_te = 0.
-    #     loss_rec_te, loss_match_te = 0., 0.
-    #     for it in range(te_batches_num):
-    #         # Sample batches of data points and Pz noise
-    #         data_ids = np.random.choice(test_size,
-    #                                     batch_size,
-    #                                     replace=False)
-    #         batch_images = data.test_data[data_ids].astype(np.float32)
-    #         batch_labels = data.test_labels[data_ids].astype(np.float32)
-    #         # Accuracy
-    #         probs = self.sess.run(self.enc_mixweight,
-    #                               feed_dict={self.sample_points: batch_images,
-    #                                          self.is_training: False})
-    #         acc = accuracy(batch_labels,probs,labelled_clusters)
-    #         acc_te += acc / te_batches_num
-    #         # Testing loss
-    #         batch_mix_noise = sample_pz(opts, self.pz_mean,
-    #                                           self.pz_cov,
-    #                                           batch_size,
-    #                                           sampling_mode='all_mixtures')
-    #         [loss_rec, loss_match] = self.sess.run(
-    #                                             [self.loss_reconstruct,
-    #                                              self.penalty],
-    #                                             feed_dict={self.sample_points: batch_images,
-    #                                                        self.sample_mix_noise: batch_mix_noise,
-    #                                                        self.is_training: False})
-    #         loss_rec_te += loss_rec / te_batches_num
-    #         loss_match_te += loss_match / te_batches_num
-    #
-    #     ### Logs
-    #     debug_str = 'rec train: %.4f, rec test: %.4f' % (loss_rec_tr,
-    #                                                    loss_rec_te)
-    #     logging.error(debug_str)
-    #     debug_str = 'match train: %.4f, match test: %.4f' % (loss_match_tr,
-    #                                                        loss_match_te)
-    #     logging.error(debug_str)
-    #     debug_str = 'acc train: %.2f, acc test: %.2f' % (100.*acc_tr,
-    #                                                          100.*acc_te)
-    #     logging.error(debug_str)
-    #
-    #     ### Saving
-    #     filename = 'res_test'
-    #     res_test = np.array((loss_rec_tr, loss_rec_te,
-    #                         loss_match_tr, loss_match_te,
-    #                         acc_tr, acc_te))
-    #     np.save(os.path.join(MODEL_PATH,filename),res_test)
-    #
+    def test(self, data, MODEL_DIR, WEIGHTS_FILE):
+        """
+        Test trained MoG model with chosen method
+        """
+        opts = self.opts
+        # Load trained weights
+        MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
+        if not tf.gfile.IsDirectory(MODEL_PATH):
+            raise Exception("model doesn't exist")
+        WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
+        if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+            raise Exception("weights file doesn't exist")
+        self.saver.restore(self.sess, WEIGHTS_PATH)
+        # Set up
+        batch_size = 100
+        tr_batches_num = int(data.num_points / batch_size)
+        train_size = data.num_points
+        te_batches_num = int(np.shape(data.test_data)[0] / batch_size)
+        test_size = np.shape(data.test_data)[0]
+        debug_str = 'test data size: %d' % (np.shape(data.test_data)[0])
+        logging.error(debug_str)
+
+        ### Compute probs
+        # Iterate over batches
+        logging.error('Determining clusters ID using training..')
+        mean_probs = np.zeros((10,10))
+        for it in range(tr_batches_num):
+            # Sample batches of data points and Pz noise
+            data_ids = np.random.choice(train_size, opts['batch_size'],
+                                                replace=True)
+            batch_images = data.test_data[data_ids].astype(np.float32)
+            batch_labels = data.test_labels[data_ids].astype(np.float32)
+            pi_train = self.sess.run(self.pi, feed_dict={
+                                                self.points:batch_images,
+                                                self.is_training:False})
+            mean_prob = get_mean_probs(opts,batch_labels,pi_train)
+            mean_probs += mean_prob / tr_batches_num
+        # Determine clusters given mean probs
+        labelled_clusters = relabelling_mask_from_probs(opts, mean_probs)
+        logging.error('Clusters ID:')
+        print(labelled_clusters)
+
+        ### Accuracy
+        logging.error('Computing losses & accuracy..')
+        # Training accuracy & loss
+        acc_tr = 0.
+        loss_rec_tr, loss_match_tr = 0., 0.
+        for it in range(tr_batches_num):
+            # Sample batches of data points and Pz noise
+            data_ids = np.random.choice(train_size, batch_size,
+                                                replace=True)
+            batch_images = data.data[data_ids].astype(np.float32)
+            batch_labels = data.labels[data_ids].astype(np.float32)
+            batch_mix_noise = sample_pz(opts, self.pz_mean,
+                                                self.pz_cov,
+                                                batch_size,
+                                                sampling_mode='all_mixtures')
+            # Accuracy & losses
+            [loss_rec, loss_match, pi] = self.sess.run([self.loss_reconstruct,
+                                                self.match_penalty,
+                                                self.pi],
+                                                feed_dict={self.points:batch_images,
+                                                           self.sample_mix_noise: batch_mix_noise,
+                                                           self.is_training:False})
+            acc = accuracy(batch_labels,pi,labelled_clusters)
+            acc_tr += acc / tr_batches_num
+            loss_rec_tr += loss_rec / tr_batches_num
+            loss_match_tr += loss_match / tr_batches_num
+        # Testing accuracy and losses
+        acc_te = 0.
+        loss_rec_te, loss_match_te = 0., 0.
+        for it in range(te_batches_num):
+            # Sample batches of data points and Pz noise
+            data_ids = np.random.choice(test_size,
+                                        batch_size,
+                                        replace=True)
+            batch_images = data.test_data[data_ids].astype(np.float32)
+            batch_labels = data.test_labels[data_ids].astype(np.float32)
+            batch_mix_noise = sample_pz(opts, self.pz_mean,
+                                                self.pz_cov,
+                                                batch_size,
+                                                sampling_mode='all_mixtures')
+            # Accuracy & losses
+            [loss_rec, loss_match, pi] = self.sess.run([self.loss_reconstruct,
+                                                self.match_penalty,
+                                                self.pi],
+                                                feed_dict={self.points:batch_images,
+                                                           self.sample_mix_noise: batch_mix_noise,
+                                                           self.is_training:False})
+            acc = accuracy(batch_labels,probs,labelled_clusters)
+            acc_te += acc / tr_batches_num
+            loss_rec_te += loss_rec / te_batches_num
+            loss_match_te += loss_match / te_batches_num
+
+        ### Logs
+        debug_str = 'rec train: %.4f, rec test: %.4f' % (loss_rec_tr,
+                                                       loss_rec_te)
+        logging.error(debug_str)
+        debug_str = 'match train: %.4f, match test: %.4f' % (loss_match_tr,
+                                                           loss_match_te)
+        logging.error(debug_str)
+        debug_str = 'acc train: %.2f, acc test: %.2f' % (100.*acc_tr,
+                                                             100.*acc_te)
+        logging.error(debug_str)
+
+        ### Saving
+        filename = 'res_test'
+        res_test = np.array((loss_rec_tr, loss_rec_te,
+                            loss_match_tr, loss_match_te,
+                            acc_tr, acc_te))
+        np.save(os.path.join(MODEL_PATH,filename),res_test)
+
+    def vizu(self, data, MODEL_DIR, WEIGHTS_FILE):
+        """
+        Plot and save different visualizations
+        """
+
+        opts = self.opts
+        # Load trained weights
+        MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
+        if not tf.gfile.IsDirectory(MODEL_PATH):
+            raise Exception("model doesn't exist")
+        WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
+        if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+            raise Exception("weights file doesn't exist")
+        self.saver.restore(self.sess, WEIGHTS_PATH)
+        # Set up
+        num_pics = 200
+        test_size = np.shape(data.test_data)[0]
+        step_inter = 20
+        num_anchors = 10
+        imshape = datashapes[opts['dataset']]
+        # Auto-encoding training images
+        logging.error('Encoding and decoding train images..')
+        rec_train = self.sess.run(self.reconstructed_point,
+                                  feed_dict={self.sample_points: data.data[:num_pics],
+                                             self.is_training: False})
+        # Auto-encoding test images
+        logging.error('Encoding and decoding test images..')
+        [rec_test, encoded, pi] = self.sess.run(
+                                [self.reconstructed_point,
+                                 self.encoded_point,
+                                 self.pi],
+                                feed_dict={self.sample_points:data.test_data[:num_pics],
+                                           self.is_training:False})
+        # Encode anchors points and interpolate
+        logging.error('Encoding anchors points and interpolating..')
+        anchors_ids = np.random.choice(test_size,2*num_anchors,replace=False)
+        anchors = data.test_data[anchors_ids]
+        enc_anchors = self.sess.run(self.encoded_point,
+                                feed_dict={self.sample_points: anchors,
+                                           self.is_training: False})
+        enc_interpolation = generate_linespace(opts, step_inter,
+                                'points_interpolation',
+                                anchors=enc_anchors)
+        noise = enc_interpolation.reshape(-1,opts['zdim'])
+        decoded = self.sess.run(self.decoded,
+                                feed_dict={self.sample_noise: noise,
+                                           self.is_training: False})
+        interpolation = decoded.reshape([-1,step_inter]+imshape)
+        start_anchors = anchors[::2]
+        end_anchors = anchors[1::2]
+        interpolation = np.concatenate((start_anchors[:,np.newaxis],
+                                        np.concatenate((interpolation,end_anchors[:,np.newaxis]), axis=1)),
+                                        axis=1)
+        # Random samples generated by the model
+        logging.error('Decoding random samples..')
+        prior_noise = sample_pz(opts, self.pz_mean,
+                                self.pz_cov,
+                                num_pics,
+                                sampling_mode = 'per_mixture')
+        samples = self.sess.run(self.decoded,
+                               feed_dict={self.sample_noise: prior_noise,
+                                          self.is_training: False})
+        # Encode prior means and interpolate
+        logging.error('Generating latent linespace and decoding..')
+        if opts['zdim']==2:
+            pz_mean_interpolation = generate_linespace(opts, step_inter,
+                                                       'transformation',
+                                                   anchors=self.pz_mean)
+        else:
+            pz_mean_interpolation = generate_linespace(opts, step_inter,
+                                                 'priors_interpolation',
+                                                   anchors=self.pz_mean)
+        noise = pz_mean_interpolation.reshape(-1,opts['zdim'])
+        decoded = self.sess.run(self.decoded,
+                                feed_dict={self.sample_noise: noise,
+                                           self.is_training: False})
+        prior_interpolation = decoded.reshape([-1,step_inter]+imshape)
+
+
+        # Making plots
+        logging.error('Saving images..')
+        save_vizu(opts, data.data[:num_pics], data.test_data[:num_pics],    # images
+                        data.test_labels[:num_pics],                        # labels
+                        rec_train, rec_test,                                # reconstructions
+                        enc_mw_test,                                        # mixweights
+                        encoded,                                            # encoded points
+                        prior_noise,                                        # prior samples
+                        samples,                                            # samples
+                        interpolation, prior_interpolation,                 # interpolations
+                        MODEL_PATH)                                         # working directory
+
     # def reg(self, data, MODEL_DIR, WEIGHTS_FILE):
     #     """
     #     Trained a logistic regression on the trained MoG model
@@ -870,93 +949,3 @@ class WAE(object):
     #                 acc_tr=np.array(acc_train),
     #                 acc_te=np.array(acc_test))
     #
-    # def vizu(self, data, MODEL_DIR, WEIGHTS_FILE):
-    #     """
-    #     Plot and save different visualizations
-    #     """
-    #
-    #     opts = self.opts
-    #     # Load trained weights
-    #     MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
-    #     if not tf.gfile.IsDirectory(MODEL_PATH):
-    #         raise Exception("model doesn't exist")
-    #     WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
-    #     if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
-    #         raise Exception("weights file doesn't exist")
-    #     self.saver.restore(self.sess, WEIGHTS_PATH)
-    #     # Set up
-    #     num_pics = 200
-    #     test_size = np.shape(data.test_data)[0]
-    #     step_inter = 20
-    #     num_anchors = 10
-    #     imshape = datashapes[opts['dataset']]
-    #     # Auto-encoding training images
-    #     logging.error('Encoding and decoding train images..')
-    #     rec_train = self.sess.run(self.reconstructed_point,
-    #                               feed_dict={self.sample_points: data.data[:num_pics],
-    #                                          self.is_training: False})
-    #     # Auto-encoding test images
-    #     logging.error('Encoding and decoding test images..')
-    #     [rec_test, encoded, enc_mw_test] = self.sess.run(
-    #                             [self.reconstructed_point,
-    #                              self.encoded_point,
-    #                              self.enc_mixweight],
-    #                             feed_dict={self.sample_points:data.test_data[:num_pics],
-    #                                        self.is_training:False})
-    #     # Encode anchors points and interpolate
-    #     logging.error('Encoding anchors points and interpolating..')
-    #     anchors_ids = np.random.choice(test_size,2*num_anchors,replace=False)
-    #     anchors = data.test_data[anchors_ids]
-    #     enc_anchors = self.sess.run(self.encoded_point,
-    #                                 feed_dict={self.sample_points: anchors,
-    #                                            self.is_training: False})
-    #     enc_interpolation = generate_linespace(opts, step_inter,
-    #                                         'points_interpolation',
-    #                                         anchors=enc_anchors)
-    #     noise = enc_interpolation.reshape(-1,opts['zdim'])
-    #     decoded = self.sess.run(self.decoded,
-    #                             feed_dict={self.sample_noise: noise,
-    #                                        self.is_training: False})
-    #     interpolation = decoded.reshape([-1,step_inter]+imshape)
-    #     start_anchors = anchors[::2]
-    #     end_anchors = anchors[1::2]
-    #     interpolation = np.concatenate((start_anchors[:,np.newaxis],
-    #                                     np.concatenate((interpolation,end_anchors[:,np.newaxis]), axis=1)),
-    #                                     axis=1)
-    #     # Random samples generated by the model
-    #     logging.error('Decoding random samples..')
-    #     prior_noise = sample_pz(opts, self.pz_mean,
-    #                                   self.pz_cov,
-    #                                   num_pics,
-    #                                   sampling_mode = 'per_mixture')
-    #     samples = self.sess.run(self.decoded,
-    #                                feed_dict={self.sample_noise: prior_noise,
-    #                                           self.is_training: False})
-    #     # Encode prior means and interpolate
-    #     logging.error('Generating latent linespace and decoding..')
-    #     if opts['zdim']==2:
-    #         pz_mean_interpolation = generate_linespace(opts, step_inter,
-    #                                                    'transformation',
-    #                                                anchors=self.pz_mean)
-    #     else:
-    #         pz_mean_interpolation = generate_linespace(opts, step_inter,
-    #                                              'priors_interpolation',
-    #                                                anchors=self.pz_mean)
-    #     noise = pz_mean_interpolation.reshape(-1,opts['zdim'])
-    #     decoded = self.sess.run(self.decoded,
-    #                             feed_dict={self.sample_noise: noise,
-    #                                        self.is_training: False})
-    #     prior_interpolation = decoded.reshape([-1,step_inter]+imshape)
-    #
-    #
-    #     # Making plots
-    #     logging.error('Saving images..')
-    #     save_vizu(opts, data.data[:num_pics], data.test_data[:num_pics],    # images
-    #                     data.test_labels[:num_pics],                        # labels
-    #                     rec_train, rec_test,                                # reconstructions
-    #                     enc_mw_test,                                        # mixweights
-    #                     encoded,                                            # encoded points
-    #                     prior_noise,                                        # prior samples
-    #                     samples,                                            # samples
-    #                     interpolation, prior_interpolation,                 # interpolations
-    #                     MODEL_PATH)                                         # working directory
