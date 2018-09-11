@@ -448,17 +448,18 @@ class WAE(object):
                 ##### TESTING LOOP #####
                 if counter % opts['print_every'] == 0:
                     now = time.time()
+                    te_batch_size = 100
                     test_size = np.shape(data.test_data)[0]
-                    te_size = max(int(test_size*0.2),opts['batch_size'])
-                    te_batches_num = int(te_size/opts['batch_size'])
+                    te_size = max(int(test_size*0.2),te_batch_size)
+                    te_batches_num = int(te_size/te_batch_size)
                     tr_size = test_size - te_size
-                    tr_batches_num = int(tr_size/opts['batch_size'])
+                    tr_batches_num = int(tr_size/te_batch_size)
                     # Determine clusters ID
                     mean_probs = np.zeros((opts['nclasses'],opts['nmixtures']))
                     for it_ in range(tr_batches_num):
                         # Sample batches of data points
                         data_ids = te_size + np.random.choice(tr_size,
-                                                        opts['batch_size'],
+                                                        te_batch_size,
                                                         replace=True)
                         batch_images = data.test_data[data_ids].astype(np.float32)
                         batch_labels = data.test_labels[data_ids].astype(np.float32)
@@ -475,7 +476,7 @@ class WAE(object):
                     for it_ in range(te_batches_num):
                         # Sample batches of data points
                         data_ids =  np.random.choice(te_size,
-                                                        opts['batch_size'],
+                                                        te_batch_size,
                                                         replace=True)
                         batch_images = data.test_data[data_ids].astype(np.float32)
                         batch_labels = data.test_labels[data_ids].astype(np.float32)
