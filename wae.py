@@ -448,7 +448,7 @@ class WAE(object):
                 ##### TESTING LOOP #####
                 if counter % opts['print_every'] == 0:
                     now = time.time()
-                    te_batch_size = 100
+                    te_batch_size = 200
                     test_size = np.shape(data.test_data)[0]
                     te_size = max(int(test_size*0.2),te_batch_size)
                     te_batches_num = int(te_size/te_batch_size)
