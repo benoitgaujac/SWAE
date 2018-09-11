@@ -37,25 +37,27 @@ def relabelling_mask_from_probs(opts, mean_probs):
     if opts['nmixtures']>1:
         assert opts['nmixtures']>=opts['nclasses'],\
         'Need more mixtures than classes to make accuracy'
-    probs_copy = mean_probs.copy()
-    k_vals = []
-    min_prob = np.zeros(opts['nmixtures'])
-    mask = np.arange(opts['nmixtures'])
-    while np.amax(probs_copy) > 0.:
-        max_probs = np.amax(probs_copy,axis=-1)
-        digit_idx = np.argmax(max_probs)
-        k_val_sort = np.argsort(probs_copy[digit_idx])
-        i = -1
-        k_val = k_val_sort[i]
-        while k_val in k_vals:
-            i -= 1
-            if i < -opts['nclasses']:
-                break
+        probs_copy = mean_probs.copy()
+        k_vals = []
+        min_prob = np.zeros(opts['nmixtures'])
+        mask = np.arange(opts['nmixtures'])
+        while np.amax(probs_copy) > 0.:
+            max_probs = np.amax(probs_copy,axis=-1)
+            digit_idx = np.argmax(max_probs)
+            k_val_sort = np.argsort(probs_copy[digit_idx])
+            i = -1
             k_val = k_val_sort[i]
-        k_vals.append(k_val)
-        mask[k_val] = digit_idx
-        probs_copy[digit_idx] = min_prob
-    return mask
+            while k_val in k_vals:
+                i -= 1
+                if i < -opts['nclasses']:
+                    break
+                k_val = k_val_sort[i]
+            k_vals.append(k_val)
+            mask[k_val] = digit_idx
+            probs_copy[digit_idx] = min_prob
+        return mask
+    else:
+        return np.arange(opts['nmixtures'])
 
 def relabelling_mask_from_entropy(opts, mean_probs, entropies):
     k_vals = []
