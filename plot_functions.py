@@ -157,7 +157,7 @@ def save_train(opts, sample_train, sample_test,
 
     cluster_to_digit = relabelling_mask_from_probs(opts,mean_probs)
     digit_to_cluster = np.argsort(cluster_to_digit)
-    mean_probs = mean_probs[::-1,cluster_to_digit]
+    mean_probs = mean_probs[:,digit_to_cluster]
     ax = plt.subplot(gs[1, 0])
     plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
     # plt.text(0.47, 1., 'Test means probs',
@@ -165,9 +165,9 @@ def save_train(opts, sample_train, sample_test,
     plt.text(0.47, 1., '$\mathrm{\mathbb{E}}_x q_D(k\vert{X})$',
            ha="center", va="bottom", size=20, transform=ax.transAxes)
     #plt.yticks(np.arange(10),relab_mask)
-    #plt.xticks(np.arange(10),digit_to_cluster)
-    plt.yticks(np.arange(10),np.arange(10)[::-1])
-    plt.xticks(np.arange(10))
+    plt.xticks(np.arange(10),digit_to_cluster)
+    plt.yticks(np.arange(10),np.arange(10))
+    #plt.xticks(np.arange(10))
 
     # ###UMAP visualization of the embedings
     ax = plt.subplot(gs[1, 1])

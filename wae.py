@@ -514,9 +514,9 @@ class WAE(object):
                     gen_blurr = self.sess.run(self.blurriness,
                                                         feed_dict={self.points: flat_samples})
                     mean_blurr.append(np.min(gen_blurr))
-                    # First convert to greyscale
+                    # First convert to RGB
                     if np.shape(flat_samples)[-1] == 1:
-                        # We have RGB
+                        # We have greyscale
                         flat_samples = self.sess.run(tf.image.grayscale_to_rgb(flat_samples))
                     preds_incep = self.inception_sess.run(self.inception_layer,
                                   feed_dict={'FID_Inception_Net/ExpandDims:0': flat_samples})
