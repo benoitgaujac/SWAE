@@ -6,6 +6,7 @@ import numpy as np
 
 import scipy.stats as scistats
 
+import pdb
 
 def accuracy(labels, probs, clusters_id=None):
     preds = np.argmax(probs,axis=-1)
@@ -21,6 +22,7 @@ def get_mean_probs(opts,labels,probs):
     num_pics = np.shape(probs)[0]
     for i in range(opts['nclasses']):
         prob = [probs[k] for k in range(num_pics) if labels[k]==i]
+        pdb.set_trace()
         # if prob==[]:
         #     prob = np.zeros(np.shape(probs)[1])
         # else:
