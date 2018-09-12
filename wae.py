@@ -376,7 +376,7 @@ class WAE(object):
 
         # Init all monitoring variables
         losses = []
-        losses_rec, loss_rec_test, losses_VAE = [], [], []
+        losses_rec, loss_rec_test, loss_VAE = [], [], []
         losses_match = []
         kl_gau, kl_dis  = [], []
         accuracies, mean_blurr, true_blurr, fid_scores = [], [], [], []
@@ -423,10 +423,9 @@ class WAE(object):
                     # print(dp)
                     # print(dq)
                     # print(dqp)
-                    [_, loss, loss_rec, loss_vae, loss_match] = self.sess.run([self.swae_opt,
+                    [_, loss, loss_rec, loss_match] = self.sess.run([self.swae_opt,
                                                         self.objective,
                                                         self.loss_reconstruct,
-                                                        self.wae_log_reconstruct,
                                                         self.match_penalty],
                                                         feed_dict=feed_dict)
                     # print(loss_match)
@@ -592,7 +591,7 @@ class WAE(object):
                                      fixed_noise,                                               # prior samples
                                      sample_gen,                                                # samples
                                      losses, losses_match,                                      # losses
-                                     losses_rec, loss_rec_test, losses_VAE,                     # rec losses
+                                     losses_rec, loss_rec_test, loss_VAE,                       # rec losses
                                      kl_gau, kl_dis,                                            # KL terms
                                      mean_blurr, true_blurr, fid_scores,                         # FID score
                                      accuracies,                                                # acc
