@@ -189,7 +189,7 @@ class WAE(object):
         prior_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='prior')
         #ae_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         if opts['clip_grad_cat']:
-        # Clipping gradient if necessary
+            # Clipping gradient if necessary
             grad_cat, var_cat = zip(*opt.compute_gradients(loss=self.objective,
                                                         var_list=e_cat_vars))
             clip_grad, _ = tf.clip_by_global_norm(grad_cat, opts['clip_norm'])
@@ -197,7 +197,7 @@ class WAE(object):
                                                         var_list=e_gaus_vars+decoder_vars))
             self.swae_opt = opt.apply_gradients(zip(grad+tuple(clip_grad), var+var_cat))
         elif opts['different_lr_cat']:
-        # Different lr for cat if necessary
+            # Different lr for cat if necessary
             opt_cat = self.optimizer(opts['lr_cat'], self.lr_decay)
             grad_cat, var_cat = zip(*opt_cat.compute_gradients(loss=self.objective, var_list=e_cat_vars))
             opt_cat_apply_grad = opt_cat.apply_gradients(zip(grad_cat, var_cat))
@@ -430,7 +430,6 @@ class WAE(object):
                                                         self.match_penalty],
                                                         feed_dict=feed_dict)
                     # print(loss_match)
-                    losses_VAE.append(loss_vae)
                 elif opts['method']=='vae':
                     [_, loss, loss_rec, loss_match, kl_g, kl_d] = self.sess.run(
                                                         [self.swae_opt,
@@ -472,6 +471,7 @@ class WAE(object):
                     labelled_clusters = relabelling_mask_from_probs(opts, mean_probs)
                     # Test accuracy & loss
                     test_rec = 0.
+                    vae_rec = 0.
                     acc_test = 0.
                     for it_ in range(te_batches_num):
                         # Sample batches of data points
@@ -480,16 +480,25 @@ class WAE(object):
                                                         replace=True)
                         batch_images = data.test_data[data_ids].astype(np.float32)
                         batch_labels = data.test_labels[data_ids].astype(np.float32)
-                        [l, pi_test] = self.sess.run([self.loss_reconstruct,
-                                                         self.pi],
-                                                        feed_dict={self.points:batch_images,
-                                                                   self.is_training:False})
+                        if opts['method']=='swae':
+                            [l, l_vae, pi_test] = self.sess.run([self.loss_reconstruct,
+                                                             self.wae_log_reconstruct,
+                                                             self.pi],
+                                                            feed_dict={self.points:batch_images,
+                                                                       self.is_training:False})
+                            vae_rec += l_vae / te_batches_num
+                        elif opts['method']=='vae':
+                            [l, pi_test] = self.sess.run([self.loss_reconstruct,
+                                                             self.pi],
+                                                            feed_dict={self.points:batch_images,
+                                                                       self.is_training:False})
                         # Computing accuracy
                         acc = accuracy(batch_labels, pi_test, labelled_clusters)
                         acc_test += acc / te_batches_num
                         test_rec += l / te_batches_num
                     accuracies.append(acc_test)
                     loss_rec_test.append(test_rec)
+                    loss_VAE.append(vae_rec)
                     # Auto-encoding unlabeled test images
                     [decoded_test, encoded, p_test] = self.sess.run(
                                                         [self.reconstructed_point,
@@ -740,6 +749,7 @@ class WAE(object):
                             acc_tr, acc_te))
         np.save(os.path.join(MODEL_PATH,filename),res_test)
 
+
     def vizu(self, data, MODEL_DIR, WEIGHTS_FILE):
         """
         Plot and save different visualizations
@@ -824,7 +834,7 @@ class WAE(object):
         save_vizu(opts, data.data[:num_pics], data.test_data[:num_pics],    # images
                         data.test_labels[:num_pics],                        # labels
                         rec_train, rec_test,                                # reconstructions
-                        enc_mw_test,                                        # mixweights
+                        pi,                                                 # mixweights
                         encoded,                                            # encoded points
                         prior_noise,                                        # prior samples
                         samples,                                            # samples

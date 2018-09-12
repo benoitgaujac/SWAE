@@ -280,7 +280,7 @@ def save_train(opts, sample_train, sample_test,
                     loss=np.array(losses[::x_step]),
                     loss_rec=np.array(losses_rec[::x_step]),
                     loss_rec_test=np.array(loss_rec_test),
-                    loss_vae=np.array(losses_vae[::x_step]),
+                    loss_vae=np.array(losses_vae),
                     loss_match=np.array(np.array(losses_match[::x_step])),
                     mean_blurr=np.array(mean_blurr),
                     true_blurr=np.array(true_blurr),
@@ -290,7 +290,7 @@ def save_train(opts, sample_train, sample_test,
 def save_vizu(opts, data_train, data_test,              # images
                     label_test,                         # labels
                     rec_train, rec_test,                # reconstructions
-                    enc_mw_test,                        # mixweights
+                    pi,                                 # mixweights
                     encoded,                            # encoded points
                     samples_prior,                      # prior samples
                     samples,                            # samples
@@ -443,9 +443,9 @@ def save_vizu(opts, data_train, data_test,              # images
 
     ###The mean mixtures plots
     mean_probs = []
-    num_pics = np.shape(enc_mw_test)[0]
+    num_pics = np.shape(pi)[0]
     for i in range(10):
-        probs = [enc_mw_test[k] for k in range(num_pics) if label_test[k]==i]
+        probs = [pi[k] for k in range(num_pics) if label_test[k]==i]
         probs = np.mean(np.stack(probs,axis=0),axis=0)
         mean_probs.append(probs)
     mean_probs = np.stack(mean_probs,axis=0)
@@ -569,7 +569,7 @@ def save_vizu(opts, data_train, data_test,              # images
                 enc=encoded,
                 points=interpolation,
                 priors=prior_interpolation,
-                enc_mw_test=enc_mw_test,
+                pi=pi,
                 lmbda=np.array(opts['lambda']))
 
 def discrete_cmap(N, base_cmap=None):
