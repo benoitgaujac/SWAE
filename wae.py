@@ -568,7 +568,7 @@ class WAE(object):
                                                         'VAE REC=%.3f' % (
                                                         loss_rec_test[-1],
                                                         losses_rec[-1],
-                                                        losses_VAE[-1])
+                                                        loss_VAE[-1])
                     else:
                         debug_str = 'TEST REC=%.3f, TRAIN REC=%.3f' % (
                                                         loss_rec_test[-1],
