@@ -225,7 +225,7 @@ def vae_matching_penalty(opts, pi0, pi, encoded_mean, encoded_sigma,
     kl_g = tf.reduce_sum(kl_g,axis=-1)
     kl_g = tf.reduce_mean(kl_g)
     # Discrete KL
-    eps = 1e-10
+    eps = 1e-8
     kl_d = tf.log(eps+pi) - tf.log(pi0)
     kl_d = tf.multiply(kl_d,pi)
     kl_d = tf.reduce_sum(kl_d,axis=-1)
