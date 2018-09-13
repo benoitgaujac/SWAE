@@ -346,6 +346,7 @@ class WAE(object):
         # Init sess and load trained weights if needed
         if opts['use_trained']:
             if not tf.gfile.Exists(WEIGHTS_FILE+".meta"):
+                pdb.set_trace()
                 raise Exception("weights file doesn't exist")
             self.saver.restore(self.sess, WEIGHTS_FILE)
         else:
