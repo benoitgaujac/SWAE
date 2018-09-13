@@ -25,7 +25,7 @@ def main():
     assert data.num_points >= opts['batch_size'], 'Training set too small'
 
     # weights_file for vae use WAE pretrained
-    weights_file = 'swae/mnist_10mix_v7/checkpoints/trained-wae-48000'
+    weights_file = 'swae/mnist_10mix_v7/checkpoints/trained-wae-36000'
 
     # VAE loop
     opts['method'] = 'vae'
@@ -58,7 +58,7 @@ def main():
     # VAE init with WAE
     opts['method'] = 'vae'
     # Working directory
-    opts['work_dir'] = 'mnist_10mix_v7_wae_pretrained'
+    opts['work_dir'] = 'mnist_10mix_v7_wae_pretrained/'
     # Create directories
     utils.create_dir(opts['method'])
     work_dir = os.path.join(opts['method'],opts['work_dir'])
