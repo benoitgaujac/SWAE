@@ -25,7 +25,7 @@ def main():
     assert data.num_points >= opts['batch_size'], 'Training set too small'
 
     # weights_file for vae use WAE pretrained
-    weights_file = 'swae/mnist_10mix_v7/checkpoints/trained-wae-36000'
+    weights_file = 'swae/mnist_10mix_v7/checkpoints/trained-wae-18000'
 
     # VAE loop
     opts['method'] = 'vae'
