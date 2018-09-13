@@ -29,8 +29,8 @@ def main():
 
     # VAE loop
     opts['method'] = 'vae'
-    #vae_exps = [1. ,5., 10., 20., 50., 100.]
-    vae_exps = [1. ,10.]
+    vae_exps = [1. ,5., 10., 20., 50., 100.]
+    #vae_exps = [1. ,10.]
     for beta in vae_exps:
         # Working directory
         opts['work_dir'] = 'mnist_10mix_v7_beta' + str(beta)
