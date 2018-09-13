@@ -157,7 +157,7 @@ class WAE(object):
     def add_savers(self):
         opts = self.opts
         saver = tf.train.Saver(max_to_keep=10)
-        # tf.add_to_collection('real_points_ph', self.sample_points)
+        # tf.add_to_collection('real_points_ph', self.points)
         # tf.add_to_collection('noise_ph', self.sample_noise)
         # tf.add_to_collection('is_training_ph', self.is_training)
         # if self.enc_mean is not None:
@@ -523,6 +523,7 @@ class WAE(object):
                     gen_blurr = self.sess.run(self.blurriness,
                                                         feed_dict={self.points: flat_samples})
                     mean_blurr.append(np.min(gen_blurr))
+                    """
                     # First convert to RGB
                     if np.shape(flat_samples)[-1] == 1:
                         # We have greyscale
@@ -538,6 +539,7 @@ class WAE(object):
                                                         self.sigma_train,
                                                         eps=1e-6)
                     fid_scores.append(fid_score)
+                    """
                     if opts['method']=='vae':
                         true_sample_gen = self.sess.run(self.vae_decoded,
                                                         feed_dict={self.points:data.data[200:200+npics],
@@ -558,10 +560,13 @@ class WAE(object):
                     logging.error(debug_str)
                     debug_str = 'TRAIN LOSS=%.3f' % (losses[-1])
                     logging.error(debug_str)
-                    debug_str = 'ACC=%.2f, BLUR=%10.4e, FID=%10.4e' % (
+                    # debug_str = 'ACC=%.2f, BLUR=%10.4e, FID=%10.4e' % (
+                    #                                     100*accuracies[-1],
+                    #                                     mean_blurr[-1],
+                    #                                     fid_scores[-1])
+                    debug_str = 'ACC=%.2f, BLUR=%10.4e' % (
                                                         100*accuracies[-1],
-                                                        mean_blurr[-1],
-                                                        fid_scores[-1])
+                                                        mean_blurr[-1])
                     logging.error(debug_str)
                     if opts['method']=='swae':
                         debug_str = 'TEST REC=%.3f, TRAIN REC=%.3f, '\
@@ -764,15 +769,15 @@ class WAE(object):
             raise Exception("weights file doesn't exist")
         self.saver.restore(self.sess, WEIGHTS_PATH)
         # Set up
-        num_pics = 200
+        num_pics = 1000
         test_size = np.shape(data.test_data)[0]
         step_inter = 20
-        num_anchors = 10
+        num_anchors = opts['nmixtures']
         imshape = datashapes[opts['dataset']]
         # Auto-encoding training images
         logging.error('Encoding and decoding train images..')
         rec_train = self.sess.run(self.reconstructed_point,
-                                  feed_dict={self.sample_points: data.data[:num_pics],
+                                  feed_dict={self.points: data.data[:num_pics],
                                              self.is_training: False})
         # Auto-encoding test images
         logging.error('Encoding and decoding test images..')
@@ -780,23 +785,25 @@ class WAE(object):
                                 [self.reconstructed_point,
                                  self.encoded_point,
                                  self.pi],
-                                feed_dict={self.sample_points:data.test_data[:num_pics],
+                                feed_dict={self.points:data.test_data[:num_pics],
                                            self.is_training:False})
         # Encode anchors points and interpolate
         logging.error('Encoding anchors points and interpolating..')
         anchors_ids = np.random.choice(test_size,2*num_anchors,replace=False)
         anchors = data.test_data[anchors_ids]
         enc_anchors = self.sess.run(self.encoded_point,
-                                feed_dict={self.sample_points: anchors,
+                                feed_dict={self.points: anchors,
                                            self.is_training: False})
         enc_interpolation = generate_linespace(opts, step_inter,
                                 'points_interpolation',
                                 anchors=enc_anchors)
-        noise = enc_interpolation.reshape(-1,opts['zdim'])
+        #noise = enc_interpolation.reshape(-1,opts['zdim'])
+        noise = np.transpose(enc_interpolation,(1,0,2))
         decoded = self.sess.run(self.decoded,
                                 feed_dict={self.sample_noise: noise,
                                            self.is_training: False})
-        interpolation = decoded.reshape([-1,step_inter]+imshape)
+        #interpolation = decoded.reshape([-1,step_inter]+imshape)
+        interpolation = np.transpose(decoded,(1,0,2,3,4))
         start_anchors = anchors[::2]
         end_anchors = anchors[1::2]
         interpolation = np.concatenate((start_anchors[:,np.newaxis],
@@ -805,7 +812,7 @@ class WAE(object):
         # Random samples generated by the model
         logging.error('Decoding random samples..')
         prior_noise = sample_pz(opts, self.pz_mean,
-                                self.pz_cov,
+                                self.pz_sigma,
                                 num_pics,
                                 sampling_mode = 'per_mixture')
         samples = self.sess.run(self.decoded,
@@ -813,19 +820,23 @@ class WAE(object):
                                           self.is_training: False})
         # Encode prior means and interpolate
         logging.error('Generating latent linespace and decoding..')
+        ancs = np.concatenate((self.pz_mean,self.pz_mean[0][np.newaxis,:]),axis=0)
         if opts['zdim']==2:
             pz_mean_interpolation = generate_linespace(opts, step_inter,
                                                        'transformation',
-                                                   anchors=self.pz_mean)
+                                                   anchors=ancs)
         else:
             pz_mean_interpolation = generate_linespace(opts, step_inter,
                                                  'priors_interpolation',
-                                                   anchors=self.pz_mean)
-        noise = pz_mean_interpolation.reshape(-1,opts['zdim'])
+                                                   anchors=ancs)
+        #noise = pz_mean_interpolation.reshape(-1,opts['zdim'])
+        noise = np.transpose(pz_mean_interpolation,(1,0,2))
         decoded = self.sess.run(self.decoded,
                                 feed_dict={self.sample_noise: noise,
                                            self.is_training: False})
-        prior_interpolation = decoded.reshape([-1,step_inter]+imshape)
+        #prior_interpolation = decoded.reshape([-1,step_inter]+imshape)
+        prior_interpolation = np.transpose(decoded,(1,0,2,3,4))
+
 
 
         # Making plots
@@ -896,7 +907,7 @@ class WAE(object):
     #             batch_images = data.data[data_ids].astype(np.float32)
     #             # Get preds
     #             preds = self.sess.run(self.enc_mixweight,
-    #                         feed_dict={self.sample_points: batch_images,
+    #                         feed_dict={self.points: batch_images,
     #                                             self.is_training: False})
     #             # linear reg
     #             batch_labels = one_hot(data.labels[data_ids])
@@ -918,7 +929,7 @@ class WAE(object):
     #                                             replace=False)
     #                 batch_images = data.data[data_ids].astype(np.float32)
     #                 preds = self.sess.run(self.enc_mixweight,
-    #                                       feed_dict={self.sample_points: batch_images,
+    #                                       feed_dict={self.points: batch_images,
     #                                                  self.is_training: False})
     #                 batch_labels = one_hot(data.labels[data_ids])
     #                 a = self.sess.run(acc,
@@ -932,7 +943,7 @@ class WAE(object):
     #                                             replace=False)
     #                 batch_images = data.test_data[data_ids].astype(np.float32)
     #                 preds = self.sess.run(self.enc_mixweight,
-    #                                       feed_dict={self.sample_points: batch_images,
+    #                                       feed_dict={self.points: batch_images,
     #                                                  self.is_training: False})
     #                 batch_labels = one_hot(data.test_labels[data_ids])
     #                 a = self.sess.run(acc,

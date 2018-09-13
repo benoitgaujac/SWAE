@@ -331,7 +331,9 @@ def save_vizu(opts, data_train, data_test,              # images
         # Arrange pics and reconstructions in a proper way
         sample, recon = pair
         num_pics = np.shape(sample)[0]
-        num_cols = 20
+        size_pics = np.shape(sample)[1]
+        num_cols = 10
+        num_to_keep = 10
         assert len(sample) == len(recon)
         pics = []
         merged = np.vstack([recon, sample])
@@ -351,6 +353,7 @@ def save_vizu(opts, data_train, data_test,              # images
         pics = np.array(pics)
         image = np.concatenate(np.split(pics, num_cols), axis=2)
         image = np.concatenate(image, axis=0)
+        image = image[:num_to_keep*size_pics]
         images.append(image)
 
     ### Points Interpolation plots
@@ -469,6 +472,8 @@ def save_vizu(opts, data_train, data_test,              # images
     ###Sample plots
     pics = []
     num_cols = 10
+    samples = np.transpose(samples,(1,0,2,3,4))
+    samples = samples.reshape((-1,)+np.shape(samples)[2:])
     num_pics = np.shape(samples)[0]
     size_pics = np.shape(samples)[1]
     num_to_keep = 10
@@ -504,13 +509,14 @@ def save_vizu(opts, data_train, data_test,              # images
     plt.close()
 
     ###UMAP visualization of the embedings
+    samples_prior_flat = samples_prior.reshape(-1,np.shape(samples_prior)[-1])
     if opts['zdim']==2:
-        embedding = np.concatenate((encoded,samples_prior),axis=0)
+        embedding = np.concatenate((encoded,samples_prior_flat),axis=0)
         #embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],samples_prior),axis=0))
+                                metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],samples_prior_flat),axis=0))
                                 #metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],enc_mean[:num_pics],sample_prior),axis=0))
     fig_height = height_pic / float(dpi)
     fig_width = width_pic / float(dpi)
