@@ -289,7 +289,7 @@ def vae_bernoulli_recons_loss(opts, pi, x1, x2):
     data_shape = datashapes[opts['dataset']]
     real = tf.reshape(x1,shape=[-1,1,1] + data_shape)
     logit = x2
-    eps = 1e-10
+    eps = 1e-8
     l = real*tf.log(eps+logit) + (1-real)*tf.log(eps+1-logit)
     loss = tf.reduce_sum(l,axis=[-3,-2,-1])
     loss = tf.reduce_mean(loss,axis=-1)
