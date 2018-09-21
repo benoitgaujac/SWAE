@@ -822,11 +822,11 @@ class WAE(object):
         logging.error('Generating latent linespace and decoding..')
         ancs = np.concatenate((self.pz_mean,self.pz_mean[0][np.newaxis,:]),axis=0)
         if opts['zdim']==2:
-            pz_mean_interpolation = generate_linespace(opts, step_inter,
+            pz_mean_interpolation = generate_linespace(opts, step_inter+2,
                                                        'transformation',
                                                    anchors=ancs)
         else:
-            pz_mean_interpolation = generate_linespace(opts, step_inter,
+            pz_mean_interpolation = generate_linespace(opts, step_inter+2,
                                                  'priors_interpolation',
                                                    anchors=ancs)
         #noise = pz_mean_interpolation.reshape(-1,opts['zdim'])

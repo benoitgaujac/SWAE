@@ -6,7 +6,7 @@ from math import pow, sqrt
 config_mnist = {}
 # Outputs set up
 config_mnist['verbose'] = False
-config_mnist['save_every_epoch'] = 1
+config_mnist['save_every_epoch'] = 10
 config_mnist['print_every'] = 600 #2400
 config_mnist['work_dir'] = 'results_mnist'
 config_mnist['plot_num_pics'] = 100
@@ -22,7 +22,7 @@ config_mnist['Zalando_data_source_url'] = 'http://fashion-mnist.s3-website.eu-ce
 # Experiment set up
 config_mnist['train_dataset_size'] = 60000
 config_mnist['batch_size'] = 50
-config_mnist['epoch_num'] = 1
+config_mnist['epoch_num'] = 21
 config_mnist['method'] = 'swae' #vae, swae
 config_mnist['use_trained'] = False #train from pre-trained model
 config_mnist['e_pretrain'] = True #pretrained the encoder parameters
@@ -46,7 +46,7 @@ config_mnist['cost'] = 'l2sq' #l2, l2sq, l1, l2sq_wrong
 config_mnist['sqrt_MMD'] = False #use MMD estimator or square MMD estimator
 config_mnist['mmd_kernel'] = 'IMQ' # RBF, IMQ
 config_mnist['MMDpp'] = True #MMD++ as in https://github.com/tolstikhin/wae/blob/master/improved_wae.py
-config_mnist['lambda'] = 450.
+config_mnist['lambda'] = 1.
 config_mnist['lambda_schedule'] = 'constant' #  adaptive, constant
 
 # Model set up
