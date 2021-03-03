@@ -19,15 +19,17 @@ def accuracy(labels, probs, clusters_id=None):
 def get_mean_probs(opts,labels,probs):
     mean_probs = []
     num_pics = np.shape(probs)[0]
-    for i in range(opts['nclasses']):
-        prob = [probs[k] for k in range(num_pics) if labels[k]==i]
+    for k in range(opts['nclasses']):
+        prob = [probs[n] for n in range(num_pics) if labels[n]==k]
+        if len(prob)==0:
+            pdb.set_trace()
         # if prob==[]:
         #     prob = np.zeros(np.shape(probs)[1])
         # else:
         #     prob = np.mean(np.stack(prob,axis=0),axis=0)
         prob = np.mean(np.stack(prob,axis=0),axis=0)
         mean_probs.append(prob)
-    mean_probs = np.stack(mean_probs,axis=0)
+    mean_probs = np.stack(mean_probs,axis=0) #[nclasses, nmixtures]
     return mean_probs
 
     # cluster_to_digit = relabelling_mask_from_probs(mean_probs)

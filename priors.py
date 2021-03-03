@@ -16,10 +16,7 @@ def init_gaussian_prior(opts):
     for all our mixtures
     """
     if opts['zdim']==2:
-        if opts['dataset']=='mnist' and opts['nmixtures']==10:
-            means = set_2d_priors(opts['nmixtures'])
-        else:
-            means = np.random.uniform(-1.,1.,(opts['nmixtures'], opts['zdim'])).astype(np.float32)
+        means = set_2d_priors(opts['nmixtures'])
     else:
         if opts['zdim']+1>=opts['nmixtures']:
             means = np.zeros([opts['nmixtures'], opts['zdim']],dtype='float32')
@@ -27,7 +24,7 @@ def init_gaussian_prior(opts):
                 if k<opts['zdim']:
                     means[k,k] = 1
                 else:
-                    means[-1] = - 1. / (1. + sqrt(opts['nmixtures']+1)) \
+                    means[k] = - 1. / (1. + sqrt(opts['nmixtures']+1)) \
                                     * np.ones((opts['zdim'],),dtype='float32')
         else:
             means_list = []
@@ -47,27 +44,23 @@ def init_gaussian_prior(opts):
             #assert False, 'Too many mixtures for the latents dim.'
     pz_means = opts['pz_scale']*means
     pz_sigma = opts['sigma_prior']*np.ones((opts['zdim']),dtype='float32')
-    return pz_means, pz_sigma
+    return pz_means, np.tile(np.expand_dims(pz_sigma,axis=0),(opts['nmixtures'],1))
 
 
 def set_2d_priors(nmixtures):
     """
     Initialize prior parameters for zdim=2 and nmixtures=10
     """
-    assert nmixtures==10, 'Too many mixtures to initialize prior'
-    means = np.zeros([10, 2]).astype(np.float32)
-    angles = []
-    for i in range(3):
-        angle = np.array([sin(i*pi/3.), cos(i*pi/3.)])
-        angles.append(angle)
-    for k in range(1,4):
-        means[k] = k / 3. * angles[0]
-    for k in range(1,4):
-        means[k+3] = k / 3. * angles[1]
-    for k in range(1,3):
-        means[k+2*3] = k / 3. * angles[2] + np.array([.0, 1.])
-    means[9] = [sqrt(3)/6., .5]
-    means -= means[9]
+    means, Sigmas = [], []
+    mean = np.array([1., 0.], dtype='float32')
+    # Sigma = np.diaglat([1., 0.2]).astype(np.float32)
+    base_angle = 2*pi / nmixtures
+    for i in range(nmixtures):
+        angle = i * base_angle
+        means.append(np.array([cos(angle), sin(angle)], dtype='float32'))
+        # Sigmas.append(np.matmul(rot, sigma))
+    means = np.vstack(means)
+    # Sigmas = np.vstack(Sigmas)
     return means
 
 
@@ -96,7 +89,8 @@ def init_cat_prior(opts):
     """
     Initialize parameters of discrete distribution
     """
-    mean_params = tf.constant(1/opts['nmixtures'], shape=[opts['nmixtures']],
-                                                            dtype=tf.float32,
-                                                            name='pi0')
+    # mean_params = tf.constant(1/opts['nmixtures'], shape=[opts['nmixtures']],
+    #                                                         dtype=tf.float32,
+    #                                                         name='pi0')
+    mean_params = (np.ones(opts['nmixtures']) / opts['nmixtures']).astype(np.float32)
     return mean_params

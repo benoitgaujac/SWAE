@@ -34,8 +34,8 @@ parser.add_argument("--model", default='WAE',
                     help='model to train [WAE/BetaVAE/...]')
 parser.add_argument("--cost", default='l2sq',
                     help='wae ground cost [l2/l2sq/l1]')
-parser.add_argument("--beta", type=float, default=0.,
-                    help='beta')
+parser.add_argument("--id", type=int,
+                    help='id exp')
 parser.add_argument("--decoder", default='bernoulli',
                     help='decoder type for VAE [gauss/bernoulli]')
 parser.add_argument("--net_archi", default='mlp',
@@ -68,7 +68,9 @@ def main():
     # Model set up
     opts['model'] = FLAGS.model
     opts['cost'] = FLAGS.cost
-    opts['beta'] = FLAGS.beta
+    betas = [0,1,5,10,15,25,50,75,100]
+    coef_id = (FLAGS.id-1) % len(betas)
+    opts['beta'] = betas[coef_id]
     opts['decoder'] = FLAGS.decoder
     opts['net_archi'] = FLAGS.net_archi
 

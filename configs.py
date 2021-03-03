@@ -1,77 +1,65 @@
 import copy
-from math import pow, sqrt
+from math import pow, sqrt, cos, sin, pi
 
-# MNIST config from ICLR paper
-
-config_mnist = {}
+### Default common config
+config = {}
 # Outputs set up
-config_mnist['verbose'] = False
-config_mnist['save_every_epoch'] = 10
-config_mnist['print_every'] = 600 #2400
-config_mnist['work_dir'] = 'results_mnist'
-config_mnist['plot_num_pics'] = 100
-config_mnist['plot_num_cols'] = 10
+config['verbose'] = False
+config['save_every'] = 1000
+config['save_final'] = True
+config['save_train_data'] = True
+config['print_every'] = 100
+config['evaluate_every'] = int(config['print_every'] / 2)
+config['embedding'] = 'umap' #vizualisation method of the embeddings: pca, umap
+config['out_dir'] = 'code_outputs'
+config['plot_num_pics'] = 100
+config['plot_num_cols'] = 10
+# Experiment set up
+config['train_dataset_size'] = -1
+config['batch_size'] = 100
+config['use_trained'] = False #train from pre-trained model
+config['e_pretrain'] = False #pretrained the encoder parameters
+config['e_pretrain_sample_size'] = 200
+# Opt set up
+config['optimizer'] = 'adam' # adam, sgd
+config['adam_beta1'] = 0.9
+config['adam_beta2'] = 0.999
+config['lr'] = 0.0001
+config['lr_adv'] = 1e-08
+config['lr_decay'] = False
+config['normalization'] = 'batchnorm' #batchnorm, layernorm, none
+config['batch_norm_eps'] = 1e-05
+config['batch_norm_momentum'] = 0.99
+config['dropout_rate'] = 1.
+# Objective set up
+config['model'] = 'WAE' #WAE, BetaVAE
+config['cost'] = 'l2sq' #l2, l2sq, l2sq_norm, l1, xentropy
+config['mmd_kernel'] = 'IMQ' # RBF, IMQ
+# Model set up
+config['zdim'] = 2
+config['nmixtures'] = 10
+config['pz_scale'] = 1.
+config['decoder'] = 'bernoulli' #bernoulli, gauss
+# config['sigma_prior'] = sqrt((1-cos(pi/5.))**2 + sin(pi/5.)**2) / 4. # to check
+config['sigma_prior'] = .1
+config['pz_scale'] = 1.
+# NN set up
+config['net_archi'] = 'mlp' #mlp. conv
+config['init_std'] = 0.099999
+config['init_bias'] = 0.0
+config['mlp_init'] = 'glorot_uniform' #normal, he, glorot, glorot_he, glorot_uniform, ('uniform', range)
+config['conv_init'] = 'glorot_uniform' #he, glorot, normilized_glorot, truncated_norm
 
+# MNIST config
+config_mnist = config.copy()
 # Data set up
 config_mnist['dataset'] = 'mnist'
 config_mnist['data_dir'] = 'mnist'
-config_mnist['input_normalize_sym'] = False
-config_mnist['MNIST_data_source_url'] = 'http://yann.lecun.com/exdb/mnist/'
-config_mnist['Zalando_data_source_url'] = 'http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/'
-
-# Experiment set up
-config_mnist['train_dataset_size'] = 60000
-config_mnist['batch_size'] = 50
-config_mnist['epoch_num'] = 21
-config_mnist['method'] = 'swae' #vae, swae
-config_mnist['use_trained'] = False #train from pre-trained model
-config_mnist['e_pretrain'] = True #pretrained the encoder parameters
-config_mnist['e_pretrain_sample_size'] = 200
-
-# Opt set up
-config_mnist['optimizer'] = 'adam' # adam, sgd
-config_mnist['adam_beta1'] = 0.5
-config_mnist['lr'] = 0.0005
-config_mnist['lr_adv'] = 0.0008
-config_mnist['clip_grad_cat'] = False
-config_mnist['clip_norm'] = 1.
-config_mnist['different_lr_cat'] = False
-config_mnist['lr_cat'] = 0.00008
-config_mnist['batch_norm'] = True
-config_mnist['batch_norm_eps'] = 1e-05
-config_mnist['batch_norm_decay'] = 0.9
-
-# Objective set up
-config_mnist['cost'] = 'l2sq' #l2, l2sq, l1, l2sq_wrong
-config_mnist['sqrt_MMD'] = False #use MMD estimator or square MMD estimator
-config_mnist['mmd_kernel'] = 'IMQ' # RBF, IMQ
-config_mnist['MMDpp'] = True #MMD++ as in https://github.com/tolstikhin/wae/blob/master/improved_wae.py
-config_mnist['lambda'] = 1.
-config_mnist['lambda_schedule'] = 'constant' #  adaptive, constant
-
-# Model set up
-config_mnist['zdim'] = 9
-config_mnist['nmixtures'] = 10
 config_mnist['nclasses'] = 10
-config_mnist['nsamples'] = 10
-config_mnist['sigma_prior'] = pow(.25,2)
-coef = 2. * config_mnist['sigma_prior'] / config_mnist['zdim'] / 3.
-config_mnist['prior_threshold'] = coef * 3.**2
-config_mnist['pz_scale'] = 1.
 
-# NN set up
-config_mnist['e_means'] = 'learnable'
-config_mnist['conv_filters_dim'] = 5
-config_mnist['init_std'] = 0.0099999
-config_mnist['init_bias'] = 0.0
-
-config_mnist['e_gaus_arch'] = 'mlp' # mlp, dcgan, ali, began
-config_mnist['e_gaus_nlayers'] =2
-config_mnist['e_gaus_nfilters'] = 16
-config_mnist['e_cat_arch'] = 'dcgan' # mlp, dcgan, ali, began
-config_mnist['e_cat_nlayers'] = 3
-config_mnist['e_cat_nfilters'] = 64
-
-config_mnist['g_cont_arch'] = 'dcgan_mod' # mlp, dcgan, dcgan_mod, ali, began
-config_mnist['g_cont_nlayers'] = 3
-config_mnist['g_cont_nfilters'] = 64
+# SVHN config
+config_SVHN = config.copy()
+# Data set up
+config_SVHN['dataset'] = 'svhn'
+config_SVHN['data_dir'] = 'svhn'
+config_SVHN['nclasses'] = 10

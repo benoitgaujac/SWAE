@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#$ -S /bin/bash
+
+#$ -wd /home/bgaujac/swae
+
+#$ -l gpu=True
+#$ -l tmem=8G
+#$ -l h_rt=4:00:00
+
+#$ -t 1-9
+
+#$ -N mnist
+
+source /share/apps/examples/source_files/python/python-3.6.4.source
+source /share/apps/examples/source_files/cuda/cuda-10.0.source
+
+# python3 run.py --data_dir ../data --out_dir mnist_test --dataset mnist --num_it 20000 --lr 0.001 --model WAE --beta 10 --net_archi mlp --save_model
+python3 run_array.py --data_dir ../data --out_dir mnist --dataset mnist --num_it 100000 --lr 0.001 --model WAE --id $SGE_TASK_ID --net_archi mlp --save_model
+
+# testing
+# python3 beta_array_run.py --num_it 100000 --data_dir ../../data --dataset shifted_mnist --out_dir shift_mnist_test --model WAE --lr 0.001 --net_archi mlp --orientation_num 8 --gamma 100 --lr_decay --fid --id 1 --cost wemd --zdim 2
+# python3 beta_array_run.py --num_it 100000 --data_dir ../../data --dataset rotated_mnist --out_dir rot_mnist_test --model WAE --lr 0.001 --net_archi mlp --orientation_num 8 --gamma 100 --lr_decay --fid --id 1 --cost wemd --zdim 2
+# python3 run_test.py --data_dir ../../data --dataset rotated_mnist --out_dir rot_mnist --model WAE --weights_file trained-WAE-final-100000 --net_archi mlp --cost wemd --res_dir beta_0_gamma_100.0_L_8 --mode perturbation
+# python3 run_test.py --data_dir ../../data --dataset shifted_mnist --out_dir shift_mnist --model WAE --weights_file trained-WAE-final-100000 --net_archi mlp --cost wemd --res_dir beta_10_gamma_100.0_L_8 --mode perturbation

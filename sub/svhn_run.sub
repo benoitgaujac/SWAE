@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#$ -S /bin/bash
+
+#$ -wd /home/bgaujac/wwae/swwae
+
+#$ -l gpu=True
+#$ -l tmem=24G
+#$ -l h_rt=12:00:00
+
+#$ -t 1-5
+
+#$ -N wgansvhn
+
+source /share/apps/examples/source_files/python/python-3.6.4.source
+source /share/apps/examples/source_files/cuda/cuda-10.0.source
+
+python3 array_run.py --num_it 100000 --data_dir ../../data --dataset svhn --out_dir svhn_critic_reg_ablation --model WAE --lr 0.0001 --beta 0 --cost wgan  --save_model --id $SGE_TASK_ID
+# python3 run.py --num_it 20000 --data_dir ../../data --dataset svhn --out_dir svhn_test --model WAE --lr 0.0001 --beta 0 --save_model --cost wgan  --net_archi coef
