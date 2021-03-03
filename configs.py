@@ -1,5 +1,5 @@
 import copy
-from math import pow, sqrt, cos, sin, pi
+from math import sqrt, pi
 
 ### Default common config
 config = {}

@@ -1,7 +1,6 @@
 import sys
 import time
 import os
-from math import sqrt, cos, sin, pi
 import numpy as np
 
 import scipy.stats as scistats

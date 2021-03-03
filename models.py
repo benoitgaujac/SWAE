@@ -96,10 +96,8 @@ class VAE(Model):
         """
         Compute VAE rec. loss
         """
-        pi = tf.nn.softmax(logits,axis=-1)
-        rec = cross_entropy_loss(self.opts, inputs, tf.nn.softmax(logits,axis=-1),
-                                    mean,
-                                    sigma)
+        rec = cross_entropy_loss(self.opts, inputs, mean, sigma,
+                                    tf.nn.softmax(logits,axis=-1))
 
         return rec
 

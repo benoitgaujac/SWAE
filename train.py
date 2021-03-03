@@ -2,7 +2,6 @@ import sys
 import os
 import logging
 
-from math import sqrt, cos, sin, pi
 import numpy as np
 import tensorflow as tf
 
@@ -51,14 +50,17 @@ class Run(object):
         self.extra_update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
 
         # --- encode & decode pass for vizu
-        self.pi, encoded, _, _, reconstructed, _ = self.model.forward_pass(
+        cat_logits, encoded, _, _, reconstructed, _ = self.model.forward_pass(
                                     inputs=self.obs_points,
                                     is_training=self.is_training,
                                     reuse=True)
-        idx = tf.reshape(tf.multinomial(self.pi,1,output_dtype=tf.int32),[-1]) #[batch,]
+        self.pi = tf.nn.softmax(cat_logits,axis=-1)
+        idx = tf.reshape(tf.multinomial(cat_logits,1,output_dtype=tf.int32),[-1]) #[batch,]
         batch_size = tf.cast(tf.shape(self.obs_points)[0], tf.int32)
         mix_idx = tf.stack([tf.range(batch_size,dtype=tf.int32),idx],axis=-1)
         self.encoded = tf.gather_nd(encoded, mix_idx) #[batch,zdim]
+        if self.opts['model']=='VAE' and self.opts['decoder']=='bernoulli':
+            reconstructed = tf.math.sigmoid(reconstructed)
         reconstructed = tf.gather_nd(reconstructed, mix_idx)
         self.reconstructed = tf.reshape(reconstructed, [-1,]+self.data.data_shape)
 
