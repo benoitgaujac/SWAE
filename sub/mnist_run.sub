@@ -16,7 +16,7 @@ source /share/apps/examples/source_files/python/python-3.6.4.source
 source /share/apps/examples/source_files/cuda/cuda-10.0.source
 
 # python3 run.py --data_dir ../data --out_dir mnist_test --dataset mnist --num_it 20000 --lr 0.001 --model WAE --beta 10 --net_archi conv --save_model
-python3 run_array.py --data_dir ../data --out_dir mnist --dataset mnist --num_it 100000 --lr 0.001--id $SGE_TASK_ID --net_archi conv --save_model  --model WAE
+python3 run_array.py --data_dir ../data --out_dir mnist --dataset mnist --num_it 100000 --lr 0.001 --id $SGE_TASK_ID --net_archi conv --save_model --model WAE
 
 # testing
 # python3 beta_array_run.py --num_it 100000 --data_dir ../../data --dataset shifted_mnist --out_dir shift_mnist_test --model WAE --lr 0.001 --net_archi mlp --orientation_num 8 --gamma 100 --lr_decay --fid --id 1 --cost wemd --zdim 2
