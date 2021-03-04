@@ -28,10 +28,10 @@ def mlp_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_tr
         layer_x = Batchnorm_layers(opts, layer_x, 'hid1/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # gaussian output layer
-    gauss_outputs = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+    gaus_outputs = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
                                     gaus_output_dim,
                                     init=opts['mlp_init'],
-                                    scope='gauss/final')
+                                    scope='gaus/final')
     # cat hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
                                     128, init=opts['mlp_init'],
@@ -52,7 +52,7 @@ def mlp_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_tr
                                     init=opts['mlp_init'],
                                     scope='cat/hid_final')
 
-    return cat_outputs, gauss_outputs
+    return cat_outputs, gaus_outputs
 
 def mlp_decoder(opts, input, output_dim, reuse=False, is_training=False):
     layer_x = input
@@ -77,14 +77,14 @@ def mlp_decoder(opts, input, output_dim, reuse=False, is_training=False):
     return outputs
 
 ######### conv #########
-def mnist_conv_encoder(opts, input, output_dim, reuse=False, is_training=False):
+def mnist_conv_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_training=False):
     """
     Archi used by Ghosh & al.
     """
     layer_x = input
     # hidden 0
     layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
-                                output_dim=32, filter_size=4,
+                                output_dim=8, filter_size=4,
                                 stride=2, scope='hid0/conv',
                                 init=opts['conv_init'])
     if opts['normalization']=='batchnorm':
@@ -93,39 +93,46 @@ def mnist_conv_encoder(opts, input, output_dim, reuse=False, is_training=False):
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # hidden 1
     layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
-                                output_dim=64, filter_size=4,
+                                output_dim=16, filter_size=4,
                                 stride=2, scope='hid1/conv',
                                 init=opts['conv_init'])
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x,
                                 'hid1/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
+    # gaussian output layer
+    gaus_outputs = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+                                    gaus_output_dim,
+                                    init=opts['mlp_init'],
+                                    scope='gaus/final')
     # hidden 2
     layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
-                                output_dim=128, filter_size=4,
-                                stride=2, scope='hid2/conv',
+                                output_dim=32, filter_size=4,
+                                stride=2, scope='cat/hid1/conv',
                                 init=opts['conv_init'])
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x,
-                                'hid2/bn', is_training, reuse)
+                                'cat/hid1/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # hidden 3
     layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
-                                output_dim=256, filter_size=4,
-                                stride=2, scope='hid3/conv',
+                                output_dim=64, filter_size=4,
+                                stride=2, scope='cat/hid2/conv',
                                 init=opts['conv_init'])
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x,
-                                'hid3/bn', is_training, reuse)
+                                'cat/hid2/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
-    # output layer
+    # cat output layer
     layer_x = tf.reshape(layer_x, [-1,np.prod(layer_x.get_shape().as_list()[1:])])
-    outputs = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                output_dim, scope='hid_final')
+    cat_outputs = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+                                    cat_output_dim,
+                                    init=opts['conv_init'],
+                                    scope='cat/hid_final')
 
-    return outputs
+    return cat_outputs, gaus_outputs
 
-def mnist_conv_decoder(opts, input, output_dim, reuse, is_training):
+def mnist_conv_decoder(opts, input, output_dim, reuse=False, is_training=False):
     """
     Archi used by Ghosh & al.
     """
@@ -134,16 +141,16 @@ def mnist_conv_decoder(opts, input, output_dim, reuse, is_training):
     layer_x = input
     # Linear layers
     layer_x = Linear(opts, layer_x, np.prod(input.get_shape().as_list()[1:]),
-                                8*8*128, scope='hid0/lin')
+                                8*8*32, scope='hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x,
                                 'hid0/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
-    layer_x = tf.reshape(layer_x, [-1, 8, 8, 128])
+    layer_x = tf.reshape(layer_x, [-1, 8, 8, 32])
     # hidden 1
     _out_shape = [batch_size, 2*layer_x.get_shape().as_list()[1],
                                 2*layer_x.get_shape().as_list()[2],
-                                64]
+                                16]
     layer_x = Deconv2D(opts, layer_x, layer_x.get_shape().as_list()[-1],
                                 output_shape=_out_shape, filter_size=4,
                                 stride=2, scope='hid1/deconv',
@@ -155,7 +162,7 @@ def mnist_conv_decoder(opts, input, output_dim, reuse, is_training):
     # hidden 2
     _out_shape = [batch_size, 2*layer_x.get_shape().as_list()[1],
                                 2*layer_x.get_shape().as_list()[2],
-                                32]
+                                8]
     layer_x = Deconv2D(opts, layer_x, layer_x.get_shape().as_list()[-1],
                                 output_shape=_out_shape, filter_size=4,
                                 stride=2, scope='hid2/deconv',
@@ -164,6 +171,7 @@ def mnist_conv_decoder(opts, input, output_dim, reuse, is_training):
         layer_x = Batchnorm_layers( opts, layer_x,
                                 'hid2/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
+
     # output layer
     outputs = Deconv2D(opts, layer_x, layer_x.get_shape().as_list()[-1],
                                 output_shape=[batch_size,]+output_dim, filter_size=1,
