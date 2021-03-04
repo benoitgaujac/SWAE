@@ -389,8 +389,8 @@ class Run(object):
             pi = self.sess.run(self.pi, feed_dict={
                                 self.obs_points: data_test,
                                 self.is_training: False})
-            acc += accuracy(labels_test, pi, classes) / te_batches_num
-            means_pi += pi / te_batches_num
+            acc += accuracy(labels_test, pi, classes) / teBatch_num
+            means_pi += pi / teBatch_num
         Acc_test.append(acc)
         logging.error('')
         debug_str = 'Training done. '
