@@ -15,7 +15,7 @@ def mlp_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_tr
     layer_x = input
     # hidden 0
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    128, init=opts['mlp_init'],
+                                    256, init=opts['mlp_init'],
                                     scope='hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'hid0/bn', is_training, reuse)
@@ -27,14 +27,14 @@ def mlp_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_tr
                                     scope='gaus/final')
     # hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    128, init=opts['mlp_init'],
+                                    256, init=opts['mlp_init'],
                                     scope='cat/hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'cat/hid0/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # cat hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    128, init=opts['mlp_init'],
+                                    256, init=opts['mlp_init'],
                                     scope='cat/hid1/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'cat/hid1/bn', is_training, reuse)
@@ -58,21 +58,21 @@ def mlp_decoder(opts, input, output_dim, reuse=False, is_training=False):
     layer_x = input
     # hidden 0
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                128, init=opts['mlp_init'], scope='hid0/lin')
+                256, init=opts['mlp_init'], scope='hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(
             opts, layer_x, 'hid0/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                128, init=opts['mlp_init'], scope='hid1/lin')
+                256, init=opts['mlp_init'], scope='hid1/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(
             opts, layer_x, 'hid1/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                128, init=opts['mlp_init'], scope='hid3/lin')
+                256, init=opts['mlp_init'], scope='hid3/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(
             opts, layer_x, 'hid3/bn', is_training, reuse)
