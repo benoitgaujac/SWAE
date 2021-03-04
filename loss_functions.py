@@ -186,7 +186,7 @@ def cross_entropy_loss(opts, inputs, mean, sigma, resp):
         xent = gauss_cross_entropy(inputs, mean, sigma)
     else:
         ValueError('Incompatibel {} decoder for VAE'.format(opts['decoder']))
-    loss = - tf.reduce_sum(resp*xent, axis=-1)
+    loss = tf.reduce_sum(resp*xent, axis=-1)
 
     return tf.reduce_mean(loss)
 
@@ -212,7 +212,7 @@ def gauss_cross_entropy(inputs, mean, sigma):
     inputs = tf.expand_dims(tf.compat.v1.layers.flatten(inputs), axis=1)
     loss = tf.log(pi*sigma) + tf.square(inputs-mean) / sigma
 
-    return -0.5 * tf.reduce_sum(loss, axis=-1)
+    return 0.5 * tf.reduce_sum(loss, axis=-1)
 
 
 ### pre-training loss###
