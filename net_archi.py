@@ -15,14 +15,14 @@ def mlp_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_tr
     layer_x = input
     # hidden 0
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    1024, init=opts['mlp_init'],
+                                    128, init=opts['mlp_init'],
                                     scope='hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'hid0/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    1024, init=opts['mlp_init'],
+                                    128, init=opts['mlp_init'],
                                     scope='hid1/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'hid1/bn', is_training, reuse)
@@ -34,14 +34,14 @@ def mlp_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_tr
                                     scope='gauss/final')
     # cat hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    1024, init=opts['mlp_init'],
+                                    128, init=opts['mlp_init'],
                                     scope='cat/hid1/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'cat/hid1/bn', is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # cat hidden 2
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    1024, init=opts['mlp_init'],
+                                    128, init=opts['mlp_init'],
                                     scope='cat/hid2/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'cat/hid2/bn', is_training, reuse)
@@ -54,31 +54,27 @@ def mlp_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_tr
 
     return cat_outputs, gauss_outputs
 
-def mlp_decoder(opts, input, nmixtures, output_dim, reuse=False, is_training=False):
-    outputs = []
-    for n in range(nmixtures):
-        layer_x = input[:,n]
-        with tf.compat.v1.variable_scope('mix{}'.format(n), reuse=reuse):
-            # hidden 0
-            layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                        1024, init=opts['mlp_init'], scope='hid0/lin')
-            if opts['normalization']=='batchnorm':
-                layer_x = Batchnorm_layers(
-                    opts, layer_x, 'hid0/bn', is_training, reuse)
-            layer_x = ops._ops.non_linear(layer_x,'relu')
-            # hidden 1
-            layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                        1024, init=opts['mlp_init'], scope='hid1/lin')
-            if opts['normalization']=='batchnorm':
-                layer_x = Batchnorm_layers(
-                    opts, layer_x, 'hid1/bn', is_training, reuse)
-            layer_x = ops._ops.non_linear(layer_x,'relu')
-            # output layer
-            output = Linear(opts, layer_x,np.prod(layer_x.get_shape().as_list()[1:]),
-                        np.prod(output_dim), init=opts['mlp_init'], scope='hid_final')
-        outputs.append(output)
+def mlp_decoder(opts, input, output_dim, reuse=False, is_training=False):
+    layer_x = input
+    # hidden 0
+    layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+                128, init=opts['mlp_init'], scope='hid0/lin')
+    if opts['normalization']=='batchnorm':
+        layer_x = Batchnorm_layers(
+            opts, layer_x, 'hid0/bn', is_training, reuse)
+    layer_x = ops._ops.non_linear(layer_x,'relu')
+    # hidden 1
+    layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+                128, init=opts['mlp_init'], scope='hid1/lin')
+    if opts['normalization']=='batchnorm':
+        layer_x = Batchnorm_layers(
+            opts, layer_x, 'hid1/bn', is_training, reuse)
+    layer_x = ops._ops.non_linear(layer_x,'relu')
+    # output layer
+    outputs = Linear(opts, layer_x,np.prod(layer_x.get_shape().as_list()[1:]),
+                np.prod(output_dim), init=opts['mlp_init'], scope='hid_final')
 
-    return tf.stack(outputs, axis=1)
+    return outputs
 
 ######### conv #########
 def mnist_conv_encoder(opts, input, output_dim, reuse=False, is_training=False):

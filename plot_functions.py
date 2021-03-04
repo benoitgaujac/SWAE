@@ -14,7 +14,8 @@ import pdb
 
 def save_train(opts, data_train, data_test,
                      rec_train, rec_test, samples,
-                     encoded, samples_prior, label_test,
+                     encoded, label_test,
+                     samples_prior, prior_means,
                      latent_interpolation,
                      mean_probs,
                      losses, losses_test,
@@ -155,8 +156,9 @@ def save_train(opts, data_train, data_test,
 
     ### UMAP visualization of the embedings
     samples_prior = samples_prior.reshape([-1, opts['zdim']])
+    num_pz = samples_prior.shape[0]
     if opts['zdim']==2:
-        embedding = np.concatenate((encoded,samples_prior),axis=0)
+        embedding = np.concatenate((encoded,samples_prior,prior_means),axis=0)
         #embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
     else:
         embedding = umap.UMAP(n_neighbors=5,
@@ -167,8 +169,10 @@ def save_train(opts, data_train, data_test,
                 c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
                 #c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
     # axes[2,0].colorbar()
-    axes[2,0].scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
+    axes[2,0].scatter(embedding[num_pics:num_pics+num_pz, 0], embedding[num_pics:num_pics+num_pz, 1],
                             color='navy', s=10, marker='*',label='Pz')
+    axes[2,0].scatter(embedding[num_pics+num_pz:, 0], embedding[num_pics+num_pz:, 1],
+                            color='red', s=15, marker='*',label='Pz means')
 
     xmin = np.amin(embedding[:,0])
     xmax = np.amax(embedding[:,0])

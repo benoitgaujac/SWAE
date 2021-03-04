@@ -41,9 +41,7 @@ def sample_gmm(opts, means, Sigma, batch_size=100, sampling_mode='one'):
         samples = noises[np.arange(batch_size),mixture]
     elif sampling_mode == 'mixtures':
         nsamples_per_mixture = ceil(batch_size / opts['nmixtures'])
-        samples = noises[:nsamples_per_mixture,:]
-    elif sampling_mode == 'all':
-        samples = noises
+        samples = noises[:nsamples_per_mixture,:].reshape([-1,opts['zdim']])
     else:
         ValueError('Unkown {} sampling for gmm'.format(sampling_mode))
 
@@ -90,14 +88,15 @@ def generate_latent_grid(opts, n, pz_means, pz_sigma):
     """
     Genereate linear latent grid
     """
-    K, zdim = pz_means.shape
-    # get means extremum
+    zdim = pz_means.shape[-1]
+    assert zdim==2, "latent dimension must be equal to 2"
     idx_max = np.argmax(pz_means,axis=0) #[zdim,]
     idx_min = np.argmin(pz_means,axis=0) #[zdim,]
     xs = []
     for d in range(zdim):
-        xmin = pz_means[idx_min[d],d] + pz_sigma[idx_min[d],d]
+        xmin = pz_means[idx_min[d],d] - pz_sigma[idx_min[d],d]
         xmax = pz_means[idx_max[d],d] + pz_sigma[idx_max[d],d]
         xs.append(np.linspace(xmin, xmax, n, endpoint=True))
-    meshgrid = np.stack(np.meshgrid(*xs), axis=-1) #[nsteps,..,nsteps,zdim]
-    return  meshgrid.reshape([-1,zdim]) #[nsteps**zdim,zdim]
+    xv, yv = np.meshgrid(xs[0],xs[1])
+    grid = np.stack((xv,yv),axis=-1)
+    return grid

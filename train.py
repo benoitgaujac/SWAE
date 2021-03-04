@@ -65,12 +65,13 @@ class Run(object):
         self.reconstructed = tf.reshape(reconstructed, [-1,]+self.data.data_shape)
 
         # --- Sampling
-        self.mixture_wise_generated = self.model.sample_x_from_prior(noise=self.pz_samples) #[batch,K,imdim]
-        batch_size = tf.cast(tf.shape(self.pz_samples)[0], tf.int32)
-        logits = tf.log(tf.expand_dims(self.pi0,axis=0)) #[1,K]
-        idx = tf.reshape(tf.multinomial(logits,batch_size,output_dtype=tf.int32),[-1]) #[batch,]
-        mix_idx = tf.stack([tf.range(batch_size,dtype=tf.int32),idx],axis=-1)
-        self.generated = tf.gather_nd(self.mixture_wise_generated, mix_idx) #[batch,imdim]
+        self.generated = self.model.sample_x_from_prior(noise=self.pz_samples) #[batch,imdim]
+        # self.mixture_wise_generated = self.model.sample_x_from_prior(noise=self.pz_samples) #[batch,K,imdim]
+        # batch_size = tf.cast(tf.shape(self.pz_samples)[0], tf.int32)
+        # logits = tf.log(tf.expand_dims(self.pi0,axis=0)) #[1,K]
+        # idx = tf.reshape(tf.multinomial(logits,batch_size,output_dtype=tf.int32),[-1]) #[batch,]
+        # mix_idx = tf.stack([tf.range(batch_size,dtype=tf.int32),idx],axis=-1)
+        # self.generated = tf.gather_nd(self.mixture_wise_generated, mix_idx) #[batch,imdim]
 
         # Not implemented yet
         # # --- Pre Training
@@ -94,7 +95,7 @@ class Run(object):
                                     [None] + self.data.data_shape,
                                     name='points_ph')
         self.pz_samples = tf.placeholder(tf.float32,
-                                    [None] + [self.opts['nmixtures'],self.opts['zdim']],
+                                    [None, self.opts['zdim']],
                                     name='noise_ph')
 
     def optimizer(self, lr, decay=1.):
@@ -193,8 +194,7 @@ class Run(object):
         # - set up for testing
         npics = self.opts['plot_num_pics']
         fixed_noise = sample_gmm(self.opts, self.pz_mean, self.pz_sigma,
-                                    npics,
-                                    sampling_mode='mixtures')
+                                    npics, sampling_mode='mixtures')
         np.random.seed(123)
         idx = np.random.choice(np.arange(self.data.test_size), npics, False)
         data_vizu, labels_vizu = self.data.sample_observations(idx)
@@ -299,7 +299,7 @@ class Run(object):
                 [rec_vizu, enc_vizu, mixwise_gen] = self.sess.run([
                                     self.reconstructed,
                                     self.encoded,
-                                    self.mixture_wise_generated],
+                                    self.generated],
                                     feed_dict={self.obs_points: data_vizu,
                                                self.pz_samples: fixed_noise,
                                                self.is_training: False})
@@ -310,22 +310,21 @@ class Run(object):
                 # Latent grid
                 if self.opts['zdim']==2:
                     nsteps = 10
-                    latent_grid = generate_latent_grid(self.opts, nsteps, #[nsteps**zdim,zdim]
+                    latent_grid = generate_latent_grid(self.opts, nsteps, #[nsteps,nsteps,zdim]
                                         self.pz_mean,
                                         self.pz_sigma)
-                    latent_grid = np.tile(np.expand_dims(latent_grid,1), #[nsteps**zdim,K,zdim]
-                                        (1,self.opts['nmixtures'],1))
+                    latent_grid = latent_grid.reshape([-1,self.opts['zdim']])
                     latent_interpolation = self.sess.run(self.generated,
                                         feed_dict={self.pz_samples: latent_grid,
                                                    self.is_training: False})
-                    latent_interpolation = np.split(latent_interpolation, nsteps, axis=0)
-                    latent_interpolation = np.stack(latent_interpolation, axis=0) #[nsteps,..,nsteps,imdim]
+                    latent_interpolation = latent_interpolation.reshape([nsteps,nsteps]+self.data.data_shape)
                 else:
                     latent_interpolation = None
                 # - Saving plots
                 save_train(self.opts, data_train, data_vizu,
                                     rec_train, rec_vizu, mixwise_gen,
-                                    enc_vizu, fixed_noise, labels_vizu,
+                                    enc_vizu, labels_vizu,
+                                    fixed_noise, self.pz_mean,
                                     latent_interpolation,
                                     means_probs,
                                     Losses, Losses_test,
@@ -425,6 +424,7 @@ class Run(object):
                     loss=np.array(Losses), loss_test=np.array(Losses_test),
                     kl=np.array(KL), kl_test=np.array(KL_test),
                     acc=np.array(Acc), acc_test=np.array(Acc_test))
+
 
     def test(self, data, MODEL_DIR, WEIGHTS_FILE):
         """

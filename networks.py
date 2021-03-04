@@ -27,7 +27,7 @@ def encoder(opts, input, cat_output_dim, gaus_output_dim, scope=None, reuse=Fals
     return cat_outputs, mean, Sigma
 
 
-def decoder(opts, input, nmixtures, output_dim, scope=None, reuse=False, is_training=False):
+def decoder(opts, input, output_dim, scope=None, reuse=False, is_training=False):
     with tf.compat.v1.variable_scope(scope, reuse=reuse):
         # build decoder network
         if opts['dataset'] in net_archi:
@@ -37,7 +37,7 @@ def decoder(opts, input, nmixtures, output_dim, scope=None, reuse=False, is_trai
                 ValueError('Unknown {} net. archi. for {} dataset'.format(
                                     opts['net_archi'], opts['dataset']))
         # decode
-        outputs = decoder_net(opts, input, nmixtures, output_dim, reuse, is_training) #[batch,nmixtures,2*outdim]
+        outputs = decoder_net(opts, input, output_dim, reuse, is_training) #[batch,nmixtures,2*outdim]
 
     mean, logSigma = tf.split(outputs,2,axis=-1)
     logSigma = tf.clip_by_value(logSigma, -20, 500)

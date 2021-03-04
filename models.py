@@ -41,14 +41,17 @@ class Model(object):
         enc_gauss_mean = tf.reshape(enc_gauss_mean,[-1,self.opts['nmixtures'],self.opts['zdim']])
         enc_gauss_Sigma = tf.reshape(enc_gauss_Sigma,[-1,self.opts['nmixtures'],self.opts['zdim']])
         enc_z = sample_all_gmm(self.opts, enc_gauss_mean, enc_gauss_Sigma) #[batch,nmixtures,zdim]
+        enc_z_flat = tf.reshape(enc_z, [-1,self.opts['zdim']])
         # Decode
         dec_mean, dec_Sigma = decoder(self.opts,
-                                        input=enc_z,
-                                        nmixtures = self.opts['nmixtures'],
+                                        input=enc_z_flat,
                                         output_dim=self.output_dim,
                                         scope='decoder',
                                         reuse=reuse,
                                         is_training=is_training)
+        outshape = [-1,self.opts['nmixtures'],np.prod(datashapes[self.opts['dataset']])]
+        dec_mean = tf.reshape(dec_mean,outshape)
+        dec_Sigma = tf.reshape(dec_Sigma,outshape)
 
         return enc_cat_logits, enc_z, enc_gauss_mean, enc_gauss_Sigma, dec_mean, dec_Sigma
 
@@ -64,12 +67,11 @@ class Model(object):
         sample_x:   [batch,K,imgdim]
         """
         sample_x, _, = decoder(self.opts, input=noise,
-                                        nmixtures = self.opts['nmixtures'],
                                         output_dim=self.output_dim,
                                         scope='decoder',
                                         reuse=True,
                                         is_training=False)
-        output_shape = [-1,self.opts['nmixtures']]+datashapes[self.opts['dataset']]
+        output_shape = [-1,]+datashapes[self.opts['dataset']]
 
         return tf.reshape(sample_x, output_shape)
 
