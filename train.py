@@ -187,7 +187,7 @@ class Run(object):
         train_size = self.data.train_size
         trBatch_num = int(self.data.train_size / self.opts['batch_size'])
         teBatch_num = int(self.data.test_size / self.opts['batch_size'])
-        logging.error('\nTrain size: {}, trBatch num.: {}, Ite. num: {}'.format(
+        logging.error('\nTrain size: {}, trBatch num.: {}, It num: {}'.format(
                                     self.data.train_size,
                                     trBatch_num,
                                     self.opts['it_num']))
