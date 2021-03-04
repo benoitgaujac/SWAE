@@ -205,12 +205,12 @@ def save_train(opts, data_train, data_test,
         image = image[0,0]
         if greyscale:
             image = 1. - image
-            image = img[:, :, 0]
+            image = image[:, :, 0]
             # in Greys higher values correspond to darker colors
             axes[2,1].imshow(image, cmap='Greys',
                             interpolation='none', vmin=0., vmax=1.)
         else:
-            axes[2,1] = plt.imshow(img, interpolation='none', vmin=0., vmax=1.)
+            axes[2,1] = plt.imshow(image, interpolation='none', vmin=0., vmax=1.)
         # Removing ticks
         axes[2,1].get_xaxis().set_ticks([])
         axes[2,1].get_yaxis().set_ticks([])
