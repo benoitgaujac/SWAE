@@ -252,7 +252,7 @@ class Run(object):
                 data_train, labels_train = self.data.sample_observations(idx, True)
                 while np.unique(labels_train).shape[0]<self.opts['nclasses']:
                     # resample if needed
-                    data_train, labels_train = self.data.sample_observations(idx)
+                    data_train, labels_train = self.data.sample_observations(idx, True)
                 pi = self.sess.run(self.pi, feed_dict={
                                     self.obs_points: data_train,
                                     self.is_training: False})
@@ -371,10 +371,10 @@ class Run(object):
         Losses_test.append(loss)
         KL_test.append(kl)
         idx = np.random.choice(np.arange(self.data.train_size), npics, False)
-        data_train, labels_train = self.data.sample_observations(idx)
+        data_train, labels_train = self.data.sample_observations(idx, True)
         while np.unique(labels_train).shape[0]<self.opts['nmixtures']:
             # resample if needed
-            data_train, labels_train = self.data.sample_observations(idx)
+            data_train, labels_train = self.data.sample_observations(idx, True)
         pi = self.sess.run(self.pi, feed_dict={
                             self.obs_points: data_train,
                             self.is_training: False})
