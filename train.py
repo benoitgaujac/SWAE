@@ -194,7 +194,7 @@ class Run(object):
         # - set up for testing
         npics = self.opts['plot_num_pics']
         fixed_noise = sample_gmm(self.opts, self.pz_mean, self.pz_sigma,
-                                    npics, sampling_mode='mixtures')
+                                    5*npics, sampling_mode='mixtures')
         np.random.seed(123)
         idx = np.random.choice(np.arange(self.data.test_size), npics, False)
         data_vizu, labels_vizu = self.data.sample_observations(idx)
@@ -301,7 +301,7 @@ class Run(object):
                                     self.encoded,
                                     self.generated],
                                     feed_dict={self.obs_points: data_vizu,
-                                               self.pz_samples: fixed_noise,
+                                               self.pz_samples: fixed_noise[:npics],
                                                self.is_training: False})
                 # Auto-encoding training images
                 rec_train = self.sess.run(self.reconstructed, feed_dict={
@@ -411,8 +411,6 @@ class Run(object):
                             KL_test[-1][0],
                             KL_test[-1][1])
             logging.error(debug_str)
-        else:
-            raise NotImplementedError('Model type not recognised')
 
         # - save training data
         if self.opts['save_train_data']:
