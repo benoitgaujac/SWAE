@@ -144,11 +144,19 @@ def mnist_conv_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False
     Archi used by Ghosh & al.
     """
     layer_x = input
+    # gaus hidden
+    layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+                                    128, init=opts['mlp_init'],
+                                    scope='gaus/hid/lin')
+    if opts['normalization']=='batchnorm':
+        layer_x = Batchnorm_layers(opts, layer_x, 'gaus/hid/bn', is_training, reuse)
+    layer_x = ops._ops.non_linear(layer_x,'relu')
     # gaussian output layer
     gaus_outputs = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
                                     gaus_output_dim,
                                     init=opts['mlp_init'],
                                     scope='gaus/final')
+    layer_x = input
     # hidden 0
     layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
                                 output_dim=16, filter_size=4,
