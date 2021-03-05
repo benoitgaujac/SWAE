@@ -46,6 +46,9 @@ class Run(object):
                                     is_training=self.is_training)
         self.objective = self.rec + self.beta * self.reg
 
+        # --- Pre Training
+        # self.pretrain_loss()
+
         # --- Get batchnorm ops for training only
         self.extra_update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
 
@@ -66,16 +69,6 @@ class Run(object):
 
         # --- Sampling
         self.generated = self.model.sample_x_from_prior(noise=self.pz_samples) #[batch,imdim]
-        # self.mixture_wise_generated = self.model.sample_x_from_prior(noise=self.pz_samples) #[batch,K,imdim]
-        # batch_size = tf.cast(tf.shape(self.pz_samples)[0], tf.int32)
-        # logits = tf.log(tf.expand_dims(self.pi0,axis=0)) #[1,K]
-        # idx = tf.reshape(tf.multinomial(logits,batch_size,output_dtype=tf.int32),[-1]) #[batch,]
-        # mix_idx = tf.stack([tf.range(batch_size,dtype=tf.int32),idx],axis=-1)
-        # self.generated = tf.gather_nd(self.mixture_wise_generated, mix_idx) #[batch,imdim]
-
-        # Not implemented yet
-        # # --- Pre Training
-        # self.pretrain_loss()
 
         # --- Optimizers, savers, etc
         self.add_optimizers()
@@ -117,11 +110,13 @@ class Run(object):
                                             scope='decoder')
         with tf.control_dependencies(self.extra_update_ops):
             self.opt = opt.minimize(loss=self.objective, var_list=encoder_vars + decoder_vars)
-        #
-        # # Pretraining optimizer
-        # if self.opts['e_pretrain']:
-        #     pre_opt = self.optimizer(0.001)
-        #     self.pre_opt = pre_opt.minimize(loss=self.pre_loss, var_list=e_gaus_vars)
+
+        # Pretraining optimizer
+        if self.opts['e_pretrain']:
+            encoder_gaus_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES,
+                                                scope='encoder/gaus')
+            pre_opt = self.optimizer(0.001)
+            self.pre_opt = pre_opt.minimize(loss=self.pre_loss, var_list=encoder_gaus_vars)
 
     def pretrain_loss(self):
         # Adding ops to pretrain the encoder so that mean and covariance

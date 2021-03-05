@@ -185,7 +185,7 @@ def mnist_conv_decoder(opts, input, output_dim, reuse=False, is_training=False):
     layer_x = input
     # Linear layers
     layer_x = Linear(opts, layer_x, np.prod(input.get_shape().as_list()[1:]),
-                                8*8*32, scope='hid0/lin')
+                                8*8*64, scope='hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x,
                                 'hid0/bn', is_training, reuse)
