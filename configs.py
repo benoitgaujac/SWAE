@@ -41,7 +41,7 @@ config['pz_scale'] = 1.
 config['decoder'] = 'bernoulli' #bernoulli, gauss
 # config['sigma_prior'] = sqrt((1-cos(pi/5.))**2 + sin(pi/5.)**2) / 4. # to check
 config['pz_scale'] = 2. #2. / sin(pi / config['nmixtures'])
-config['sigma_prior'] = (config['pz_scale']*sin(pi / config['nmixtures'])/2)**2
+config['sigma_prior'] = (config['pz_scale']*sin(pi / config['nmixtures'])/3)**2
 # NN set up
 config['net_archi'] = 'mlp' #mlp. conv
 config['init_std'] = 0.099999
