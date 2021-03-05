@@ -8,7 +8,7 @@ import tensorflow as tf
 import utils
 import models
 from priors import init_gaussian_prior, init_cat_prior
-from sampling_functions import sample_gmm, generate_linespace, generate_latent_grid
+from sampling_functions import sample_gmm, sample_all_gmm, generate_linespace, generate_latent_grid
 from loss_functions import moments_loss
 from supervised_functions import accuracy, get_mean_probs, relabelling_mask_from_probs, one_hot
 from plot_functions import save_train, save_vizu
@@ -47,7 +47,7 @@ class Run(object):
         self.objective = self.rec + self.beta * self.reg
 
         # --- Pre Training
-        # self.pretrain_loss()
+        self.pretrain_loss()
 
         # --- Get batchnorm ops for training only
         self.extra_update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
@@ -112,7 +112,7 @@ class Run(object):
             self.opt = opt.minimize(loss=self.objective, var_list=encoder_vars + decoder_vars)
 
         # Pretraining optimizer
-        if self.opts['e_pretrain']:
+        if self.opts['pretrain_encoder']:
             encoder_gaus_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES,
                                                 scope='encoder/gaus')
             pre_opt = self.optimizer(0.001)
@@ -121,26 +121,23 @@ class Run(object):
     def pretrain_loss(self):
         # Adding ops to pretrain the encoder so that mean and covariance
         # of Qz will try to match those of Pz
-        self.pre_loss = moments_loss(self.sample_mix_noise, self.mixtures_encoded)
+        _, encoded, _, _, _, _ = self.model.forward_pass(
+                                    inputs=self.data.next_element,
+                                    is_training=self.is_training,
+                                    reuse=True)
+        pz = sample_all_gmm(self.opts, self.pz_mean, self.pz_sigma,
+                                    self.opts['batch_size'], False)
+        self.pre_loss = moments_loss(encoded, pz)
 
     def pretrain_encoder(self):
-        steps_max = 1000
-        batch_size = self['e_pretrain_sample_size']
-        train_size = self.data.num_points
-        for step in range(steps_max):
-            data_ids = np.random.choice(train_size, batch_size,
-                                    replace=False)
-            batch_images = data.data[data_ids].astype(np.float32)
-            batch_mix_noise = sample_gmm(self, self.pz_mean,
-                                    self.pz_sigma,
-                                    batch_size,
-                                    sampling_mode='all')
-            [_, pre_loss] = self.sess.run([self.pre_opt, self.pre_loss],
-                                    feed_dict={self.points: batch_images,
-                                               self.sample_mix_noise: batch_mix_noise,
+        logging.error('\nPre training encoder...')
+        it_num = 1000
+        for _ in range(it_num):
+            _, pre_loss = self.sess.run([self.pre_opt, self.pre_loss],
+                                    feed_dict={self.data.handle: self.train_handle,
                                                self.is_training: True})
-        logging.error('Pretraining the encoder done.')
-        logging.error ('Loss after %d iterations: %.3f' % (steps_max,pre_loss))
+        logging.error('Pretraining the done.')
+        logging.error ('Loss after %d iterations: %.3f' % (it_num,pre_loss))
 
     def get_classes(self):
         train_size = 20000
@@ -199,6 +196,9 @@ class Run(object):
         KL, KL_test = [], []
         Acc, Acc_test = [], []
         decay, decay_rate, fix_decay_steps = 1., .9, 25000
+        # - Pre training encoder if needed
+        if self.opts['pretrain_encoder']:
+            self.pretrain_encoder()
         # - Training
         for it in range(self.opts['it_num']):
             # - Saver

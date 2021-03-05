@@ -1,9 +1,11 @@
 import sys
 import time
 import os
-from math import pi
+
 import numpy as np
 import tensorflow as tf
+from math import pi
+from scipy.stats import moment
 
 import utils
 from datahandler import datashapes
@@ -216,22 +218,26 @@ def gauss_cross_entropy(inputs, mean, sigma):
 
 
 ### pre-training loss###
-def moments_loss(prior_samples, model_samples):
-    # Matching the first 2 moments (mean and covariance)
-    # Means
-    #mean_qzs = tf.reduce_mean(model_samples, axis=0, keepdims=True)
-    mean_qzs = tf.reduce_mean(model_samples, axis=[0,2], keepdims=True)
-    #mean_pz = tf.reduce_mean(prior_samples, axis=0, keepdims=True)
-    mean_pz = tf.reduce_mean(prior_samples, axis=[0,2], keepdims=True)
-    mean_loss = tf.reduce_sum(tf.square(mean_qzs - mean_pz),axis=-1)
-    mean_loss = tf.reduce_mean(mean_loss)
-    # Covariances
-    qz_covs = tf.reduce_mean(tf.square(model_samples-mean_qzs),axis=[0,2])
-    pz_cov = tf.reduce_mean(tf.square(prior_samples-mean_pz),axis=[0,2])
-    # qz_covs = tf.reduce_mean(tf.square(model_samples-mean_qzs),axis=0)
-    # pz_cov = tf.reduce_mean(tf.square(prior_samples-mean_pz),axis=0)
-    cov_loss = tf.reduce_sum(tf.square(qz_covs - pz_cov),axis=-1)
-    cov_loss = tf.reduce_mean(cov_loss)
-    # Loss
-    pre_loss = mean_loss + cov_loss
-    return pre_loss
+def moments_loss(sample_qz, sample_pz):
+    """
+    Matching the first 2 moments (mean and covariance)
+    of prior and aggregated post.
+
+    sample_qz/pz: [batch,K,zdim]
+    Return:
+    sum_k ||muq[k]-mup[k]||^2 + ||covq[k]-covp[k]||^2 where
+    mu[k] = 1/N sum_n sample[n,k]
+    cov[k] = 1
+
+    """
+    mean_qz = tf.reduce_mean(sample_qz, axis=0, keepdims=True) #[1,K,zdim]
+    mean_pz = tf.reduce_mean(sample_pz, axis=0, keepdims=True) #[1,K,zdim]
+    mean_loss = tf.reduce_sum(tf.square(mean_qz - mean_pz),axis=[0,-1]) #[K,]
+    hat_qz = tf.expand_dims(sample_qz-mean_qz, axis=-1) #[batch,K,zdim,1]
+    cov_qz = tf.reduce_mean(tf.linalg.matmul(hat_qz,hat_qz,transpose_b=True),axis=0) #[K,zdim,zdim]
+    hat_pz = tf.expand_dims(sample_pz-mean_pz, axis=-1) #[batch,K,zdim,1]
+    cov_pz = tf.reduce_mean(tf.linalg.matmul(hat_pz,hat_pz,transpose_b=True),axis=0) #[K,zdim,zdim]
+    cov_loss = tf.reduce_sum(tf.square(cov_qz-cov_pz),axis=[-2,-1]) #[K,]
+    loss = mean_loss + cov_loss
+
+    return tf.reduce_sum(loss)

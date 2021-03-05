@@ -18,8 +18,7 @@ config['plot_num_cols'] = 10
 config['train_dataset_size'] = -1
 config['batch_size'] = 100
 config['use_trained'] = False #train from pre-trained model
-config['e_pretrain'] = False #pretrained the encoder parameters
-config['e_pretrain_sample_size'] = 200
+config['pretrain_encoder'] = False #pretrained the encoder parameters
 # Opt set up
 config['optimizer'] = 'adam' # adam, sgd
 config['adam_beta1'] = 0.9

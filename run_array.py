@@ -45,8 +45,13 @@ parser.add_argument('--save_model', action='store_false', default=True,
                     help='save final model weights [True/False]')
 parser.add_argument("--save_data", action='store_false', default=True,
                     help='save training data')
-parser.add_argument("--weights_file")
 
+# pretrainined/used pretrained
+parser.add_argument('--use_trained', action='store_true', default=False,
+                    help='use trained model')
+parser.add_argument('--weights_file', help='weights from trained model')
+parser.add_argument('--pretrain_encoder', action='store_true', default=False,
+                    help='pretrain encoder net.')
 
 FLAGS = parser.parse_args()
 
@@ -106,6 +111,8 @@ def main():
     opts['save_every'] = 10000000000
     opts['save_final'] = FLAGS.save_model
     opts['save_train_data'] = FLAGS.save_data
+    opts['use_trained'] = FLAGS.use_trained
+    opts['pretrain_encoder'] = FLAGS.pretrain_encoder
 
     #Reset tf graph
     tf.reset_default_graph()
