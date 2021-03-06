@@ -73,7 +73,7 @@ def main():
     # Model set up
     opts['model'] = FLAGS.model
     opts['cost'] = FLAGS.cost
-    betas = [1,50,100,150,200,250,500,750,1000]
+    betas = [1,100,200,250,500,750,1000]
     coef_id = (FLAGS.id-1) % len(betas)
     opts['beta'] = betas[coef_id]
     opts['decoder'] = FLAGS.decoder
