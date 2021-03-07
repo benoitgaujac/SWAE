@@ -49,13 +49,13 @@ def mlp_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_tr
 
 def mlp_encoder_per_mixtures(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_training=False):
     layer_x = input
-    # gaussian output layer
+    ### gaussian encoder
     gaus_outputs = []
     gaus_output_dim = int(gaus_output_dim / opts['nmixtures'])
     for n in range(opts['nmixtures']):
         # hidden 0
         gaus_layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                        256, init=opts['mlp_init'],
+                                        128, init=opts['mlp_init'],
                                         scope='gaus_{}/hid/lin'.format(n))
         if opts['normalization']=='batchnorm':
             gaus_layer_x = Batchnorm_layers(opts, gaus_layer_x, 'gaus_{}/hid/bn'.format(n),
@@ -68,6 +68,7 @@ def mlp_encoder_per_mixtures(opts, input, cat_output_dim, gaus_output_dim, reuse
                                         scope='gaus_{}/final'.format(n))
         gaus_outputs.append(gaus_output)
     gaus_outputs = tf.stack(gaus_outputs,axis=1)
+    ### cat encoder
     # hidden 0
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
                                     256, init=opts['mlp_init'],
@@ -212,6 +213,55 @@ def mnist_conv_encoder(opts, input, cat_output_dim, gaus_output_dim, reuse=False
     # hidden 1
     layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
                                 output_dim=32, filter_size=4,
+                                stride=2, scope='hid1/conv',
+                                init=opts['conv_init'])
+    if opts['normalization']=='batchnorm':
+        layer_x = Batchnorm_layers(opts, layer_x,
+                                'hid1/bn', is_training, reuse)
+    layer_x = ops._ops.non_linear(layer_x,'relu')
+    # cat output layer
+    layer_x = tf.reshape(layer_x, [-1,np.prod(layer_x.get_shape().as_list()[1:])])
+    cat_outputs = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+                                    cat_output_dim,
+                                    init=opts['conv_init'],
+                                    scope='cat/hid_final')
+
+    return cat_outputs, gaus_outputs
+
+def mnist_conv_encoder_per_mix(opts, input, cat_output_dim, gaus_output_dim, reuse=False, is_training=False):
+    layer_x = input
+    ### gaussian encoder
+    gaus_outputs = []
+    gaus_output_dim = int(gaus_output_dim / opts['nmixtures'])
+    for n in range(opts['nmixtures']):
+        # hidden 0
+        gaus_layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+                                        128, init=opts['mlp_init'],
+                                        scope='gaus_{}/hid/lin'.format(n))
+        if opts['normalization']=='batchnorm':
+            gaus_layer_x = Batchnorm_layers(opts, gaus_layer_x, 'gaus_{}/hid/bn'.format(n),
+                                        is_training, reuse)
+        gaus_layer_x = ops._ops.non_linear(gaus_layer_x,'relu')
+        # output
+        gaus_output = Linear(opts, gaus_layer_x, np.prod(gaus_layer_x.get_shape().as_list()[1:]),
+                                        gaus_output_dim,
+                                        init=opts['mlp_init'],
+                                        scope='gaus_{}/final'.format(n))
+        gaus_outputs.append(gaus_output)
+    gaus_outputs = tf.stack(gaus_outputs,axis=1)
+    ### cat encoder
+    # hidden 0
+    layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
+                                output_dim=32, filter_size=4,
+                                stride=2, scope='hid0/conv',
+                                init=opts['conv_init'])
+    if opts['normalization']=='batchnorm':
+        layer_x = Batchnorm_layers(opts, layer_x,
+                                'hid0/bn', is_training, reuse)
+    layer_x = ops._ops.non_linear(layer_x,'relu')
+    # hidden 1
+    layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
+                                output_dim=64, filter_size=4,
                                 stride=2, scope='hid1/conv',
                                 init=opts['conv_init'])
     if opts['normalization']=='batchnorm':
@@ -372,7 +422,8 @@ def svhn_conv_decoder(opts, input, output_dim, reuse, is_training):
 
 net_archi = {'mnist': {'mlp': {'encoder': mlp_encoder, 'decoder': mlp_decoder},
                     'mlp_per_mix': {'encoder': mlp_encoder_per_mixtures, 'decoder': mlp_decoder},
-                    'conv':{'encoder': mnist_conv_encoder, 'decoder': mnist_conv_decoder}},
+                    'conv':{'encoder': mnist_conv_encoder, 'decoder': mnist_conv_decoder},
+                    'conv_per_mix':{'encoder': mnist_conv_encoder_per_mix, 'decoder': mnist_conv_decoder}},
             'svhn': {'mlp': {'encoder': mlp_encoder, 'decoder': mlp_decoder},
                     'conv': {'encoder': svhn_conv_encoder, 'decoder': svhn_conv_decoder}}
             }
