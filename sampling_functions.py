@@ -47,7 +47,6 @@ def sample_gmm(opts, means, Sigma, batch_size=100, sampling_mode='one'):
 
     return samples
 
-
 def generate_linespace(opts, n, mode, anchors):
     """
     Genereate various latent interpolation
@@ -94,8 +93,8 @@ def generate_latent_grid(opts, n, pz_means, pz_sigma):
     idx_min = np.argmin(pz_means,axis=0) #[zdim,]
     xs = []
     for d in range(zdim):
-        xmin = pz_means[idx_min[d],d] - pz_sigma[idx_min[d],d]
-        xmax = pz_means[idx_max[d],d] + pz_sigma[idx_max[d],d]
+        xmin = pz_means[idx_min[d],d] - 2*pz_sigma[idx_min[d],d]
+        xmax = pz_means[idx_max[d],d] + 2*pz_sigma[idx_max[d],d]
         xs.append(np.linspace(xmin, xmax, n, endpoint=True))
     xv, yv = np.meshgrid(xs[0],xs[1])
     grid = np.stack((xv,yv),axis=-1)

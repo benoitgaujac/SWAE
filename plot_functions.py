@@ -140,7 +140,7 @@ def save_train(opts, data_train, data_test,
     axes[1,1].plot(x, y, linewidth=1, color='blue', linestyle=':', label=r'$\beta$ trRec')
     y = np.log(opts['beta']*losses_test[::x_step,2])
     axes[1,1].plot(x, y, linewidth=3, color='red', label=r'$\beta$ teReg')
-    y = np.log(opts['beta']*losses[::x_step,1])
+    y = np.log(opts['beta']*losses[::x_step,2])
     axes[1,1].plot(x, y, linewidth=1, color='red', linestyle=':', label=r'$\beta$ trReg')
     axes[1,1].grid(axis='y')
     axes[1,1].legend(loc='best')
@@ -156,6 +156,7 @@ def save_train(opts, data_train, data_test,
 
     ### UMAP visualization of the embedings
     samples_prior = samples_prior.reshape([-1, opts['zdim']])
+    num_pics = encoded.shape[0]
     num_pz = samples_prior.shape[0]
     if opts['zdim']==2:
         embedding = np.concatenate((encoded,samples_prior,prior_means),axis=0)
@@ -163,7 +164,7 @@ def save_train(opts, data_train, data_test,
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                metric='correlation').fit_transform(np.concatenate((encoded,samples_prior),axis=0))
+                                metric='correlation').fit_transform(np.concatenate((encoded,samples_prior,prior_means),axis=0))
 
     axes[2,0].scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
                 c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))

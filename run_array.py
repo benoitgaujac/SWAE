@@ -32,6 +32,8 @@ parser.add_argument("--lr", type=float,
 # Model setup
 parser.add_argument("--model", default='WAE',
                     help='model to train [WAE/BetaVAE/...]')
+parser.add_argument("--zdim", type=int,
+                    help='latent dim')
 parser.add_argument("--cost", default='l2sq',
                     help='wae ground cost [l2/l2sq/l1]')
 parser.add_argument("--id", type=int,
@@ -74,8 +76,10 @@ def main():
 
     # Model set up
     opts['model'] = FLAGS.model
+    if FLAGS.zdim:
+        opts['zdim'] = FLAGS.zdim
     opts['cost'] = FLAGS.cost
-    betas = [1,100,200,250,500,750,1000]
+    betas = [100,250,500,750,1000]
     coef_id = (FLAGS.id-1) % len(betas)
     opts['beta'] = betas[coef_id]
     opts['decoder'] = FLAGS.decoder
