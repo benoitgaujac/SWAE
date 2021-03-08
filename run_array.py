@@ -79,7 +79,7 @@ def main():
     if FLAGS.zdim:
         opts['zdim'] = FLAGS.zdim
     opts['cost'] = FLAGS.cost
-    betas = [100,250,500,750,1000]
+    betas = [100,250,500,750,1000,1500,2000]
     coef_id = (FLAGS.id-1) % len(betas)
     opts['beta'] = betas[coef_id]
     opts['decoder'] = FLAGS.decoder

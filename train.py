@@ -256,7 +256,7 @@ class Run(object):
                                     self.is_training: False})
                 Acc.append(accuracy(labels_train, pi, classes))
                 # testing acc
-                acc, means_probs = 0., 0.
+                acc, means_pi = 0., 0.
                 for it_ in range(teBatch_num):
                     idx = np.random.choice(np.arange(self.data.test_size), npics, False)
                     data_test, labels_test = self.data.sample_observations(idx)
@@ -267,7 +267,7 @@ class Run(object):
                                     self.obs_points: data_test,
                                     self.is_training: False})
                     acc += accuracy(labels_test, pi, classes) / teBatch_num
-                    means_probs += get_mean_probs(self.opts, labels_test, pi) / teBatch_num
+                    means_pi += get_mean_probs(self.opts, labels_test, pi) / teBatch_num
                 Acc_test.append(acc)
                 # - Printing various loss values
                 logging.error('')
@@ -328,7 +328,7 @@ class Run(object):
                                     enc_vizu, labels_enc_vizu,
                                     fixed_noise, self.pz_mean,
                                     latent_interpolation,
-                                    means_probs,
+                                    means_pi,
                                     Losses, Losses_test,
                                     Acc, Acc_test,
                                     exp_dir, 'res_it%07d.png' % (it))
@@ -381,7 +381,7 @@ class Run(object):
                             self.obs_points: data_train,
                             self.is_training: False})
         Acc.append(accuracy(labels_train, pi, classes))
-        means_pi = 0.
+        acc = 0.
         for it_ in range(teBatch_num):
             idx = np.random.choice(np.arange(self.data.test_size), npics, False)
             data_test, labels_test = self.data.sample_observations(idx)
@@ -392,7 +392,6 @@ class Run(object):
                                 self.obs_points: data_test,
                                 self.is_training: False})
             acc += accuracy(labels_test, pi, classes) / teBatch_num
-            means_pi += pi / teBatch_num
         Acc_test.append(acc)
         logging.error('')
         debug_str = 'Training done. '
