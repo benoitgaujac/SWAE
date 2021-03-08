@@ -218,9 +218,9 @@ def gauss_cross_entropy(inputs, mean, sigma):
 
 
 ### pre-training loss###
-def moments_loss(sample_qz, sample_pz):
+def moments_loss_empirical_pz(sample_qz, sample_pz):
     """
-    Matching the first 2 moments (mean and covariance)
+    Matching the first 2 empirical moments (mean and covariance)
     of prior and aggregated post.
 
     sample_qz/pz: [batch,K,zdim]
@@ -237,6 +237,30 @@ def moments_loss(sample_qz, sample_pz):
     cov_qz = tf.reduce_mean(tf.linalg.matmul(hat_qz,hat_qz,transpose_b=True),axis=0) #[K,zdim,zdim]
     hat_pz = tf.expand_dims(sample_pz-mean_pz, axis=-1) #[batch,K,zdim,1]
     cov_pz = tf.reduce_mean(tf.linalg.matmul(hat_pz,hat_pz,transpose_b=True),axis=0) #[K,zdim,zdim]
+    cov_loss = tf.reduce_sum(tf.square(cov_qz-cov_pz),axis=[-2,-1]) #[K,]
+    loss = mean_loss + cov_loss
+
+    return tf.reduce_sum(loss)
+
+def moments_loss(sample_qz, pz_mean, pz_sigma):
+    """
+    Matching the first 2 moments (mean and covariance)
+    of prior and aggregated post, using true prior parameters.
+
+    sample_qz: [batch,K,zdim]
+    pz_mean/pz_sigma: [K,zdim]
+    Return:
+    sum_k ||muq[k]-mup[k]||^2 + ||covq[k]-covp[k]||^2 where
+    mu[k] = 1/N sum_n sample[n,k]
+    cov[k] = 1
+
+    """
+    mean_qz = tf.reduce_mean(sample_qz, axis=0, keepdims=True) #[1,K,zdim]
+    mean_pz = tf.expand_dims(pz_mean, axis=0) #[1,K,zdim]
+    mean_loss = tf.reduce_sum(tf.square(mean_qz - mean_pz),axis=[0,-1]) #[K,]
+    hat_qz = tf.expand_dims(sample_qz-mean_qz, axis=-1) #[batch,K,zdim,1]
+    cov_qz = tf.reduce_mean(tf.linalg.matmul(hat_qz,hat_qz,transpose_b=True),axis=0) #[K,zdim,zdim]
+    cov_pz = tf.expand_dims(tf.linalg.diag(pz_sigma),axis=0)#[K,zdim,zdim]
     cov_loss = tf.reduce_sum(tf.square(cov_qz-cov_pz),axis=[-2,-1]) #[K,]
     loss = mean_loss + cov_loss
 

@@ -52,6 +52,8 @@ parser.add_argument('--use_trained', action='store_true', default=False,
 parser.add_argument('--weights_file', help='weights from trained model')
 parser.add_argument('--pretrain_encoder', action='store_true', default=False,
                     help='pretrain encoder net.')
+parser.add_argument('--pretrain_empirical', action='store_false', default=True,
+                    help='use empirical prior moments for pretraining')
 
 FLAGS = parser.parse_args()
 
@@ -113,6 +115,7 @@ def main():
     opts['save_train_data'] = FLAGS.save_data
     opts['use_trained'] = FLAGS.use_trained
     opts['pretrain_encoder'] = FLAGS.pretrain_encoder
+    opts['pretrain_empirical_pz'] = FLAGS.pretrain_empirical
 
     #Reset tf graph
     tf.reset_default_graph()

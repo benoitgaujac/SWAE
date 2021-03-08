@@ -125,9 +125,12 @@ class Run(object):
                                     inputs=self.data.next_element,
                                     is_training=self.is_training,
                                     reuse=True)
-        pz = sample_all_gmm(self.opts, self.pz_mean, self.pz_sigma,
-                                    self.opts['batch_size'], False)
-        self.pre_loss = moments_loss(encoded, pz)
+        if self.opts['pretrain_empirical_pz']:
+            pz = sample_all_gmm(self.opts, self.pz_mean, self.pz_sigma,
+                                        self.opts['batch_size'], False)
+            self.pre_loss = moments_loss_empirical_pz(encoded, pz)
+        else:
+            self.pre_loss = moments_loss(encoded, self.pz_mean, self.pz_sigma)
 
     def pretrain_encoder(self):
         logging.error('\nPre training encoder...')
