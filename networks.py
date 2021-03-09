@@ -16,13 +16,11 @@ def encoder(opts, input, cat_output_dim, gaus_output_dim, scope=None, reuse=Fals
         else:
             ValueError('{} dataset'.format(opts['dataset']))
         # encode
-        cat_outputs, gauss_outputs = encoder_net(opts, input, cat_output_dim,
+        cat_outputs, gaus_outputs = encoder_net(opts, input, cat_output_dim,
                                     gaus_output_dim, reuse, is_training)
-
-    mean, logSigma = tf.split(gauss_outputs,2,axis=-1)
+    mean, logSigma = tf.split(gaus_outputs,2,axis=-1)
     logSigma = tf.clip_by_value(logSigma, -20, 500) #[batch,nmixtures*zdim]
     Sigma = tf.nn.softplus(logSigma) #[batch,nmixtures*zdim]
-
 
     return cat_outputs, mean, Sigma
 

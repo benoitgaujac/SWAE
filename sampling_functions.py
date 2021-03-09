@@ -11,7 +11,8 @@ def sample_all_gmm(opts, means, Sigma, batch_size=100, tensor=True):
     """
     Sample for each component of the gmm
 
-    means/Sigma: [batch,K,zdim]/[K,zdim] for encoder/prior
+    means: [:,K,zdim]
+    Sigma: [:,K,zdim] or [:,K,zdim,zdim]
     """
     if tensor:
         if len(means.get_shape().as_list())<3:
@@ -26,7 +27,12 @@ def sample_all_gmm(opts, means, Sigma, batch_size=100, tensor=True):
             Sigma = np.expand_dims(Sigma,axis=0)
         shape = means.shape[1:]
         eps = np.random.normal(0.,1.,(batch_size,)+shape).astype(np.float32)
-        noise = means + np.multiply(eps,np.sqrt(1e-10+Sigma))
+        if opts['full_cov_matrix'] and opts['zdim']==2:
+            chol = np.linalg.cholesky(Sigma)
+            noise = np.matmul(chol,np.expand_dims(eps,axis=-1)) #[batch,K,zdim,1]
+            noise = means + np.reshape(noise,[-1,opts['nmixtures'],opts['zdim']]) #[batch,K,zdim]
+        else:
+            noise = means + np.multiply(eps,np.sqrt(1e-10+Sigma))
 
     return noise
 
@@ -93,8 +99,12 @@ def generate_latent_grid(opts, n, pz_means, pz_sigma):
     idx_min = np.argmin(pz_means,axis=0) #[zdim,]
     xs = []
     for d in range(zdim):
-        xmin = pz_means[idx_min[d],d] - 2*pz_sigma[idx_min[d],d]
-        xmax = pz_means[idx_max[d],d] + 2*pz_sigma[idx_max[d],d]
+        if opts['full_cov_matrix']:
+            max_var = max(pz_sigma[idx_min[d],0,0],pz_sigma[idx_min[d],1,1])
+        else:
+            max_var = pz_sigma[idx_min[d],d]
+        xmin = pz_means[idx_min[d],d] - 2*max_var
+        xmax = pz_means[idx_max[d],d] + 2*max_var
         xs.append(np.linspace(xmin, xmax, n, endpoint=True))
     xv, yv = np.meshgrid(xs[0],xs[1])
     grid = np.stack((xv,yv),axis=-1)

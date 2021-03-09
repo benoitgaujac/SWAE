@@ -131,11 +131,25 @@ def gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz):
     """
     mean_pz = tf.expand_dims(mean_pz, axis=0)
     sigma_pz = tf.expand_dims(sigma_pz, axis=0)
-    cov_ratio = sigma_qz / sigma_pz
-    mean_sqr_dist = tf.square(mean_qz - mean_pz)
-    kl = cov_ratio + mean_sqr_dist/sigma_pz - tf.math.log(cov_ratio) - 1.
-
-    return 0.5 * tf.reduce_sum(kl, axis=-1)
+    if len(sigma_pz.shape)==3:
+        # diagonal cov
+        cov_ratio = sigma_qz / sigma_pz
+        mean_sqr_dist = tf.square(mean_qz - mean_pz)
+        kl = cov_ratio + mean_sqr_dist/sigma_pz - tf.math.log(cov_ratio) - 1.
+        return 0.5 * tf.reduce_sum(kl, axis=-1)
+    else:
+        # full cov
+        sigma_qz = tf.matrix_diag(sigma_qz)
+        zdim = sigma_pz.shape[-1]
+        sigma_pz_invert = tf.linalg.inv(sigma_pz)
+        mean_diff = tf.expand_dims(mean_qz - mean_pz,axis=-1)
+        mean_square_dist = tf.linalg.matmul(sigma_pz_invert,mean_diff)
+        mean_square_dist = tf.linalg.matmul(tf.transpose(mean_diff,perm=(0,1,3,2)),
+                                    mean_square_dist)
+        log_det = tf.linalg.logdet(sigma_pz) - tf.linalg.logdet(sigma_qz)
+        kl = tf.linalg.trace(tf.linalg.matmul(sigma_pz_invert,sigma_qz)) + \
+                mean_square_dist + log_det - zdim
+        return 0.5 * kl
 
 def cat_kl(prob0, prob1):
     """
@@ -260,7 +274,10 @@ def moments_loss(sample_qz, pz_mean, pz_sigma):
     mean_loss = tf.reduce_sum(tf.square(mean_qz - mean_pz),axis=[0,-1]) #[K,]
     hat_qz = tf.expand_dims(sample_qz-mean_qz, axis=-1) #[batch,K,zdim,1]
     cov_qz = tf.reduce_mean(tf.linalg.matmul(hat_qz,hat_qz,transpose_b=True),axis=0) #[K,zdim,zdim]
-    cov_pz = tf.expand_dims(tf.linalg.diag(pz_sigma),axis=0)#[K,zdim,zdim]
+    if len(pz_sigma.shape)==2:
+        cov_pz = tf.expand_dims(tf.linalg.diag(pz_sigma),axis=0)#[K,zdim,zdim]
+    else:
+        cov_pz = pz_sigma
     cov_loss = tf.reduce_sum(tf.square(cov_qz-cov_pz),axis=[-2,-1]) #[K,]
     loss = mean_loss + cov_loss
 

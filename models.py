@@ -33,8 +33,8 @@ class Model(object):
         enc_cat_logits, enc_gauss_mean, enc_gauss_Sigma = encoder(
                                         self.opts,
                                         input=inputs,
-                                        cat_output_dim = self.opts['nmixtures'],
-                                        gaus_output_dim=2*self.opts['nmixtures']*self.opts['zdim'],
+                                        cat_output_dim=self.opts['nmixtures'],
+                                        gaus_output_dim=2*self.opts['zdim'],
                                         scope='encoder',
                                         reuse=reuse,
                                         is_training=is_training)

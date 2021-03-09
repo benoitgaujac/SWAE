@@ -34,6 +34,8 @@ parser.add_argument("--model", default='WAE',
                     help='model to train [WAE/BetaVAE/...]')
 parser.add_argument("--zdim", type=int,
                     help='latent dim')
+parser.add_argument("--full_cov_mat", action='store_true', default=False,
+                    help='using full latent covariance matrix')
 parser.add_argument("--cost", default='l2sq',
                     help='wae ground cost [l2/l2sq/l1]')
 parser.add_argument("--id", type=int,
@@ -54,7 +56,7 @@ parser.add_argument('--use_trained', action='store_true', default=False,
 parser.add_argument('--weights_file', help='weights from trained model')
 parser.add_argument('--pretrain_encoder', action='store_true', default=False,
                     help='pretrain encoder net.')
-parser.add_argument('--pretrain_empirical', action='store_false', default=True,
+parser.add_argument('--pretrain_empirical', action='store_true', default=False,
                     help='use empirical prior moments for pretraining')
 
 FLAGS = parser.parse_args()
@@ -78,6 +80,7 @@ def main():
     opts['model'] = FLAGS.model
     if FLAGS.zdim:
         opts['zdim'] = FLAGS.zdim
+    opts['full_cov_matrix'] = FLAGS.full_cov_mat
     opts['cost'] = FLAGS.cost
     betas = [100,250,500,750,1000,1500,2000]
     coef_id = (FLAGS.id-1) % len(betas)

@@ -15,53 +15,61 @@ def init_gaussian_prior(opts):
     Initialize the prior parameters (mu_0,sigma_0)
     for all our mixtures
     """
-    if opts['zdim']==2:
-        means = set_2d_priors(opts['nmixtures'])
+    if opts['full_cov_matrix'] and opts['zdim']==2:
+        pz_means, pz_sigma = set_2d_priors(opts['nmixtures'],opts['full_cov_matrix'])
+        pz_means = opts['pz_scale']*pz_means
+        pz_sigma *= opts['pz_scale']**2
     else:
-        if opts['zdim']+1>=opts['nmixtures']:
-            means = np.zeros([opts['nmixtures'], opts['zdim']],dtype='float32')
-            for k in range(opts['nmixtures']):
-                if k<opts['zdim']:
-                    means[k,k] = 1
-                else:
-                    means[k] = - 1. / (1. + sqrt(opts['nmixtures']+1)) \
-                                    * np.ones((opts['zdim'],),dtype='float32')
+        if opts['zdim']==2:
+            means, pz_sigma = set_2d_priors(opts['nmixtures'])
+            pz_means = opts['pz_scale']*means
+            pz_sigma *= (opts['pz_scale']*sin(pi / opts['nmixtures'])/3)**2
         else:
-            means_list = []
-            for k in range(opts['nmixtures']):
-                nearest = 0.
-                count = 0
-                while nearest<opts['prior_threshold'] and count<10:
-                    mean = np.random.uniform(low=-opts['prior_threshold'],
-                                             high=opts['prior_threshold'],
-                                             size=(opts['zdim']))
-                    nearest = get_nearest(opts,means_list,mean)
-                    count += 1
-                means_list.append(mean)
-            means = np.array(means_list)
-            eps = np.random.normal(loc=0.0, scale=.01, size=np.shape(means))
-            means = means + eps
-            #assert False, 'Too many mixtures for the latents dim.'
-    pz_means = opts['pz_scale']*means
-    pz_sigma = opts['sigma_prior']*np.ones((opts['zdim']),dtype='float32')
-    return pz_means, np.tile(np.expand_dims(pz_sigma,axis=0),(opts['nmixtures'],1))
+            if opts['zdim']+1>=opts['nmixtures']:
+                means = np.zeros([opts['nmixtures'], opts['zdim']],dtype='float32')
+                for k in range(opts['nmixtures']):
+                    if k<opts['zdim']:
+                        means[k,k] = 1
+                    else:
+                        means[k] = np.ones((opts['zdim'],),dtype='float32')
+                        means[k] *= (1. - sqrt(1.+opts['zdim'])) / opts['zdim']
+                pz_means = opts['pz_scale']*means
+                pz_sigma = np.ones((opts['nmixtures'], opts['zdim']),dtype='float32')
+                pz_sigma *= opts['pz_scale'] * sqrt(2.) / 4.
+            else:
+                assert False, 'Too many mixtures for the latents dim.'
+    return pz_means, pz_sigma
 
 
-def set_2d_priors(nmixtures):
+def set_2d_priors(nmixtures,is_full_cov=False):
     """
     Initialize prior parameters for zdim=2 and nmixtures=10
+    Return:
+    means: [nmixtures,zdim]
+    sigma: [nmixtures,zdim,zdim] if is_full_cov [nmixtures,zdim] else
     """
-    means, Sigmas = [], []
+    # means
+    means = []
     mean = np.array([1., 0.], dtype='float32')
-    # Sigma = np.diaglat([1., 0.2]).astype(np.float32)
     base_angle = 2*pi / nmixtures
     for i in range(nmixtures):
         angle = i * base_angle
         means.append(np.array([cos(angle), sin(angle)], dtype='float32'))
-        # Sigmas.append(np.matmul(rot, sigma))
     means = np.vstack(means)
-    # Sigmas = np.vstack(Sigmas)
-    return means
+    # cov matrix
+    if is_full_cov:
+        sigmas = []
+        sigma = np.array([[1./3.**2,0], [0,(sin(pi / nmixtures)/3.)**2]], dtype='float32')
+        for i in range(nmixtures):
+            rot = np.array([[cos(i * base_angle), -sin(i * base_angle)],
+                    [sin(i * base_angle), cos(i * base_angle)]], dtype='float32')
+            sigmas.append(np.matmul(np.matmul(rot,sigma),np.transpose(rot)))# + 1e-10*np.eye(2))
+        sigmas = np.stack(sigmas)
+    else:
+        sigmas = np.ones((nmixtures, 2),dtype='float32')
+
+    return means, sigmas
+
 
 
 def get_nearest(opts,means_list,mean):
