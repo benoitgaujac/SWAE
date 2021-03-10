@@ -40,7 +40,7 @@ config['zdim'] = 2
 config['nmixtures'] = 10
 config['pz_scale'] = 1.
 config['decoder'] = 'bernoulli' #bernoulli, gauss
-config['pz_scale'] = 1.
+config['pz_scale'] = 2.
 config['full_cov_matrix'] = False
 # NN set up
 config['net_archi'] = 'mlp' #mlp. conv

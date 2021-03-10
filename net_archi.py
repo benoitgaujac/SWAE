@@ -230,7 +230,6 @@ def mnist_conv_encoder_per_mix(opts, input, cat_output_dim, gaus_output_dim, reu
     layer_x = input
     ### gaussian encoder
     gaus_outputs = []
-    gaus_output_dim = int(gaus_output_dim / opts['nmixtures'])
     for n in range(opts['nmixtures']):
         # hidden 0
         gaus_layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
@@ -240,11 +239,10 @@ def mnist_conv_encoder_per_mix(opts, input, cat_output_dim, gaus_output_dim, reu
             gaus_layer_x = Batchnorm_layers(opts, gaus_layer_x, 'gaus_{}/hid/bn'.format(n),
                                         is_training, reuse)
         gaus_layer_x = ops._ops.non_linear(gaus_layer_x,'relu')
-        # output
         gaus_output = Linear(opts, gaus_layer_x, np.prod(gaus_layer_x.get_shape().as_list()[1:]),
                                         gaus_output_dim,
                                         init=opts['mlp_init'],
-                                        scope='gaus_{}/final'.format(n))
+                                        scope='gaus_{}/hid_final'.format(n))
         gaus_outputs.append(gaus_output)
     gaus_outputs = tf.stack(gaus_outputs,axis=1)
     ### cat encoder

@@ -35,7 +35,7 @@ def init_gaussian_prior(opts):
                         means[k] *= (1. - sqrt(1.+opts['zdim'])) / opts['zdim']
                 pz_means = opts['pz_scale']*means
                 pz_sigma = np.ones((opts['nmixtures'], opts['zdim']),dtype='float32')
-                pz_sigma *= opts['pz_scale'] * sqrt(2.) / 4.
+                pz_sigma *= 2 * (opts['pz_scale'] / 6.)**2
             else:
                 assert False, 'Too many mixtures for the latents dim.'
     return pz_means, pz_sigma
