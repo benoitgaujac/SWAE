@@ -143,8 +143,8 @@ class Run(object):
         logging.error ('Loss after %d iterations: %.3f' % (it_num,pre_loss))
 
     def get_classes(self):
-        train_size = 20000
-        batch_size = 500
+        train_size = 30000
+        batch_size = 1000
         batch_num = int(train_size / batch_size)
         mean_probs = 0.
         for it_ in range(batch_num):
@@ -300,7 +300,7 @@ class Run(object):
                                     feed_dict={self.obs_points: data_vizu,
                                                self.pz_samples: fixed_noise[:npics],
                                                self.is_training: False})
-                idx = np.random.choice(np.arange(self.data.test_size), 5*npics, False)
+                idx = np.random.choice(np.arange(self.data.test_size), 10*npics, False)
                 data_enc_vizu, labels_enc_vizu = self.data.sample_observations(idx)
                 enc_vizu = self.sess.run(self.encoded,
                                     feed_dict={self.obs_points: data_enc_vizu,
