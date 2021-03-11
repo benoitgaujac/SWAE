@@ -70,7 +70,7 @@ def mlp_encoder_per_mixtures(opts, input, cat_output_dim, gaus_output_dim, reuse
     ### cat encoder
     # hidden 0
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    512, init=opts['mlp_init'],
+                                    1024, init=opts['mlp_init'],
                                     scope='cat/hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'cat/hid0/bn',
@@ -78,20 +78,20 @@ def mlp_encoder_per_mixtures(opts, input, cat_output_dim, gaus_output_dim, reuse
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    512, init=opts['mlp_init'],
+                                    1024, init=opts['mlp_init'],
                                     scope='cat/hid1/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'cat/hid1/bn',
                                     is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
-    # hidden 2
-    layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    512, init=opts['mlp_init'],
-                                    scope='cat/hid2/lin')
-    if opts['normalization']=='batchnorm':
-        layer_x = Batchnorm_layers(opts, layer_x, 'cat/hid2/bn',
-                                    is_training, reuse)
-    layer_x = ops._ops.non_linear(layer_x,'relu')
+    # # hidden 2
+    # layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
+    #                                 512, init=opts['mlp_init'],
+    #                                 scope='cat/hid2/lin')
+    # if opts['normalization']=='batchnorm':
+    #     layer_x = Batchnorm_layers(opts, layer_x, 'cat/hid2/bn',
+    #                                 is_training, reuse)
+    # layer_x = ops._ops.non_linear(layer_x,'relu')
     # cat output layer
     cat_outputs = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
                                     cat_output_dim,
