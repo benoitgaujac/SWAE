@@ -16,7 +16,7 @@ config['plot_num_pics'] = 100
 config['plot_num_cols'] = 10
 # Experiment set up
 config['train_dataset_size'] = -1
-config['batch_size'] = 100
+config['batch_size'] = 200
 config['use_trained'] = False #train from pre-trained model
 config['pretrain_encoder'] = False #pretrained the encoder parameters
 config['pretrain_empirical_pz'] = True #use empirical pz moments for encoder pretraining
