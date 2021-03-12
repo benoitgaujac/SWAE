@@ -54,7 +54,7 @@ def mlp_encoder_per_mixtures(opts, input, cat_output_dim, gaus_output_dim, reuse
     for n in range(opts['nmixtures']):
         # hidden 0
         gaus_layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                        128, init=opts['mlp_init'],
+                                        64, init=opts['mlp_init'],
                                         scope='gaus_{}/hid/lin'.format(n))
         if opts['normalization']=='batchnorm':
             gaus_layer_x = Batchnorm_layers(opts, gaus_layer_x,
@@ -104,7 +104,7 @@ def mlp_decoder(opts, input, output_dim, reuse=False, is_training=False):
     layer_x = input
     # hidden 0
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    1024, init=opts['mlp_init'],
+                                    512, init=opts['mlp_init'],
                                     scope='hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'hid0/bn',
@@ -112,7 +112,7 @@ def mlp_decoder(opts, input, output_dim, reuse=False, is_training=False):
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # hidden 1
     layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                    1024, init=opts['mlp_init'],
+                                    512, init=opts['mlp_init'],
                                     scope='hid1/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'hid1/bn',
