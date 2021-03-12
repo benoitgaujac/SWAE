@@ -54,7 +54,7 @@ def mlp_encoder_per_mixtures(opts, input, cat_output_dim, gaus_output_dim, reuse
     for n in range(opts['nmixtures']):
         # hidden 0
         gaus_layer_x = Linear(opts, layer_x, np.prod(layer_x.get_shape().as_list()[1:]),
-                                        32, init=opts['mlp_init'],
+                                        128, init=opts['mlp_init'],
                                         scope='gaus_{}/hid/lin'.format(n))
         if opts['normalization']=='batchnorm':
             gaus_layer_x = Batchnorm_layers(opts, gaus_layer_x,
