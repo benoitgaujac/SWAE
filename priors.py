@@ -16,7 +16,10 @@ def init_gaussian_prior(opts):
     for all our mixtures
     """
     if opts['full_cov_matrix'] and opts['zdim']==2:
-        pz_means, pz_sigma = set_2d_priors(opts['nmixtures'],opts['full_cov_matrix'])
+        # pz_means, pz_sigma = set_2d_priors(opts['nmixtures'], opts['full_cov_matrix'],
+        #                             x_var=1./3., y_var=sin(pi / nmixtures)/3.)
+        pz_means, pz_sigma = set_2d_priors(opts['nmixtures'], opts['full_cov_matrix'],
+                                    x_var=0.5, y_var=0.1)
         pz_means = opts['pz_scale']*pz_means
         pz_sigma *= opts['pz_scale']**2
     else:
@@ -41,7 +44,7 @@ def init_gaussian_prior(opts):
     return pz_means, pz_sigma
 
 
-def set_2d_priors(nmixtures,is_full_cov=False):
+def set_2d_priors(nmixtures, is_full_cov=False, x_var=1., y_var=1.):
     """
     Initialize prior parameters for zdim=2 and nmixtures=10
     Return:
@@ -59,6 +62,7 @@ def set_2d_priors(nmixtures,is_full_cov=False):
     # cov matrix
     if is_full_cov:
         sigmas = []
+        sigma = np.array([[x_var**2,0], [0,y_var**2]], dtype='float32')
         sigma = np.array([[1./3.**2,0], [0,(sin(pi / nmixtures)/3.)**2]], dtype='float32')
         for i in range(nmixtures):
             rot = np.array([[cos(i * base_angle), -sin(i * base_angle)],
@@ -66,7 +70,8 @@ def set_2d_priors(nmixtures,is_full_cov=False):
             sigmas.append(np.matmul(np.matmul(rot,sigma),np.transpose(rot)))# + 1e-10*np.eye(2))
         sigmas = np.stack(sigmas)
     else:
-        sigmas = np.ones((nmixtures, 2),dtype='float32')
+        assert x_var==y_var, '{} and {} must be equal for scalar prior Sig.'.format(x_var,y_var)
+        sigmas = x_var**2 * np.ones((nmixtures, 2),dtype='float32')
 
     return means, sigmas
 
