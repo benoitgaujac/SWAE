@@ -82,7 +82,7 @@ def main():
         opts['zdim'] = FLAGS.zdim
     opts['full_cov_matrix'] = FLAGS.full_cov_mat
     opts['cost'] = FLAGS.cost
-    betas = [1,5,10,25,100,250,500,750,1000,1500,2000]
+    betas = [1,10,100,250,500,750,1000,1500,2000]
     coef_id = (FLAGS.id-1) % len(betas)
     opts['beta'] = betas[coef_id]
     opts['decoder'] = FLAGS.decoder
@@ -115,8 +115,8 @@ def main():
     # Experiemnts set up
     opts['lr'] = FLAGS.lr
     opts['it_num'] = FLAGS.num_it
-    opts['print_every'] = int(opts['it_num'] / 10.)
-    opts['evaluate_every'] = int(opts['it_num'] / 10.)
+    opts['print_every'] = int(opts['it_num'] / 20.)
+    opts['evaluate_every'] = int(opts['it_num'] / 20.)
     opts['save_every'] = 10000000000
     opts['save_final'] = FLAGS.save_model
     opts['save_train_data'] = FLAGS.save_data
