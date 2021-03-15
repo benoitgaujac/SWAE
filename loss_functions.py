@@ -23,10 +23,8 @@ def MMD(opts, resp_qz, sample_qz, resp_pz, sample_pz):
     """
 
     K, zdim = sample_qz.get_shape().as_list()[1:]
-    n = utils.get_batch_size(sample_qz)
-    n = tf.cast(n, tf.int32)
-    nf = tf.cast(n, tf.float32)
-    half_size = tf.cast((n * n - n) / 2,tf.int32)
+    nf = tf.cast(utils.get_batch_size(sample_qz), tf.float32)
+    half_size = tf.cast((nf * nf - nf) / 2, tf.int32)
     # reshape resp_pz to be broadcastable along batch dim
     resp_pz = tf.expand_dims(resp_pz,axis=0) #[1,K]
     # get pairwise distances
@@ -62,9 +60,10 @@ def MMD(opts, resp_qz, sample_qz, resp_pz, sample_pz):
         res = res1 - 2. * res2
     elif opts['mmd_kernel'] == 'IMQ':
         # k(x, y) = C / (C + ||x - y||^2)
-        Cbase = 2 * zdim * opts['pz_scale']**2
+        Cbase = 2 * zdim * ((opts['x_var']+opts['x_var']) / 2.)**2
         res = 0.
-        for scale in [.1, .2, .5, 1., 2., 5., 10., 20., 50., 100.]:
+        # for scale in [.1, .2, .5, 1., 2., 5., 10., 20., 50., 100.]:
+        for scale in [.1, .2, .5, 1., 2., 5., 10.]:
             C = Cbase * scale
             # q term
             res_q = C / (C + distances_qz)

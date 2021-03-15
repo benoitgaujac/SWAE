@@ -63,7 +63,7 @@ def set_2d_priors(nmixtures, is_full_cov=False, x_var=1., y_var=1.):
     if is_full_cov:
         sigmas = []
         sigma = np.array([[x_var**2,0], [0,y_var**2]], dtype='float32')
-        sigma = np.array([[1./3.**2,0], [0,(sin(pi / nmixtures)/3.)**2]], dtype='float32')
+        # sigma = np.array([[1./3.**2,0], [0,(sin(pi / nmixtures)/3.)**2]], dtype='float32')
         for i in range(nmixtures):
             rot = np.array([[cos(i * base_angle), -sin(i * base_angle)],
                     [sin(i * base_angle), cos(i * base_angle)]], dtype='float32')

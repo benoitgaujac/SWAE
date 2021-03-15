@@ -38,9 +38,10 @@ config['mmd_kernel'] = 'IMQ' # RBF, IMQ
 # Model set up
 config['zdim'] = 2
 config['nmixtures'] = 10
-config['pz_scale'] = 1.
 config['decoder'] = 'bernoulli' #bernoulli, gauss
 config['pz_scale'] = 1.
+config['x_var'] = .5
+config['y_var'] = .1
 config['full_cov_matrix'] = False
 # NN set up
 config['net_archi'] = 'mlp' #mlp. conv
