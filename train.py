@@ -197,7 +197,7 @@ class Run(object):
         Losses, Losses_test = [], []
         KL, KL_test = [], []
         Acc, Acc_test = [], []
-        decay = 1.
+        wait, decay = 1, 1.
         # - Pre training encoder if needed
         if self.opts['pretrain_encoder']:
             self.pretrain_encoder()
