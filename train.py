@@ -339,7 +339,7 @@ class Run(object):
                     # If no significant progress was made in last 100 epochs
                     # then decrease the learning rate.
                     last_100 = int(200 * trBatch_num / self.opts['evaluate_every'])
-                    if loss < min(Losses[0][-last_100:]):
+                    if Losses[-1][1] < np.array(Losses)[1,-last_100:]:
                         wait = 0
                     else:
                         wait += 1
