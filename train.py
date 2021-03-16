@@ -198,7 +198,7 @@ class Run(object):
         Losses, Losses_test = [], []
         KL, KL_test = [], []
         Acc, Acc_test = [], []
-        decay, decay_rate, fix_decay_steps = 1., .9, 25000
+        decay = 1.
         # - Pre training encoder if needed
         if self.opts['pretrain_encoder']:
             self.pretrain_encoder()
@@ -334,10 +334,19 @@ class Run(object):
                                     exp_dir, 'res_it%07d.png' % (it))
             # - Update learning rate if necessary
             if self.opts['lr_decay']:
-                # decaying every fix_decay_steps
-                if it % fix_decay_steps == 0:
-                    decay = decay_rate ** (int(it / fix_decay_steps))
-                    logging.error('Reduction in lr: %f\n' % decay)
+                # First 200 epochs do nothing
+                if it >= 200*trBatch_num:
+                    # If no significant progress was made in last 100 epochs
+                    # then decrease the learning rate.
+                    last_100 = int(200 * trBatch_num / self.opts['evaluate_every'])
+                    if loss < min(Losses[0][-last_100:]):
+                        wait = 0
+                    else:
+                        wait += 1
+                    if wait > 100 * trBatch_num:
+                        decay *= 0.5
+                        logging.error('Reduction in lr: %f' % decay)
+                        wait = 0
             # - Logging
             if (it)%50000==0 :
                 logging.error('')

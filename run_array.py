@@ -29,6 +29,8 @@ parser.add_argument("--num_it", type=int, default=300000,
                     help='iteration number')
 parser.add_argument("--lr", type=float,
                     help='learning rate size')
+parser.add_argument("--lr_decay", action='store_true', default=False,
+                    help='learning rate decay')
 # Model setup
 parser.add_argument("--model", default='WAE',
                     help='model to train [WAE/BetaVAE/...]')
@@ -82,7 +84,7 @@ def main():
         opts['zdim'] = FLAGS.zdim
     opts['full_cov_matrix'] = FLAGS.full_cov_mat
     opts['cost'] = FLAGS.cost
-    betas = [1,10,100,250,500,750,1000,2000]
+    betas = [1,100,250,500,750,1000,1500,2000]
     coef_id = (FLAGS.id-1) % len(betas)
     opts['beta'] = betas[coef_id]
     opts['decoder'] = FLAGS.decoder
@@ -114,6 +116,7 @@ def main():
 
     # Experiemnts set up
     opts['lr'] = FLAGS.lr
+    opts['lr_decay'] = FLAGS.lr_decay
     opts['it_num'] = FLAGS.num_it
     opts['print_every'] = int(opts['it_num'] / 20.)
     opts['evaluate_every'] = int(opts['it_num'] / 20.)
