@@ -7,8 +7,6 @@ import tensorflow as tf
 
 import pdb
 
-cat_initializer = tf.random_normal_initializer(mean=0.0, stddev=.1, dtype=tf.float64)
-
 
 def init_gaussian_prior(opts):
     """
@@ -88,15 +86,6 @@ def get_nearest(opts,means_list,mean):
                 nearest = dist
     return nearest
 
-
-def init_learnable_cat_prior(opts):
-    """
-    Initialize parameters of discrete distribution
-    """
-    with tf.variable_scope('prior'):
-        logits = tf.get_variable("pi0", [opts['nmixtures']], initializer=cat_initializer)
-    mean_params = tf.nn.softmax(logits)
-    return mean_params
 
 def init_cat_prior(opts):
     """

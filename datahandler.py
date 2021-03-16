@@ -20,7 +20,6 @@ import requests
 from scipy.io import loadmat
 from sklearn.feature_extraction import image
 import struct
-from tqdm import tqdm
 from PIL import Image
 import sys
 import tarfile

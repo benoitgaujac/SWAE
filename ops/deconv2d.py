@@ -23,7 +23,7 @@ def Deconv2D(opts, input, input_dim, output_shape, filter_size=3, stride=2, scop
     if filter_size is None:
         filter_size = opts['filter_size']
 
-    with tf.variable_scope(scope or "deconv2d"):
+    with tf.compat.v1.variable_scope(scope or "deconv2d"):
         if init=='he':
             fan_in = input_dim * filter_size / stride
             fan_out = output_dim * filter_size
@@ -31,7 +31,7 @@ def Deconv2D(opts, input, input_dim, output_shape, filter_size=3, stride=2, scop
             filter_values = custom_uniform(
                 filters_stdev,
                 (filter_size, filter_size, output_dim, input_dim))
-            w = tf.get_variable(
+            w = tf.compat.v1.get_variable(
                 'filter', initializer=filter_values)
         elif init=='normilized_glorot':
             fan_in = input_dim * filter_size / stride
@@ -40,16 +40,16 @@ def Deconv2D(opts, input, input_dim, output_shape, filter_size=3, stride=2, scop
             filter_values = custom_uniform(
                 filters_stdev,
                 (filter_size, filter_size, output_dim, input_dim))
-            w = tf.get_variable(
+            w = tf.compat.v1.get_variable(
                 'filter', initializer=filter_values)
         elif init=='truncated_norm':
-            w = tf.get_variable(
+            w = tf.compat.v1.get_variable(
                 'filter', [filter_size, filter_size, output_dim, input_dim],
                 initializer=tf.random_normal_initializer(stddev=opts['init_std']))
         elif init=='glorot_uniform':
-            w = tf.get_variable(
+            w = tf.compat.v1.get_variable(
                 'filter', [filter_size, filter_size, output_dim, input_dim],
-                initializer=tf.glorot_uniform_initializer(seed=None, dtype=tf.float32))
+                initializer=tf.compat.v1.keras.initializers.glorot_uniform(seed=None, dtype=tf.float32))
         else:
             raise Exception('Invalid %s conv initialization!' % opts['conv_init'])
         deconv = tf.nn.conv2d_transpose(
@@ -57,7 +57,7 @@ def Deconv2D(opts, input, input_dim, output_shape, filter_size=3, stride=2, scop
             strides=[1, stride, stride, 1], padding=padding)
 
         if biases:
-            biais = tf.get_variable(
+            biais = tf.compat.v1.get_variable(
                 'b', [output_dim],
                 initializer=tf.constant_initializer(0.0))
             deconv = tf.nn.bias_add(deconv, biais)

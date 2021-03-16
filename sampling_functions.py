@@ -19,7 +19,7 @@ def sample_all_gmm(opts, means, Sigma, batch_size=100, tensor=True):
             means = tf.expand_dims(means,axis=0)
             Sigma = tf.expand_dims(covs,axis=0)
         shape = tf.shape(means)
-        eps = tf.random_normal(shape, dtype=tf.float32)
+        eps = tf.random.normal(shape, dtype=tf.float32)
         noise = means + tf.multiply(eps,tf.sqrt(1e-10+Sigma)) #[batch,K,zdim]
     else:
         if len(means.shape)<3:

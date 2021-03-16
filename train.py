@@ -21,7 +21,6 @@ class Run(object):
         logging.error('Building the Tensorflow Graph')
 
         # --- Create session
-        self.sess = tf.Session()
         self.opts = opts
         self.data = data
 
@@ -58,7 +57,7 @@ class Run(object):
                                     is_training=self.is_training,
                                     reuse=True)
         self.pi = tf.nn.softmax(cat_logits,axis=-1)
-        idx = tf.reshape(tf.multinomial(cat_logits,1,output_dtype=tf.int32),[-1]) #[batch,]
+        idx = tf.reshape(tf.compat.v1.multinomial(cat_logits,1,output_dtype=tf.int32),[-1]) #[batch,]
         batch_size = tf.cast(tf.shape(self.obs_points)[0], tf.int32)
         mix_idx = tf.stack([tf.range(batch_size,dtype=tf.int32),idx],axis=-1)
         self.encoded = tf.gather_nd(encoded, mix_idx) #[batch,zdim]
@@ -76,18 +75,18 @@ class Run(object):
         # --- Init iteratorssess, saver and load trained weights if needed, else init variables
         self.sess = tf.compat.v1.Session()
         self.train_handle, self.test_handle = self.data.init_iterator(self.sess)
-        self.saver = tf.train.Saver(max_to_keep=10)
-        self.initializer = tf.global_variables_initializer()
+        self.saver = tf.compat.v1.train.Saver(max_to_keep=10)
+        self.initializer = tf.compat.v1.global_variables_initializer()
         self.sess.graph.finalize()
 
     def add_ph(self):
-        self.lr_decay = tf.placeholder(tf.float32, name='rate_decay_ph')
-        self.is_training = tf.placeholder(tf.bool, name='is_training_ph')
-        self.beta = tf.placeholder(tf.float32, name='beta_ph')
-        self.obs_points = tf.placeholder(tf.float32,
+        self.lr_decay = tf.compat.v1.placeholder(tf.float32, name='rate_decay_ph')
+        self.is_training = tf.compat.v1.placeholder(tf.bool, name='is_training_ph')
+        self.beta = tf.compat.v1.placeholder(tf.float32, name='beta_ph')
+        self.obs_points = tf.compat.v1.placeholder(tf.float32,
                                     [None] + self.data.data_shape,
                                     name='points_ph')
-        self.pz_samples = tf.placeholder(tf.float32,
+        self.pz_samples = tf.compat.v1.placeholder(tf.float32,
                                     [None, self.opts['zdim']],
                                     name='noise_ph')
 
@@ -96,7 +95,7 @@ class Run(object):
         if self.opts['optimizer'] == 'sgd':
             return tf.train.GradientDescentOptimizer(lr)
         elif self.opts['optimizer'] == 'adam':
-            return tf.train.AdamOptimizer(lr, beta1=self.opts['adam_beta1'])
+            return tf.compat.v1.train.AdamOptimizer(lr, beta1=self.opts['adam_beta1'])
         else:
             assert False, 'Unknown optimizer.'
 
@@ -170,10 +169,10 @@ class Run(object):
             if WEIGHTS_FILE is None:
                     raise Exception("No model/weights provided")
             else:
-                if not tf.gfile.IsDirectory(self.opts['exp_dir']):
+                if not tf.io.gfile.IsDirectory(self.opts['exp_dir']):
                                     raise Exception("model doesn't exist")
                 WEIGHTS_PATH = os.path.join(self.opts['exp_dir'],'checkpoints', WEIGHTS_FILE)
-                if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+                if not tf.io.gfile.Exists(WEIGHTS_PATH+".meta"):
                                     raise Exception("weights file doesn't exist")
                 self.saver.restore(self.sess, WEIGHTS_PATH)
         else:
@@ -339,7 +338,7 @@ class Run(object):
                     # If no significant progress was made in last 100 epochs
                     # then decrease the learning rate.
                     last_100 = int(200 * trBatch_num / self.opts['evaluate_every'])
-                    if Losses[-1][1] < np.array(Losses)[1,-last_100:]:
+                    if Losses[-1][1] < np.amin(np.array(Losses)[-last_100:,1]):
                         wait = 0
                     else:
                         wait += 1
@@ -441,10 +440,10 @@ class Run(object):
         opts = self.opts
         # Load trained weights
         MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
-        if not tf.gfile.IsDirectory(MODEL_PATH):
+        if not tf.io.gfile.IsDirectory(MODEL_PATH):
             raise Exception("model doesn't exist")
         WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
-        if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+        if not tf.io.gfile.Exists(WEIGHTS_PATH+".meta"):
             raise Exception("weights file doesn't exist")
         self.saver.restore(self.sess, WEIGHTS_PATH)
         # Set up
@@ -555,10 +554,10 @@ class Run(object):
         opts = self.opts
         # Load trained weights
         MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
-        if not tf.gfile.IsDirectory(MODEL_PATH):
+        if not tf.io.gfile.IsDirectory(MODEL_PATH):
             raise Exception("model doesn't exist")
         WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
-        if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+        if not tf.io.gfile.Exists(WEIGHTS_PATH+".meta"):
             raise Exception("weights file doesn't exist")
         self.saver.restore(self.sess, WEIGHTS_PATH)
         # Set up
@@ -652,10 +651,10 @@ class Run(object):
     #     opts = self.opts
     #     # Load trained weights
     #     MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
-    #     if not tf.gfile.IsDirectory(MODEL_PATH):
+    #     if not tf.io.gfile.IsDirectory(MODEL_PATH):
     #         raise Exception("model doesn't exist")
     #     WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
-    #     if not tf.gfile.Exists(WEIGHTS_PATH+".meta"):
+    #     if not tf.io.gfile.Exists(WEIGHTS_PATH+".meta"):
     #         raise Exception("weights file doesn't exist")
     #     self.saver.restore(self.sess, WEIGHTS_PATH)
     #     # set up

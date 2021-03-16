@@ -26,7 +26,7 @@ def Conv2d(opts, input, input_dim, output_dim, filter_size, stride=1, padding='S
 
     assert len(input.get_shape().as_list()) == 4, 'Conv2d works only with 4d tensors.'
 
-    with tf.variable_scope(scope or 'conv2d'):
+    with tf.compat.v1.variable_scope(scope or 'conv2d'):
         if init=='he':
             fan_in = input_dim * filter_size**2
             fan_out = output_dim * filter_size**2 / (stride**2)
@@ -34,7 +34,7 @@ def Conv2d(opts, input, input_dim, output_dim, filter_size, stride=1, padding='S
             filter_values = custom_uniform(
                 filters_stdev,
                 (filter_size, filter_size, input_dim, output_dim))
-            w = tf.get_variable(
+            w = tf.compat.v1.get_variable(
                 'filter', initializer=filter_values)
         elif init=='normilized_glorot':
             fan_in = input_dim * filter_size**2
@@ -43,22 +43,22 @@ def Conv2d(opts, input, input_dim, output_dim, filter_size, stride=1, padding='S
             filter_values = custom_uniform(
                 filters_stdev,
                 (filter_size, filter_size, input_dim, output_dim))
-            w = tf.get_variable(
+            w = tf.compat.v1.get_variable(
                 'filter', initializer=filter_values)
         elif init=='truncated_norm':
-            w = tf.get_variable(
+            w = tf.compat.v1.get_variable(
                 'filter', [filter_size, filter_size, input_dim, output_dim],
                 initializer=tf.truncated_normal_initializer(stddev=opts['init_std']))
         elif init=='glorot_uniform':
-            w = tf.get_variable(
+            w = tf.compat.v1.get_variable(
                 'filter', [filter_size, filter_size, input_dim, output_dim],
-                initializer=tf.glorot_uniform_initializer(seed=None, dtype=tf.float32))
+                initializer=tf.compat.v1.keras.initializers.glorot_uniform(seed=None, dtype=tf.float32))
         else:
             raise Exception('Invalid %s conv initialization!' % opts['conv_init'])
         conv = tf.nn.conv2d(input, w, strides=[1, stride, stride, 1], padding=padding)
 
         if biases:
-            bias = tf.get_variable(
+            bias = tf.compat.v1.get_variable(
                 'b', [output_dim],
                 initializer=tf.constant_initializer(opts['init_bias']))
             conv = tf.nn.bias_add(conv, bias)

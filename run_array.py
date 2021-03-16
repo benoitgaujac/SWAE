@@ -128,7 +128,7 @@ def main():
     opts['pretrain_empirical_pz'] = FLAGS.pretrain_empirical
 
     #Reset tf graph
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph
 
     # Loading the dataset
     data = DataHandler(opts)
