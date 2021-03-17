@@ -147,7 +147,7 @@ def gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz):
         sigma_pz_shape = sigma_pz.shape
         K = sigma_pz_shape[1]
         zdim = tf.cast(sigma_pz_shape[-1], tf.float32)
-        eye = 1e-10*tf.eye(sigma_pz_shape[-1], num_columns=sigma_pz_shape[-1],
+        eye = 1e-10*tf.eye(num_rows=sigma_pz_shape[-1], num_columns=sigma_pz_shape[-1],
                                     batch_shape=sigma_pz_shape[:2])
         sigma_pz_invert = tf.linalg.inv(sigma_pz + eye)
         mean_diff = tf.expand_dims(mean_qz - mean_pz,axis=-1)
