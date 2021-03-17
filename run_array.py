@@ -84,8 +84,8 @@ def main():
         opts['zdim'] = FLAGS.zdim
     opts['full_cov_matrix'] = FLAGS.full_cov_mat
     opts['cost'] = FLAGS.cost
-    betas = [1,100,250,500,750,1000,1500,2000]
-    # betas = [1,5,10]
+    # betas = [1,100,250,500,750,1000,1500,2000]
+    betas = [1,5,10]
     coef_id = (FLAGS.id-1) % len(betas)
     opts['beta'] = betas[coef_id]
     opts['decoder'] = FLAGS.decoder
