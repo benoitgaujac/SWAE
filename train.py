@@ -145,16 +145,18 @@ class Run(object):
         train_size = 30000
         batch_size = 1000
         batch_num = int(train_size / batch_size)
-        mean_probs = 0.
+        mean_probs, c = 0., 0
         for it_ in range(batch_num):
             idx = np.random.choice(np.arange(self.data.train_size), batch_size, False)
             data, labels = self.data.sample_observations(idx, True)
-            pi = self.sess.run(self.pi, feed_dict={
-                                self.obs_points: data,
-                                self.is_training: False})
-            probs = get_mean_probs(self.opts, labels, pi)
-            mean_probs += probs / batch_num
-
+            if np.unique(labels).shape[0]==self.opts['nclasses']:
+                pi = self.sess.run(self.pi, feed_dict={
+                                    self.obs_points: data,
+                                    self.is_training: False})
+                probs = get_mean_probs(self.opts, labels, pi)
+                mean_probs += probs
+                c += 1
+        mean_probs /= c
         return relabelling_mask_from_probs(self.opts, mean_probs)
 
     def train(self, WEIGHTS_FILE=None):
@@ -247,27 +249,32 @@ class Run(object):
                 # training acc
                 idx = np.random.choice(np.arange(self.data.train_size), npics, False)
                 data_train, labels_train = self.data.sample_observations(idx, True)
-                while np.unique(labels_train).shape[0]<self.opts['nclasses']:
-                    # resample if needed
-                    data_train, labels_train = self.data.sample_observations(idx, True)
-                pi = self.sess.run(self.pi, feed_dict={
-                                    self.obs_points: data_train,
-                                    self.is_training: False})
-                Acc.append(accuracy(labels_train, pi, classes))
+                # while np.unique(labels_train).shape[0]<self.opts['nmixtures']:
+                #     # resample if needed
+                #     data_train, labels_train = self.data.sample_observations(idx, True)
+                if np.unique(labels_train).shape[0]==self.opts['nclasses']:
+                    pi = self.sess.run(self.pi, feed_dict={
+                                        self.obs_points: data_train,
+                                        self.is_training: False})
+                    Acc.append(accuracy(labels_train, pi, classes))
                 # testing acc
                 acc, means_pi = 0., 0.
+                c = 0
                 for it_ in range(teBatch_num):
                     idx = np.random.choice(np.arange(self.data.test_size), npics, False)
                     data_test, labels_test = self.data.sample_observations(idx)
-                    while np.unique(labels_test).shape[0]<self.opts['nmixtures']:
-                        # resample if needed
-                        data_test, labels_test = self.data.sample_observations(idx)
+                    # while np.unique(labels_test).shape[0]<self.opts['nmixtures']:
+                    #     # resample if needed
+                    #     data_test, labels_test = self.data.sample_observations(idx)
                     pi = self.sess.run(self.pi, feed_dict={
                                     self.obs_points: data_test,
                                     self.is_training: False})
-                    acc += accuracy(labels_test, pi, classes) / teBatch_num
-                    means_pi += get_mean_probs(self.opts, labels_test, pi) / teBatch_num
-                Acc_test.append(acc)
+                    if np.unique(labels_test).shape[0]==self.opts['nmixtures']:
+                        acc += accuracy(labels_test, pi, classes)
+                        c += 1
+                        means_pi += get_mean_probs(self.opts, labels_test, pi)
+                Acc_test.append(acc / c)
+                means_pi /= c
                 # - Printing various loss values
                 logging.error('')
                 debug_str = 'it: %d/%d, ' % (it, self.opts['it_num'])
@@ -382,25 +389,28 @@ class Run(object):
         KL_test.append(kl)
         idx = np.random.choice(np.arange(self.data.train_size), npics, False)
         data_train, labels_train = self.data.sample_observations(idx, True)
-        while np.unique(labels_train).shape[0]<self.opts['nmixtures']:
-            # resample if needed
-            data_train, labels_train = self.data.sample_observations(idx, True)
-        pi = self.sess.run(self.pi, feed_dict={
-                            self.obs_points: data_train,
-                            self.is_training: False})
-        Acc.append(accuracy(labels_train, pi, classes))
-        acc = 0.
+        # while np.unique(labels_train).shape[0]<self.opts['nmixtures']:
+        #     # resample if needed
+        #     data_train, labels_train = self.data.sample_observations(idx, True)
+        if np.unique(labels_train).shape[0]==self.opts['nmixtures']:
+            pi = self.sess.run(self.pi, feed_dict={
+                                self.obs_points: data_train,
+                                self.is_training: False})
+            Acc.append(accuracy(labels_train, pi, classes))
+        acc, c = 0., 0
         for it_ in range(teBatch_num):
             idx = np.random.choice(np.arange(self.data.test_size), npics, False)
             data_test, labels_test = self.data.sample_observations(idx)
-            while np.unique(labels_test).shape[0]<self.opts['nmixtures']:
-                # resample if needed
-                data_test, labels_test = self.data.sample_observations(idx)
+            # while np.unique(labels_test).shape[0]<self.opts['nmixtures']:
+            #     # resample if needed
+            #     data_test, labels_test = self.data.sample_observations(idx)
             pi = self.sess.run(self.pi, feed_dict={
                                 self.obs_points: data_test,
                                 self.is_training: False})
-            acc += accuracy(labels_test, pi, classes) / teBatch_num
-        Acc_test.append(acc)
+            if np.unique(labels_test).shape[0]==self.opts['nmixtures']:
+                acc += accuracy(labels_test, pi, classes)
+                c += 1
+        Acc_test.append(acc / c)
         logging.error('')
         debug_str = 'Training done. '
         logging.error(debug_str)

@@ -20,8 +20,8 @@ def get_mean_probs(opts,labels,probs):
     num_pics = np.shape(probs)[0]
     for k in range(opts['nclasses']):
         prob = [probs[n] for n in range(num_pics) if labels[n]==k]
-        if len(prob)==0:
-            pdb.set_trace()
+        # if len(prob)==0:
+        #     pdb.set_trace()
         # if prob==[]:
         #     prob = np.zeros(np.shape(probs)[1])
         # else:
