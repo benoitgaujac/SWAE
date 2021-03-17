@@ -8,16 +8,16 @@
 #$ -l tmem=6G
 #$ -l h_rt=12:00:00
 
-#$ -t 1-8
+#$ -t 9-11
 
-#$ -N waemnist
+#$ -N vaemnist
 
 source /share/apps/examples/source_files/python/python-3.6.4.source
 source /share/apps/examples/source_files/cuda/cuda-10.0.source
 
-# python3 run.py --data_dir ../data --out_dir mnist_test --dataset mnist --num_it 10 --lr 0.001 --model WAE --beta 200 --net_archi mlp_per_mix --save_model --zdim 2 --full_cov_mat --lr_decay
-# python3 run_array.py --data_dir ../data --dataset mnist --num_it 500000 --lr 0.001 --id $SGE_TASK_ID --save_model --pretrain_encoder --full_cov_mat --lr_decay --model VAE --out_dir mnist_mlp_zdim2_1024 --net_archi mlp_per_mix --zdim 2
-python3 run_array.py --data_dir ../data --dataset mnist --num_it 500000 --lr 0.001 --id $SGE_TASK_ID --save_model --full_cov_mat --lr_decay --model WAE --out_dir mnist_mlp_zdim2_1024_no_pretraining --net_archi mlp_per_mix --zdim 2
+# python3 run.py --data_dir ../data --out_dir mnist_test --dataset mnist --num_it 1000 --lr 0.001 --model VAE --beta 1 --net_archi mlp_per_mix --save_model --zdim 2 --full_cov_mat --lr_decay --pretrain_encoder
+python3 run_array.py --data_dir ../data --dataset mnist --num_it 500000 --lr 0.001 --id $SGE_TASK_ID --save_model --pretrain_encoder --full_cov_mat --lr_decay --model VAE --out_dir mnist_mlp_zdim2_1024 --net_archi mlp_per_mix --zdim 2
+# python3 run_array.py --data_dir ../data --dataset mnist --num_it 500000 --lr 0.001 --id $SGE_TASK_ID --save_model --full_cov_mat --lr_decay --model WAE --out_dir mnist_mlp_zdim2_1024_no_pretraining --net_archi mlp_per_mix --zdim 2
 
 # testing
 # python3 beta_array_run.py --num_it 100000 --data_dir ../../data --dataset shifted_mnist --out_dir shift_mnist_test --model WAE --lr 0.001 --net_archi mlp --orientation_num 8 --gamma 100 --lr_decay --fid --id 1 --cost wemd --zdim 2

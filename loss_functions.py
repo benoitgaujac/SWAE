@@ -119,7 +119,7 @@ def KL(opts, resp_qz, mean_qz, sigma_qz, resp_pz, mean_pz, sigma_pz):
 
     g_kl = gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz) #[batch,K]
     g_kl = tf.reduce_sum(resp_qz*g_kl, axis=-1)
-    c_kl = cat_kl(resp_qz, resp_pz) #[batch,K]
+    c_kl = cat_kl(resp_qz+1e-10, resp_pz) #[batch,K]
     c_kl = tf.reduce_sum(c_kl, axis=-1)
 
     return tf.reduce_mean(c_kl+g_kl), tf.reduce_mean(g_kl), tf.reduce_mean(c_kl)
@@ -144,18 +144,19 @@ def gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz):
         return 0.5 * tf.reduce_sum(kl, axis=-1)
     else:
         # full cov
-        sigma_qz = tf.linalg.diag(sigma_qz)
-        K = sigma_pz.shape[1]
-        zdim = tf.cast(sigma_pz.shape[-1], tf.float32)
-        sigma_pz_invert = tf.linalg.inv(sigma_pz)
+        sigma_pz_shape = sigma_pz.shape
+        K = sigma_pz_shape[1]
+        zdim = tf.cast(sigma_pz_shape[-1], tf.float32)
+        eye = 1e-10*tf.eye(sigma_pz_shape[-1],batch_shape=sigma_pz_shape[:2])
+        sigma_pz_invert = tf.linalg.inv(sigma_pz + eye)
         mean_diff = tf.expand_dims(mean_qz - mean_pz,axis=-1)
         mean_square_dist = tf.linalg.matmul(sigma_pz_invert,mean_diff)
         mean_square_dist = tf.linalg.matmul(
                                     tf.transpose(mean_diff,perm=(0,1,3,2)),
                                     mean_square_dist)
         mean_square_dist = tf.reshape(mean_square_dist,[-1,K])
-        log_det = tf.linalg.logdet(sigma_pz) - tf.linalg.logdet(sigma_qz)
-        kl = tf.linalg.trace(tf.linalg.matmul(sigma_pz_invert,sigma_qz)) + \
+        log_det = tf.linalg.logdet(sigma_pz) - tf.reduce_sum(tf.math.log(sigma_qz), axis=-1)
+        kl = tf.linalg.trace(tf.linalg.matmul(sigma_pz_invert,tf.linalg.diag(sigma_qz))) + \
                 mean_square_dist + log_det - zdim
         return 0.5 * kl
 
