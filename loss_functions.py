@@ -119,7 +119,7 @@ def KL(opts, resp_qz, mean_qz, sigma_qz, resp_pz, mean_pz, sigma_pz):
 
     g_kl = gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz) #[batch,K]
     g_kl = tf.reduce_sum(resp_qz*g_kl, axis=-1)
-    c_kl = cat_kl(resp_qz, resp_pz)
+    c_kl = cat_kl(resp_qz, resp_pz) #[batch,K]
     c_kl = tf.reduce_sum(c_kl, axis=-1)
 
     return tf.reduce_mean(c_kl+g_kl), tf.reduce_mean(g_kl), tf.reduce_mean(c_kl)
@@ -127,6 +127,12 @@ def KL(opts, resp_qz, mean_qz, sigma_qz, resp_pz, mean_pz, sigma_pz):
 def gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz):
     """
     Compute kl between gaussian components qz[:,k], pz[:,k]
+
+    mean_qz/sigma_qz: [batch,K,zdim]
+    resp_qz: [batch,K]
+    mean_pz: [K,zdim]
+    sigma_pz: [K,zdim] or [K,zdim,zdim] for full cov
+    resp_pz: [K,]
     """
     mean_pz = tf.expand_dims(mean_pz, axis=0)
     sigma_pz = tf.expand_dims(sigma_pz, axis=0)
@@ -138,13 +144,16 @@ def gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz):
         return 0.5 * tf.reduce_sum(kl, axis=-1)
     else:
         # full cov
-        sigma_qz = tf.matrix_diag(sigma_qz)
-        zdim = sigma_pz.shape[-1]
+        sigma_qz = tf.linalg.diag(sigma_qz)
+        K = sigma_pz.shape[1]
+        zdim = tf.cast(sigma_pz.shape[-1], tf.float32)
         sigma_pz_invert = tf.linalg.inv(sigma_pz)
         mean_diff = tf.expand_dims(mean_qz - mean_pz,axis=-1)
         mean_square_dist = tf.linalg.matmul(sigma_pz_invert,mean_diff)
-        mean_square_dist = tf.linalg.matmul(tf.transpose(mean_diff,perm=(0,1,3,2)),
+        mean_square_dist = tf.linalg.matmul(
+                                    tf.transpose(mean_diff,perm=(0,1,3,2)),
                                     mean_square_dist)
+        mean_square_dist = tf.reshape(mean_square_dist,[-1,K])
         log_det = tf.linalg.logdet(sigma_pz) - tf.linalg.logdet(sigma_qz)
         kl = tf.linalg.trace(tf.linalg.matmul(sigma_pz_invert,sigma_qz)) + \
                 mean_square_dist + log_det - zdim
@@ -155,10 +164,9 @@ def cat_kl(prob0, prob1):
     Compute kl between cat. distribution with probs prob0 and prob1
     """
     prob1 = tf.expand_dims(prob1, axis=0)
-    log_ratio = tf.log(prob0 / prob1)
-    kl = prob0 * log_ratio
+    log_ratio = tf.math.log(prob0 / prob1)
 
-    return tf.reduce_sum(kl, axis=-1)
+    return prob0 * log_ratio
 
 
 ### reconstructions loss ###
@@ -225,7 +233,7 @@ def gauss_cross_entropy(inputs, mean, sigma):
     mean/sigma: [batch,K,prod(imgdim)]
     """
     inputs = tf.expand_dims(tf.compat.v1.layers.flatten(inputs), axis=1)
-    loss = tf.log(pi*sigma) + tf.square(inputs-mean) / sigma
+    loss = tf.math.log(pi*sigma) + tf.square(inputs-mean) / sigma
 
     return 0.5 * tf.reduce_sum(loss, axis=-1)
 
