@@ -146,8 +146,9 @@ def gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz):
         # full cov
         sigma_pz_shape = sigma_pz.shape
         K = sigma_pz_shape[1]
-        zdim = tf.cast(sigma_pz_shape[-1], tf.float32)
-        eye = 1e-10*tf.eye(num_rows=sigma_pz_shape[-1], num_columns=sigma_pz_shape[-1],
+        zdimf = tf.cast(sigma_pz_shape[-1], tf.float32)
+        zdim = int(sigma_pz_shape[-1])
+        eye = 1e-10* tf.compat.v1.linalg.eye(num_rows=zdim, num_columns=zdim,
                                     batch_shape=sigma_pz_shape[:2])
         sigma_pz_invert = tf.linalg.inv(sigma_pz + eye)
         mean_diff = tf.expand_dims(mean_qz - mean_pz,axis=-1)
@@ -158,7 +159,7 @@ def gauss_kl(mean_qz, sigma_qz, mean_pz, sigma_pz):
         mean_square_dist = tf.reshape(mean_square_dist,[-1,K])
         log_det = tf.linalg.logdet(sigma_pz) - tf.reduce_sum(tf.math.log(sigma_qz), axis=-1)
         kl = tf.linalg.trace(tf.linalg.matmul(sigma_pz_invert,tf.linalg.diag(sigma_qz))) + \
-                mean_square_dist + log_det - zdim
+                mean_square_dist + log_det - zdimf
         return 0.5 * kl
 
 def cat_kl(prob0, prob1):
