@@ -142,9 +142,8 @@ class Run(object):
         logging.error ('Loss after %d iterations: %.3f' % (it_num,pre_loss))
 
     def get_classes(self):
-        train_size = 30000
         batch_size = 1000
-        batch_num = int(train_size / batch_size)
+        batch_num = int(self.data.train_size / batch_size)
         mean_probs, c = 0., 0
         for it_ in range(batch_num):
             idx = np.random.choice(np.arange(self.data.train_size), batch_size, False)
@@ -258,21 +257,20 @@ class Run(object):
                                         self.is_training: False})
                     Acc.append(accuracy(labels_train, pi, classes))
                 # testing acc
-                acc, means_pi = 0., 0.
-                c = 0
+                acc, c, means_pi = 0., 0, 0.
                 for it_ in range(teBatch_num):
                     idx = np.random.choice(np.arange(self.data.test_size), npics, False)
                     data_test, labels_test = self.data.sample_observations(idx)
                     # while np.unique(labels_test).shape[0]<self.opts['nmixtures']:
                     #     # resample if needed
                     #     data_test, labels_test = self.data.sample_observations(idx)
-                    pi = self.sess.run(self.pi, feed_dict={
-                                    self.obs_points: data_test,
-                                    self.is_training: False})
                     if np.unique(labels_test).shape[0]==self.opts['nmixtures']:
+                        pi = self.sess.run(self.pi, feed_dict={
+                                        self.obs_points: data_test,
+                                        self.is_training: False})
                         acc += accuracy(labels_test, pi, classes)
-                        c += 1
                         means_pi += get_mean_probs(self.opts, labels_test, pi)
+                        c += 1
                 Acc_test.append(acc / c)
                 means_pi /= c
                 # - Printing various loss values
@@ -342,14 +340,14 @@ class Run(object):
             if self.opts['lr_decay']:
                 # First 200 epochs do nothing
                 if it >= 200*trBatch_num:
-                    # If no significant progress was made in last 100 epochs
+                    # If no significant progress was made in last 50 epochs
                     # then decrease the learning rate.
-                    last_100 = int(200 * trBatch_num / self.opts['evaluate_every'])
+                    last_100 = int(100 * trBatch_num / self.opts['evaluate_every'])
                     if Losses[-1][1] < np.amin(np.array(Losses)[-last_100:,1]):
                         wait = 0
                     else:
                         wait += 1
-                    if wait > 100 * trBatch_num:
+                    if wait > 50 * trBatch_num:
                         decay *= 0.5
                         logging.error('Reduction in lr: %f' % decay)
                         wait = 0
@@ -404,10 +402,10 @@ class Run(object):
             # while np.unique(labels_test).shape[0]<self.opts['nmixtures']:
             #     # resample if needed
             #     data_test, labels_test = self.data.sample_observations(idx)
-            pi = self.sess.run(self.pi, feed_dict={
-                                self.obs_points: data_test,
-                                self.is_training: False})
             if np.unique(labels_test).shape[0]==self.opts['nmixtures']:
+                pi = self.sess.run(self.pi, feed_dict={
+                                    self.obs_points: data_test,
+                                    self.is_training: False})
                 acc += accuracy(labels_test, pi, classes)
                 c += 1
         Acc_test.append(acc / c)
