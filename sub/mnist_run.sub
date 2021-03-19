@@ -8,7 +8,7 @@
 #$ -l tmem=6G
 #$ -l h_rt=12:00:00
 
-#$ -t 1-6
+#$ -t 1-9
 
 #$ -N waemnist
 
@@ -20,7 +20,4 @@ python3 run_array.py --data_dir ../data --dataset mnist --num_it 300000 --lr 0.0
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 500000 --lr 0.001 --id $SGE_TASK_ID --save_model --full_cov_mat --lr_decay --model WAE --out_dir mnist_mlp_zdim2_1024_no_pretraining --net_archi mlp_per_mix --zdim 2
 
 # testing
-# python3 beta_array_run.py --num_it 100000 --data_dir ../../data --dataset shifted_mnist --out_dir shift_mnist_test --model WAE --lr 0.001 --net_archi mlp --orientation_num 8 --gamma 100 --lr_decay --fid --id 1 --cost wemd --zdim 2
-# python3 beta_array_run.py --num_it 100000 --data_dir ../../data --dataset rotated_mnist --out_dir rot_mnist_test --model WAE --lr 0.001 --net_archi mlp --orientation_num 8 --gamma 100 --lr_decay --fid --id 1 --cost wemd --zdim 2
-# python3 run_test.py --data_dir ../../data --dataset rotated_mnist --out_dir rot_mnist --model WAE --weights_file trained-WAE-final-100000 --net_archi mlp --cost wemd --res_dir beta_0_gamma_100.0_L_8 --mode perturbation
-# python3 run_test.py --data_dir ../../data --dataset shifted_mnist --out_dir shift_mnist --model WAE --weights_file trained-WAE-final-100000 --net_archi mlp --cost wemd --res_dir beta_10_gamma_100.0_L_8 --mode perturbation
+# python3 run_test.py --data_dir ../data --dataset mnist --out_dir mnist_mlp_zdim2_1024 --net_archi mlp_per_mix --full_cov_mat --mode plot --zdim 2 --weights_file trained-WAE-final-300000 --model WAE --res_dir res_750_2021_03_18_11_18

@@ -231,7 +231,7 @@ def save_train(opts, data_train, data_test,
     axes[2,2].set_xticklabels(digit_to_cluster)
     axes[2,2].set_yticks(np.arange(10))
     axes[2,2].set_yticklabels(np.arange(10))
-    axes[2,2].set_title('$\mathrm{\mathbb{E}}_x q_D(k\vert{X})$')
+    axes[2,2].set_title('$\mathrm{\mathbb{E}}_x q_D(k|X)$')
 
     ### Saving plots and data
     # Plot
@@ -243,122 +243,95 @@ def save_train(opts, data_train, data_test,
     plt.close()
 
 
-def save_vizu(opts, data_train, data_test,              # images
-                    label_test,                         # labels
-                    rec_train, rec_test,                # reconstructions
-                    pi,                                 # mixweights
-                    encoded,                            # encoded points
-                    samples_prior,                      # prior samples
-                    samples,                            # samples
-                    interpolation, prior_interpolation, # interpolations
-                    work_dir):                          # working directory
+def save_plot(opts, data_test, rec_test, samples, # rec, samples
+                                    encoded, labels, # enc, labels
+                                    samples_prior, means_prior,  # prior samples, samples
+                                    latent_interpolation, # interpolations
+                                    probs_train, probs_test, # mean probs
+                                    work_dir):  # working directory
 
     """ Generates and saves the following plots:
-        img1    -   train reconstruction
-        img2    -   test reconstruction
-        img3    -   samples
-        img4    -   test interpolation
-        img5    -   prior interpolation
-        img6    -   discrete latents
-        img7    -   UMAP
+        img1    -   test reconstruction
+        img2    -   samples
+        img3    -   latent interpolation
+        img4    -   embedings
+        img5    -   mean probs
     """
 
     # Create saving directory
-    plots_dir = 'vizu_plots'
+    plots_dir = 'test_plots'
     save_path = os.path.join(work_dir,plots_dir)
     utils.create_dir(save_path)
 
-    greyscale = np.shape(prior_interpolation)[-1] == 1
+    greyscale = data_test.shape[-1] == 1
     images = []
-    ### Reconstruction plots
-    for pair in [(data_train, rec_train),
-                 (data_test, rec_test)]:
-        # Arrange pics and reconstructions in a proper way
-        sample, recon = pair
-        num_pics = np.shape(sample)[0]
-        size_pics = np.shape(sample)[1]
-        num_cols = 10
-        num_to_keep = 10
-        assert len(sample) == len(recon)
-        pics = []
-        merged = np.vstack([recon, sample])
-        r_ptr = 0
-        w_ptr = 0
-        for _ in range(int(num_pics / 2)):
-            merged[w_ptr] = sample[r_ptr]
-            merged[w_ptr + 1] = recon[r_ptr]
-            r_ptr += 1
-            w_ptr += 2
-        for idx in range(num_pics):
-            if greyscale:
-                pics.append(1. - merged[idx, :, :, :])
-            else:
-                pics.append(merged[idx, :, :, :])
-        # Figuring out a layout
-        pics = np.array(pics)
-        image = np.concatenate(np.split(pics, num_cols), axis=2)
-        image = np.concatenate(image, axis=0)
-        image = image[:num_to_keep*size_pics]
-        images.append(image)
-
-    ### Points Interpolation plots
-    white_pix = 4
-    num_pics = np.shape(interpolation)[0]
-    num_cols = np.shape(interpolation)[1]
+    # - Reconstruction plots
+    # Arrange pics and reconstructions in a proper way
+    num_pics = np.shape(data_test)[0]
+    size_pics = np.shape(data_test)[1]
+    num_cols = 10
+    num_to_keep = 10
+    assert len(data_test) == len(rec_test)
+    assert len(data_test) == num_pics
     pics = []
-    for idx in range(num_pics):
-        if greyscale:
-            pic = 1. - interpolation[idx, :, :, :, :]
-            pic = np.concatenate(np.split(pic, num_cols),axis=2)
-            white = np.zeros((white_pix,)+np.shape(pic)[2:])
-            pic = np.concatenate((white,pic[0]),axis=0)
-            pics.append(pic)
-        else:
-            pic = interpolation[idx, :, :, :, :]
-            pic = np.concatenate(np.split(pic, num_cols),axis=1)
-            white = np.zeros((white_pix,)+np.shape(pic)[1:])
-            pic = np.concatenate(white,pic)
-            pics.append(pic)
-    image = np.concatenate(pics, axis=0)
-    images.append(image)
-
-    ###Prior Interpolation plots
-    white_pix = 4
-    num_pics = np.shape(prior_interpolation)[0]
-    num_cols = np.shape(prior_interpolation)[1]
-    pics = []
-    for idx in range(num_pics):
-        if greyscale:
-            pic = 1. - prior_interpolation[idx, :, :, :, :]
-            pic = np.concatenate(np.split(pic, num_cols),axis=2)
-            if opts['zdim']!=2:
-                white = np.zeros((white_pix,)+np.shape(pic)[2:])
-                pic = np.concatenate((white,pic[0]),axis=0)
-            pics.append(pic)
-        else:
-            pic = prior_interpolation[idx, :, :, :, :]
-            pic = np.concatenate(np.split(pic, num_cols),axis=1)
-            if opts['zdim']!=2:
-                white = np.zeros((white_pix,)+np.shape(pic)[1:])
-                pic = np.concatenate(white,pic)
-            pics.append(pic)
+    merged = np.vstack([rec_test, data_test])
+    r_ptr = 0
+    w_ptr = 0
+    for _ in range(int(num_pics / 2)):
+        merged[w_ptr] = data_test[r_ptr]
+        merged[w_ptr + 1] = rec_test[r_ptr]
+        r_ptr += 1
+        w_ptr += 2
     # Figuring out a layout
-    image = np.concatenate(pics, axis=0)
+    image = np.split(merged[:num_pics], num_cols)
+    image = [np.pad(img, ((0,0),(0,0),(0,1),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    image = np.concatenate(image, axis=2)
+    image = np.split(image,image.shape[0],axis=0)
+    image = [np.pad(img, ((0,0),(0,1),(0,0),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    image = np.concatenate(image, axis=1)
+    image = image[0]
+    if greyscale:
+        image = 1. - image
     images.append(image)
-
-    img1, img2, img3, img4 = images
-
-    ###Settings for pyplot fig
+    # - Sample plots
+    samples_shape = samples.shape
+    samples = samples.reshape((-1,)+samples_shape[-3:])
+    assert len(samples) == num_pics
+    # Figuring out a layout
+    image = np.split(samples, num_cols)
+    image = [np.pad(img, ((0,0),(0,0),(0,1),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    image = np.concatenate(image, axis=2)
+    image = np.split(image,image.shape[0],axis=0)
+    image = [np.pad(img, ((0,0),(0,1),(0,0),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    image = np.concatenate(image, axis=1)
+    image = image[0]
+    if greyscale:
+        image = 1. - image
+    images.append(image)
+    # - Latent space interpolation
+    num_cols = latent_interpolation.shape[0]
+    num_rows = latent_interpolation.shape[1]
+    # Figuring out a layout, latent_interpolation is shape [nsteps, nsteps, imdim]
+    image = np.split(latent_interpolation, num_cols,axis=1)
+    image = [np.pad(img, ((0,0),(0,0),(0,0),(0,1),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    image = np.concatenate(image, axis=3)
+    image = np.split(image,num_rows,axis=0)
+    image = [np.pad(img, ((0,0),(0,0),(0,1),(0,0),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    image = np.concatenate(image, axis=2)
+    image = image[0,0]
+    if greyscale:
+        image = 1. - image
+    images.append(image)
+    # - Settings for pyplot fig
+    img1, img2, img3 = images
     dpi = 100
-    for img, title, filename in zip([img1, img2, img3, img4],
-                         ['Train reconstruction',
-                         'Test reconstruction',
-                         'Points interpolation',
-                         'Priors interpolation'],
-                         ['train_recon',
-                         'test_recon',
-                         'point_inter',
-                         'prior_inter']):
+    for img, title, filename in zip([img1, img2, img3],
+                         ['Test reconstruction',
+                         'Samples',
+                         'Latent interpolation'],
+                         ['test_recon',
+                         'samples',
+                         'latent_int']):
         height_pic = img.shape[0]
         width_pic = img.shape[1]
         fig_height = height_pic / 10
@@ -382,96 +355,30 @@ def save_vizu(opts, data_train, data_test,              # images
                     dpi=dpi, format='png', box_inches='tight', pad_inches=0.0)
         plt.close()
 
-    #Set size for following plots
+    # - Set size for following plots
     height_pic= img1.shape[0]
     width_pic = img1.shape[1]
+    fig_height = 5*height_pic / float(dpi)
+    fig_width = 5*width_pic / float(dpi)
 
-    fig_height = height_pic / float(dpi)
-    fig_width = width_pic / float(dpi)
-
-    ###The mean mixtures plots
-    mean_probs = []
-    num_pics = np.shape(pi)[0]
-    for i in range(10):
-        probs = [pi[k] for k in range(num_pics) if label_test[k]==i]
-        probs = np.mean(np.stack(probs,axis=0),axis=0)
-        mean_probs.append(probs)
-    mean_probs = np.stack(mean_probs,axis=0)
-    # entropy
-    #entropies = calculate_row_entropy(mean_probs)
-    #cluster_to_digit = relabelling_mask_from_entropy(mean_probs, entropies)
-    cluster_to_digit = relabelling_mask_from_probs(opts,mean_probs)
-    digit_to_cluster = np.argsort(cluster_to_digit)
-    mean_probs = mean_probs[::-1,digit_to_cluster]
-    fig = plt.figure(figsize=(fig_width, fig_height))
-    plt.imshow(mean_probs,cmap='hot', interpolation='none', vmax=1.,vmin=0.)
-    plt.title('Average probs')
-    plt.yticks(np.arange(10),np.arange(10)[::-1])
-    plt.xticks(np.arange(10))
-    # Saving
-    filename = 'probs.png'
-    fig.savefig(utils.o_gfile((save_path, filename), 'wb'),
-                dpi=dpi, format='png', bbox_inches='tight')
-    plt.close()
-
-    ###Sample plots
-    pics = []
-    num_cols = 10
-    samples = np.transpose(samples,(1,0,2,3,4))
-    samples = samples.reshape((-1,)+np.shape(samples)[2:])
-    num_pics = np.shape(samples)[0]
-    size_pics = np.shape(samples)[1]
-    num_to_keep = 10
-    for idx in range(num_pics):
-        if greyscale:
-            pics.append(1. - samples[idx, :, :, :])
-        else:
-            pics.append(samples[idx, :, :, :])
-    # Figuring out a layout
-    pics = np.array(pics)
-    cluster_pics = np.array(np.split(pics, num_cols))[digit_to_cluster]
-    img = np.concatenate(cluster_pics.tolist(), axis=2)
-    img = np.concatenate(img, axis=0)
-    img = img[:num_to_keep*size_pics]
-    fig = plt.figure(figsize=(img.shape[1]/10, img.shape[0]/10))
-    #fig = plt.figure()
-    if greyscale:
-        image = img[:, :, 0]
-        # in Greys higher values correspond to darker colors
-        plt.imshow(image, cmap='Greys',
-                        interpolation='none', vmin=0., vmax=1.)
-    else:
-        plt.imshow(img, interpolation='none', vmin=0., vmax=1.)
-    # Removing axes, ticks, labels
-    plt.axis('off')
-    # # placing subplot
-    plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0,
-            hspace = 0, wspace = 0)
-    # Saving
-    filename = 'samples.png'
-    plt.savefig(utils.o_gfile((save_path, filename), 'wb'),
-                dpi=dpi, format='png', box_inches='tight', pad_inches=0.0)
-    plt.close()
-
-    ###UMAP visualization of the embedings
-    pdb.set_trace()
-    samples_prior_flat = samples_prior.reshape(-1,np.shape(samples_prior)[-1])
+    # - UMAP visualization of the embedings
+    samples_prior = samples_prior.reshape([-1, opts['zdim']])
+    num_pics = encoded.shape[0]
+    num_pz = samples_prior.shape[0]
     if opts['zdim']==2:
-        embedding = np.concatenate((encoded,samples_prior_flat),axis=0)
-        #embedding = np.concatenate((encoded,enc_mean,sample_prior),axis=0)
+        embedding = np.concatenate((encoded,samples_prior,means_prior),axis=0)
     else:
         embedding = umap.UMAP(n_neighbors=5,
                                 min_dist=0.3,
-                                metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],samples_prior_flat),axis=0))
-                                #metric='correlation').fit_transform(np.concatenate((encoded[:num_pics],enc_mean[:num_pics],sample_prior),axis=0))
-    fig_height = height_pic / float(dpi)
-    fig_width = width_pic / float(dpi)
+                                metric='correlation').fit_transform(np.concatenate((encoded,samples_prior,means_prior),axis=0))
     fig = plt.figure(figsize=(fig_width, fig_height))
     plt.scatter(embedding[:num_pics, 0], embedding[:num_pics, 1],
-               c=label_test[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='Vega10'))
+               c=labels[:num_pics], s=40, label='Qz test',cmap=discrete_cmap(10, base_cmap='tab10'))
     plt.colorbar()
-    plt.scatter(embedding[num_pics:, 0], embedding[num_pics:, 1],
+    plt.scatter(embedding[num_pics:num_pics+num_pz, 0], embedding[num_pics:num_pics+num_pz, 1],
                             color='navy', s=3, alpha=0.5, marker='*',label='Pz')
+    plt.scatter(embedding[num_pics+num_pz:, 0], embedding[num_pics+num_pz:, 1],
+                            color='red', s=10, alpha=0.8, marker='*',label='Pz means')
     # plt.scatter(embedding[num_pics:(2*num_pics-1), 0], embedding[num_pics:(2*num_pics-1), 1],
     #            color='aqua', s=3, alpha=0.5, marker='x',label='mean Qz test')
     # plt.scatter(embedding[2*num_pics:, 0], embedding[2*num_pics:, 1],
@@ -498,31 +405,38 @@ def save_vizu(opts, data_train, data_test,              # images
                     left='off',
                     labelleft='off')
     plt.legend(loc='upper left')
-    plt.title('UMAP latents')
+    plt.title('Latents vizualisation')
     # Saving
     filename = 'umap.png'
     fig.savefig(utils.o_gfile((save_path, filename), 'wb'),
                 dpi=dpi, format='png')
     plt.close()
 
-    ###Saving data
-    data_dir = 'vizu_data'
-    save_path = os.path.join(work_dir,data_dir)
-    utils.create_dir(save_path)
-    filename = 'final_plots'
-    np.savez(os.path.join(save_path,filename),
-                data_train=data_train,
-                data_test=data_test,
-                labels_test=label_test,
-                smples_pr=samples_prior,
-                smples=samples,
-                rec_tr=rec_train,
-                rec_te=rec_test,
-                enc=encoded,
-                points=interpolation,
-                priors=prior_interpolation,
-                pi=pi,
-                lmbda=np.array(opts['beta']))
+    # - The mean mixtures plots
+    cluster_to_digit = relabelling_mask_from_probs(opts,probs_train)
+    trdigit_to_cluster = np.argsort(cluster_to_digit)
+    trProbs = probs_train[:,trdigit_to_cluster]
+    cluster_to_digit = relabelling_mask_from_probs(opts,probs_test)
+    tedigit_to_cluster = np.argsort(cluster_to_digit)
+    teProbs = probs_test[:,tedigit_to_cluster]
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(2*fig_width, fig_height))
+    for img, (xticks, i, title) in zip([trProbs, teProbs],
+                             [(trdigit_to_cluster, 0, 'Train $\mathrm{\mathbb{E}}_x q_D(k|X)$'),
+                              (tedigit_to_cluster, 1, 'Test $\mathrm{\mathbb{E}}_x q_D(k|X)$')]):
+
+        axes[i].imshow(img, cmap='hot', interpolation='none', vmax=1.,vmin=0.)
+        # plt.text(0.47, 1., 'Test means probs',
+        #        ha="center", va="bottom", size=20, transform=ax.transAxes)
+        axes[i].set_xticks(np.arange(10))
+        axes[i].set_xticklabels(xticks)
+        axes[i].set_yticks(np.arange(10))
+        axes[i].set_yticklabels(np.arange(10))
+        axes[i].set_title(title)
+    # Saving
+    filename = 'probs.png'
+    fig.savefig(utils.o_gfile((save_path, filename), 'wb'),
+                dpi=dpi, format='png', bbox_inches='tight')
+    plt.close()
 
 def discrete_cmap(N, base_cmap=None):
     """Create an N-bin discrete colormap from the specified input map"""

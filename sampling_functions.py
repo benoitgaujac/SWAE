@@ -36,7 +36,6 @@ def sample_all_gmm(opts, means, Sigma, batch_size=100, tensor=True):
 
     return noise
 
-
 def sample_gmm(opts, means, Sigma, batch_size=100, sampling_mode='one'):
     """
     Sample prior noise according to sampling_mode
@@ -58,30 +57,24 @@ def generate_linespace(opts, n, mode, anchors):
     Genereate various latent interpolation
     """
     nanchors = np.shape(anchors)[0]
-    dim_to_interpolate = min(opts['nmixtures'],opts['zdim'])
-    if mode=='transformation':
-        assert np.shape(anchors)[1]==0, 'Zdim needs to be 2 to plot transformation'
-        ymin, xmin = np.amin(anchors,axis=0)
-        ymax, xmax = np.amax(anchors,axis=0)
-        x = np.linspace(1.1*xmin,1.1*xmax,n)
-        y = np.linspace(1.1*ymin,1.1*ymax,n)
-        linespce = np.stack(np.meshgrid(y,x)).T
-    elif mode=='points_interpolation':
+    zdim = np.shape(anchors)[-1]
+    assert zdim==opts['zdim'], 'Wrong encoded dim'
+    if mode=='points_interpolation':
         assert np.shape(anchors)[0]%2==0, 'Need an even number of anchors points'
-        axs = [[np.linspace(anchors[2*k,d],anchors[2*k+1,d],n) for d in range(dim_to_interpolate)] for k in range(int(nanchors/2))]
+        axs = [[np.linspace(anchors[2*k,d],anchors[2*k+1,d],n) for d in range(zdim)] for k in range(int(nanchors/2))]
         linespce = []
         for i in range(len(axs)):
-            crd = np.stack([np.asarray(axs[i][j]) for j in range(dim_to_interpolate)],axis=0).T
-            coord = np.zeros((crd.shape[0],opts['zdim']))
+            crd = np.stack([np.asarray(axs[i][j]) for j in range(zdim)],axis=0).T
+            coord = np.zeros((crd.shape[0],zdim))
             coord[:,:crd.shape[1]] = crd
             linespce.append(coord)
         linespace = np.asarray(linespce)
     elif mode=='priors_interpolation':
-        axs = [[np.linspace(anchors[0,d],anchors[k,d],n) for d in range(dim_to_interpolate)] for k in range(1,nanchors)]
+        axs = [[np.linspace(anchors[k,d],anchors[k+1,d],n) for d in range(zdim)] for k in range(nanchors-1)]
         linespce = []
         for i in range(len(axs)):
-            crd = np.stack([np.asarray(axs[i][j]) for j in range(dim_to_interpolate)],axis=0).T
-            coord = np.zeros((crd.shape[0],opts['zdim']))
+            crd = np.stack([np.asarray(axs[i][j]) for j in range(zdim)],axis=0).T
+            coord = np.zeros((crd.shape[0],zdim))
             coord[:,:crd.shape[1]] = crd
             linespce.append(coord)
         linespace = np.asarray(linespce)
