@@ -283,16 +283,16 @@ def mnist_conv_decoder(opts, input, output_dim, reuse=False, is_training=False):
     layer_x = input
     # Linear layers
     layer_x = Linear(opts, layer_x, np.prod(input.get_shape().as_list()[1:]),
-                                    8*8*64, scope='hid0/lin')
+                                    8*8*256, scope='hid0/lin')
     if opts['normalization']=='batchnorm':
         layer_x = Batchnorm_layers(opts, layer_x, 'hid0/bn',
                                     is_training, reuse)
     layer_x = ops._ops.non_linear(layer_x,'relu')
-    layer_x = tf.reshape(layer_x, [-1, 8, 8, 64])
+    layer_x = tf.reshape(layer_x, [-1, 8, 8, 256])
     # hidden 1
     _out_shape = [batch_size, 2*layer_x.get_shape().as_list()[1],
                                     2*layer_x.get_shape().as_list()[2],
-                                    32]
+                                    128]
     layer_x = Deconv2D(opts, layer_x, layer_x.get_shape().as_list()[-1],
                                     output_shape=_out_shape, filter_size=4,
                                     stride=2, scope='hid1/deconv',
@@ -304,7 +304,7 @@ def mnist_conv_decoder(opts, input, output_dim, reuse=False, is_training=False):
     # hidden 2
     _out_shape = [batch_size, 2*layer_x.get_shape().as_list()[1],
                                     2*layer_x.get_shape().as_list()[2],
-                                    16]
+                                    64]
     layer_x = Deconv2D(opts, layer_x, layer_x.get_shape().as_list()[-1],
                                     output_shape=_out_shape, filter_size=4,
                                     stride=2, scope='hid2/deconv',
@@ -422,6 +422,7 @@ net_archi = {'mnist': {'mlp': {'encoder': mlp_encoder, 'decoder': mlp_decoder},
                     'mlp_per_mix': {'encoder': mlp_encoder_per_mixtures, 'decoder': mlp_decoder},
                     'conv':{'encoder': mnist_conv_encoder, 'decoder': mlp_decoder},
                     'conv_per_mix':{'encoder': mnist_conv_encoder_per_mix, 'decoder': mlp_decoder}},
+                    'conv_per_mix_conv_dec':{'encoder': mnist_conv_encoder_per_mix, 'decoder': mnist_conv_decoder}},
             'svhn': {'mlp': {'encoder': mlp_encoder, 'decoder': mlp_decoder},
                     'conv': {'encoder': svhn_conv_encoder, 'decoder': svhn_conv_decoder}}
             }
