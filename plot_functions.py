@@ -312,10 +312,10 @@ def save_plot(opts, data_test, rec_test, samples, # rec, samples
     num_cols = latent_interpolation.shape[0]
     num_rows = latent_interpolation.shape[1]
     # Figuring out a layout, latent_interpolation is shape [nsteps, nsteps, imdim]
-    image = np.split(latent_interpolation, num_cols,axis=1)
+    image = np.split(latent_interpolation, num_rows,axis=1)
     image = [np.pad(img, ((0,0),(0,0),(0,0),(0,1),(0,0)), mode='constant', constant_values=1.0) for img in image]
     image = np.concatenate(image, axis=3)
-    image = np.split(image,num_rows,axis=0)
+    image = np.split(image,num_cols,axis=0)
     image = [np.pad(img, ((0,0),(0,0),(0,1),(0,0),(0,0)), mode='constant', constant_values=1.0) for img in image]
     image = np.concatenate(image, axis=2)
     image = image[0,0]

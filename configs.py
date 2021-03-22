@@ -29,7 +29,7 @@ config['lr_adv'] = 1e-08
 config['lr_decay'] = False
 config['normalization'] = 'batchnorm' #batchnorm, layernorm, none
 config['batch_norm_eps'] = 1e-05
-config['batch_norm_momentum'] = 0.99
+config['batch_norm_momentum'] = 0.9
 config['dropout_rate'] = 1.
 # Objective set up
 config['model'] = 'WAE' #WAE, BetaVAE

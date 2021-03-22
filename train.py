@@ -133,7 +133,8 @@ class Run(object):
 
     def pretrain_encoder(self):
         logging.error('\nPre training encoder...')
-        it_num = 10000
+        # it_num = 10000
+        it_num = 1000
         for _ in range(it_num):
             _, pre_loss = self.sess.run([self.pre_opt, self.pre_loss],
                                     feed_dict={self.data.handle: self.train_handle,
