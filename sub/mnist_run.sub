@@ -16,7 +16,7 @@ source /share/apps/examples/source_files/python/python-3.6.4.source
 source /share/apps/examples/source_files/cuda/cuda-10.0.source
 
 # python3 run.py --data_dir ../data --out_dir mnist_test --dataset mnist --num_it 1000 --lr 0.0001 --model WAE --beta 750 --net_archi conv_per_mix --save_model --zdim 10 --full_cov_mat --lr_decay
-python3 run_array.py --data_dir ../data --dataset mnist --num_it 40000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_conv_zdim10_conv_dec --net_archi conv_per_mix_conv_dec --model WAE --zdim 10
+python3 run_array.py --data_dir ../data --dataset mnist --num_it 40000 --lr 0.0001 --id $SGE_TASK_ID --save_model --pretrain_encoder --lr_decay --out_dir mnist_conv_zdim10_conv_dec --net_archi conv_per_mix_conv_dec --model WAE --zdim 10
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 300000 --lr 0.001 --id 1 --lr_decay --model WAE --out_dir mnist_mlp_zdim10_1024 --net_archi mlp_per_mix --zdim 10
 
 # testing
