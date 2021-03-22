@@ -249,7 +249,7 @@ def mnist_conv_encoder_per_mix(opts, input, cat_output_dim, gaus_output_dim, reu
     ### cat encoder
     # hidden 0
     layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
-                                        output_dim=64, filter_size=4,
+                                        output_dim=128, filter_size=4,
                                         stride=2, scope='hid0/conv',
                                         init=opts['conv_init'])
     if opts['normalization']=='batchnorm':
@@ -258,7 +258,7 @@ def mnist_conv_encoder_per_mix(opts, input, cat_output_dim, gaus_output_dim, reu
     layer_x = ops._ops.non_linear(layer_x,'relu')
     # hidden 1
     layer_x = Conv2d(opts, layer_x, layer_x.get_shape().as_list()[-1],
-                                        output_dim=128, filter_size=4,
+                                        output_dim=256, filter_size=4,
                                         stride=2, scope='hid1/conv',
                                         init=opts['conv_init'])
     if opts['normalization']=='batchnorm':
