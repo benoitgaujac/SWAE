@@ -70,14 +70,12 @@ def generate_linespace(opts, n, mode, anchors):
             linespce.append(coord)
         linespace = np.asarray(linespce)
     elif mode=='priors_interpolation':
-        axs = [[np.linspace(anchors[k,d],anchors[k+1,d],n) for d in range(zdim)] for k in range(nanchors-1)]
+        axs = [[np.linspace(anchors[0,d],anchors[k,d],n) for d in range(zdim)] for k in range(1,nanchors)]
         linespce = []
         for i in range(len(axs)):
-            crd = np.stack([np.asarray(axs[i][j]) for j in range(zdim)],axis=0).T
-            coord = np.zeros((crd.shape[0],zdim))
-            coord[:,:crd.shape[1]] = crd
+            coord = np.stack([np.asarray(axs[i][j]) for j in range(zdim)],axis=-1)
             linespce.append(coord)
-        linespace = np.asarray(linespce)
+        linespace = np.stack(linespce,axis=0)
     else:
         assert False, 'Unknown mode %s for vizualisation' % opts['mode']
     return linespace
