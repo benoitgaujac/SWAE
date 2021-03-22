@@ -8,16 +8,16 @@
 #$ -l tmem=6G
 #$ -l h_rt=6:00:00
 
-#$ -t 5-9
+#$ -t 1-6
 
-#$ -N waeconvmnist
+#$ -N waezdim2convmnist
 
 source /share/apps/examples/source_files/python/python-3.6.4.source
 source /share/apps/examples/source_files/cuda/cuda-10.0.source
 
 # python3 run.py --data_dir ../data --out_dir mnist_test --dataset mnist --num_it 1000 --lr 0.0001 --model WAE --beta 750 --net_archi conv_per_mix --save_model --zdim 10 --full_cov_mat --lr_decay
-python3 run_array.py --data_dir ../data --dataset mnist --num_it 40000 --lr 0.0001 --id $SGE_TASK_ID --save_model --pretrain_encoder --lr_decay --out_dir mnist_conv_zdim10_conv_dec --net_archi conv_per_mix_conv_dec --model WAE --zdim 10
+python3 run_array.py --data_dir ../data --dataset mnist --num_it 40000 --lr 0.0001 --id $SGE_TASK_ID --save_model --pretrain_encoder --lr_decay --out_dir mnist_conv_zdim2_conv_dec --net_archi conv_per_mix_conv_dec --model WAE --zdim 2
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 300000 --lr 0.001 --id 1 --lr_decay --model WAE --out_dir mnist_mlp_zdim10_1024 --net_archi mlp_per_mix --zdim 10
 
 # testing
-# python3 run_test.py --data_dir ../data --dataset mnist --out_dir mnist_mlp_zdim2_1024 --net_archi mlp_per_mix --full_cov_mat --mode plot --zdim 2 --weights_file trained-WAE-final-300000 --model WAE --res_dir res_750_2021_03_18_11_18
+# python3 run_test.py --data_dir ../data --dataset mnist --out_dir mnist_mlp_zdim10_1024 --net_archi mlp_per_mix --mode plot --zdim 10 --weights_file trained-WAE-final-300000 --model WAE --res_dir res_1500_2021_03_22_10_18
