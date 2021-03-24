@@ -119,8 +119,8 @@ def main():
     opts['lr'] = FLAGS.lr
     opts['lr_decay'] = FLAGS.lr_decay
     opts['it_num'] = FLAGS.num_it
-    opts['print_every'] = 5000 #int(opts['it_num'] / 60.)
-    opts['evaluate_every'] = 5000 #int(opts['it_num'] / 60.)
+    opts['print_every'] = int(opts['it_num'] / 10.)
+    opts['evaluate_every'] = int(opts['it_num'] / 10.)
     opts['save_every'] = 10000000000
     opts['save_final'] = FLAGS.save_model
     opts['save_train_data'] = FLAGS.save_data

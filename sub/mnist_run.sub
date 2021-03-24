@@ -6,7 +6,7 @@
 
 #$ -l gpu=True
 #$ -l tmem=6G
-#$ -l h_rt=10:00:00
+#$ -l h_rt=16:00:00
 
 #$ -t 1-7
 
@@ -16,8 +16,8 @@ source /share/apps/examples/source_files/python/python-3.6.4.source
 source /share/apps/examples/source_files/cuda/cuda-10.0.source
 
 # python3 run.py --data_dir ../data --out_dir mnist_test --dataset mnist --num_it 1000 --lr 0.0001 --model WAE --beta 750 --net_archi conv_per_mix --save_model --zdim 10 --full_cov_mat --lr_decay
-python3 run_array.py --data_dir ../data --dataset mnist --num_it 100000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_conv_zdim2_conv_dec_v2 --full_cov_mat --net_archi conv_per_mix_conv_dec  --zdim 2 --model WAE
-# python3 run_array.py --data_dir ../data --dataset mnist --num_it 100000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_conv_zdim10_conv_dec_v2 --net_archi conv_per_mix_conv_dec --zdim 10 --model WAE
+python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0002 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_conv_zdim2_conv_dec_v2 --full_cov_mat --net_archi conv_per_mix_conv_dec  --zdim 2 --model WAE
+# python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0002 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_conv_zdim10_conv_dec_v2 --net_archi conv_per_mix_conv_dec --zdim 10 --model WAE
 
 # testing
 # python3 run_test.py --data_dir ../data --dataset mnist --out_dir mnist_mlp_zdim10_1024 --net_archi mlp_per_mix --mode plot --zdim 10 --weights_file trained-WAE-final-300000 --model WAE --res_dir res_1500_2021_03_22_10_18
