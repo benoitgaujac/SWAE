@@ -519,8 +519,8 @@ net_archi = {'mnist': {'mlp': {'encoder': mlp_encoder, 'decoder': mlp_decoder},
                     'mlp_per_mix': {'encoder': mlp_encoder_per_mixtures, 'decoder': mlp_decoder},
                     'conv':{'encoder': mnist_conv_encoder, 'decoder': mlp_decoder},
                     'conv_per_mix':{'encoder': mnist_conv_encoder_per_mix, 'decoder': mlp_decoder},
-                    # 'conv_per_mix_conv_dec':{'encoder': mnist_conv_encoder_per_mix, 'decoder': mnist_conv_decoder}},
-                    'conv_per_mix_conv_dec':{'encoder': mnist_conv_encoder_per_mix_v2, 'decoder': mnist_conv_decoder}},
+                    'conv_per_mix_conv_dec':{'encoder': mnist_conv_encoder_per_mix, 'decoder': mnist_conv_decoder}},
+                    # 'conv_per_mix_conv_dec':{'encoder': mnist_conv_encoder_per_mix_v2, 'decoder': mnist_conv_decoder}},
             'svhn': {'mlp': {'encoder': mlp_encoder, 'decoder': mlp_decoder},
                     'conv': {'encoder': svhn_conv_encoder, 'decoder': svhn_conv_decoder}}
             }
