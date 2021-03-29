@@ -269,7 +269,7 @@ def save_plot(opts, data_test, rec_test, samples, # rec, samples
     # Arrange pics and reconstructions in a proper way
     num_pics = np.shape(data_test)[0]
     size_pics = np.shape(data_test)[1]
-    num_cols = 10
+    num_cols = opts['plot_num_cols']
     num_to_keep = 10
     assert len(data_test) == len(rec_test)
     assert len(data_test) == num_pics
@@ -294,16 +294,23 @@ def save_plot(opts, data_test, rec_test, samples, # rec, samples
         image = 1. - image
     images.append(image)
     # - Sample plots
-    samples_shape = samples.shape
-    samples = samples.reshape((-1,)+samples_shape[-3:])
     assert len(samples) == num_pics
     # Figuring out a layout
+    # image = np.split(samples, num_cols)
+    # image = [np.pad(img, ((0,0),(0,0),(0,1),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    # image = np.concatenate(image, axis=2)
+    # image = np.split(image,image.shape[0],axis=0)
+    # image = [np.pad(img, ((0,0),(0,1),(0,0),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    # image = np.concatenate(image, axis=1)
     image = np.split(samples, num_cols)
+    # order column by digit id
+    cluster_to_digit = relabelling_mask_from_probs(opts,probs_test)
+    tedigit_to_cluster = np.argsort(cluster_to_digit)
+    image = [np.pad(img[tedigit_to_cluster], ((0,0),(0,1),(0,0),(0,0)), mode='constant', constant_values=1.0) for img in image]
+    image = np.concatenate(image, axis=1)
+    image = np.split(image,image.shape[0],axis=0)
     image = [np.pad(img, ((0,0),(0,0),(0,1),(0,0)), mode='constant', constant_values=1.0) for img in image]
     image = np.concatenate(image, axis=2)
-    image = np.split(image,image.shape[0],axis=0)
-    image = [np.pad(img, ((0,0),(0,1),(0,0),(0,0)), mode='constant', constant_values=1.0) for img in image]
-    image = np.concatenate(image, axis=1)
     image = image[0]
     if greyscale:
         image = 1. - image
@@ -428,7 +435,8 @@ def save_plot(opts, data_test, rec_test, samples, # rec, samples
         # plt.text(0.47, 1., 'Test means probs',
         #        ha="center", va="bottom", size=20, transform=ax.transAxes)
         axes[i].set_xticks(np.arange(10))
-        axes[i].set_xticklabels(xticks)
+        # axes[i].set_xticklabels(xticks)
+        axes[i].set_xticklabels(np.arange(10))
         axes[i].set_yticks(np.arange(10))
         axes[i].set_yticklabels(np.arange(10))
         axes[i].set_title(title)

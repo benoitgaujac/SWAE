@@ -85,7 +85,7 @@ def main():
     opts['full_cov_matrix'] = FLAGS.full_cov_mat
     opts['cost'] = FLAGS.cost
     # betas = [750,1250,1750,1,2,10]
-    betas = [50, 100, 250, 500, 1000]
+    betas = [1, 50, 100, 250, 500, 1000]
     # betas = [250,350,500,650,800,1000,1500,1,2,5,10]
     coef_id = (FLAGS.id-1) % len(betas)
     opts['beta'] = betas[coef_id]

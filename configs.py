@@ -40,6 +40,7 @@ config['zdim'] = 2
 config['nmixtures'] = 10
 config['decoder'] = 'bernoulli' #bernoulli, gauss
 config['pz_scale'] = 1.
+config['pz_sigma_scale'] = 1.
 config['x_var'] = .5
 config['y_var'] = .1
 config['full_cov_matrix'] = False

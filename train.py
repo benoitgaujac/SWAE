@@ -356,6 +356,22 @@ class Run(object):
             if (it)%50000==0 :
                 logging.error('')
                 logging.error('Train it.: {}/{}'.format(it,self.opts['it_num']))
+
+            # - Save after 10 and 6000 tr steps for vae
+            if self.opts['save_final'] and self.opts['model']=='VAE':
+                if it==10 or it==6000:
+                    self.saver.save(self.sess, os.path.join(exp_dir,
+                                            'checkpoints',
+                                            'trained-{}-final'.format(self.opts['model'])),
+                                            global_step=it)
+                    data_dir = 'train_data'
+                    save_path = os.path.join(exp_dir, data_dir)
+                    utils.create_dir(save_path)
+                    name = 'res_train_{}'.format(it)
+                    np.savez(os.path.join(save_path, name),
+                            loss=np.array(Losses), loss_test=np.array(Losses_test),
+                            kl=np.array(KL), kl_test=np.array(KL_test))
+
         # - Save the final model
         if self.opts['save_final'] and it > 0:
             self.saver.save(self.sess, os.path.join(exp_dir,
@@ -589,10 +605,13 @@ class Run(object):
                                     feed_dict={self.obs_points: data_vizu,
                                                self.pz_samples: fixed_noise[:npics],
                                                self.is_training: False})
-        batch_size = 1000
+        # batch_size = 1000
+        batch_size = 100
         teBatch_num = int(self.data.test_size / batch_size)
         labels_enc_vizu, enc_vizu = [], []
-        for n in range(teBatch_num):
+        # for n in range(teBatch_num):
+        # for n in range(5):
+        for n in range(1):
             idx = np.random.choice(np.arange(self.data.test_size), batch_size, False)
             data, labels = self.data.sample_observations(idx)
             enc = self.sess.run(self.encoded, feed_dict={self.obs_points: data,

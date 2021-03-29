@@ -17,7 +17,7 @@ def init_gaussian_prior(opts):
         # pz_means, pz_sigma = set_2d_priors(opts['nmixtures'], opts['full_cov_matrix'],
         #                             x_var=1./3., y_var=sin(pi / nmixtures)/3.)
         pz_means, pz_sigma = set_2d_priors(opts['nmixtures'], opts['full_cov_matrix'],
-                                    x_var=0.5, y_var=0.1)
+                                    opts['x_var'], opts['x_var'])
         pz_means = opts['pz_scale']*pz_means
         pz_sigma *= opts['pz_scale']**2
     else:
@@ -35,7 +35,7 @@ def init_gaussian_prior(opts):
                         means[k] = np.ones((opts['zdim'],),dtype='float32')
                         means[k] *= (1. - sqrt(1.+opts['zdim'])) / opts['zdim']
                 pz_means = opts['pz_scale']*means
-                pz_sigma = np.ones((opts['nmixtures'], opts['zdim']),dtype='float32')
+                pz_sigma = opts['pz_sigma_scale']*np.ones((opts['nmixtures'], opts['zdim']),dtype='float32')
                 pz_sigma *= 2 * (opts['pz_scale'] / 6.)**2
             else:
                 assert False, 'Too many mixtures for the latents dim.'
