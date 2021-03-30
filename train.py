@@ -142,13 +142,18 @@ class Run(object):
         logging.error('Pretraining the done.')
         logging.error ('Loss after %d iterations: %.3f' % (it_num,pre_loss))
 
-    def get_classes(self):
+    def get_classes(self, held_out_size=1000, train=False):
         batch_size = 1000
-        batch_num = int(self.data.train_size / batch_size)
+        assert batch_size<=held_out_size, 'batch too big for held out dataset'
+        if train:
+            data_size = self.data.train_size-held_out_size
+        else:
+            data_size = self.data.test_size-held_out_size
+        batch_num = int(held_out_size / batch_size)
         mean_probs, c = 0., 0
         for it_ in range(batch_num):
-            idx = np.random.choice(np.arange(self.data.train_size), batch_size, False)
-            data, labels = self.data.sample_observations(idx, True)
+            idx = np.random.choice(np.arange(data_size), batch_size, False)
+            data, labels = self.data.sample_observations(idx, train)
             if np.unique(labels).shape[0]==self.opts['nclasses']:
                 pi = self.sess.run(self.pi, feed_dict={
                                     self.obs_points: data,
@@ -219,8 +224,6 @@ class Run(object):
             _ = self.sess.run(self.opt,feed_dict=feed_dict)
             ##### TESTING LOOP #####
             if it % self.opts['evaluate_every'] == 0:
-                # - Get classes for supervised eval
-                classes = self.get_classes()
                 # - Train
                 feed_dict={self.data.handle: self.train_handle,
                                     self.beta: self.opts['beta'],
@@ -231,7 +234,29 @@ class Run(object):
                                     feed_dict=feed_dict)
                 Losses.append(losses[:3])
                 KL.append(losses[3:])
+                # acc
+                held_out_size = 5000
+                batch_size = 1000
+                assert batch_size<=held_out_size, 'batch too big for held out dataset'
+                batch_num = int(held_out_size / batch_size)
+                # get classes
+                tr_classes = self.get_classes(held_out_size,True)
+                # loop over hold out
+                acc, c = 0., 0
+                for it_ in range(batch_num):
+                    idx = np.random.choice(np.arange(self.data.train_size-held_out_size,self.data.train_size),
+                                            batch_size, False)
+                    data, labels = self.data.sample_observations(idx, True)
+                    if np.unique(labels).shape[0]==self.opts['nclasses']:
+                        pi = self.sess.run(self.pi, feed_dict={
+                                            self.obs_points: data,
+                                            self.is_training: False})
+                        acc += accuracy(labels, pi, tr_classes)
+                        c += 1
+                Acc.append(acc / c)
+
                 # - Test
+                # test losses
                 loss, kl = np.zeros(3), np.zeros(2)
                 for it_ in range(teBatch_num):
                     test_feed_dict={self.data.handle: self.test_handle,
@@ -245,35 +270,30 @@ class Run(object):
                     kl += np.array(losses[3:]) / teBatch_num
                 Losses_test.append(loss)
                 KL_test.append(kl)
-                # - Accurcay
-                # training acc
-                idx = np.random.choice(np.arange(self.data.train_size), npics, False)
-                data_train, labels_train = self.data.sample_observations(idx, True)
-                # while np.unique(labels_train).shape[0]<self.opts['nmixtures']:
-                #     # resample if needed
-                #     data_train, labels_train = self.data.sample_observations(idx, True)
-                if np.unique(labels_train).shape[0]==self.opts['nclasses']:
-                    pi = self.sess.run(self.pi, feed_dict={
-                                        self.obs_points: data_train,
-                                        self.is_training: False})
-                    Acc.append(accuracy(labels_train, pi, classes))
                 # testing acc
-                acc, c, means_pi = 0., 0, 0.
-                for it_ in range(teBatch_num):
-                    idx = np.random.choice(np.arange(self.data.test_size), npics, False)
-                    data_test, labels_test = self.data.sample_observations(idx)
-                    # while np.unique(labels_test).shape[0]<self.opts['nmixtures']:
-                    #     # resample if needed
-                    #     data_test, labels_test = self.data.sample_observations(idx)
-                    if np.unique(labels_test).shape[0]==self.opts['nmixtures']:
+                held_out_size = 1000
+                batch_size = 1000
+                assert batch_size<=held_out_size, 'batch too big for held out dataset'
+                batch_num = int(held_out_size / batch_size)
+                # get classes
+                te_classes = self.get_classes(held_out_size)
+                # loop over hold out
+                acc, c = 0., 0
+                means_pi = np.zeros([self.opts['nclasses'], self.opts['nmixtures']])
+                for it_ in range(batch_num):
+                    idx = np.random.choice(np.arange(self.data.test_size-held_out_size,self.data.test_size),
+                                            batch_size, False)
+                    data, labels = self.data.sample_observations(idx)
+                    if np.unique(labels).shape[0]==self.opts['nclasses']:
                         pi = self.sess.run(self.pi, feed_dict={
-                                        self.obs_points: data_test,
-                                        self.is_training: False})
-                        acc += accuracy(labels_test, pi, classes)
-                        means_pi += get_mean_probs(self.opts, labels_test, pi)
+                                            self.obs_points: data,
+                                            self.is_training: False})
+                        acc += accuracy(labels, pi, te_classes)
+                        means_pi += get_mean_probs(self.opts, labels, pi)
                         c += 1
                 Acc_test.append(acc / c)
                 means_pi /= c
+
                 # - Printing various loss values
                 logging.error('')
                 debug_str = 'it: %d/%d, ' % (it, self.opts['it_num'])
@@ -311,6 +331,9 @@ class Run(object):
                                     feed_dict={self.obs_points: data_enc_vizu,
                                                self.is_training: False})
                 # Auto-encoding training images
+                idx = np.random.choice(np.arange(self.data.train_size),
+                                        npics, False)
+                data_train, _ = self.data.sample_observations(idx, True)
                 rec_train = self.sess.run(self.reconstructed, feed_dict={
                                     self.obs_points: data_train,
                                     self.is_training: False})
@@ -379,7 +402,7 @@ class Run(object):
                                     'trained-{}-final'.format(self.opts['model'])),
                                     global_step=it)
         # - Finale losses & scores
-        classes = self.get_classes()
+        # losses
         feed_dict={self.data.handle: self.train_handle,
                     self.beta: self.opts['beta'],
                     self.is_training: False}
@@ -402,30 +425,50 @@ class Run(object):
             kl += np.array(losses[3:]) / teBatch_num
         Losses_test.append(loss)
         KL_test.append(kl)
-        idx = np.random.choice(np.arange(self.data.train_size), npics, False)
-        data_train, labels_train = self.data.sample_observations(idx, True)
-        # while np.unique(labels_train).shape[0]<self.opts['nmixtures']:
-        #     # resample if needed
-        #     data_train, labels_train = self.data.sample_observations(idx, True)
-        if np.unique(labels_train).shape[0]==self.opts['nmixtures']:
-            pi = self.sess.run(self.pi, feed_dict={
-                                self.obs_points: data_train,
-                                self.is_training: False})
-            Acc.append(accuracy(labels_train, pi, classes))
+        # tr acc
+        held_out_size = 5000
+        batch_size = 1000
+        assert batch_size<=held_out_size, 'batch too big for held out dataset'
+        batch_num = int(held_out_size / batch_size)
+        # get classes
+        tr_classes = self.get_classes(held_out_size,True)
+        # loop over hold out
         acc, c = 0., 0
-        for it_ in range(teBatch_num):
-            idx = np.random.choice(np.arange(self.data.test_size), npics, False)
-            data_test, labels_test = self.data.sample_observations(idx)
-            # while np.unique(labels_test).shape[0]<self.opts['nmixtures']:
-            #     # resample if needed
-            #     data_test, labels_test = self.data.sample_observations(idx)
-            if np.unique(labels_test).shape[0]==self.opts['nmixtures']:
+        for it_ in range(batch_num):
+            idx = np.random.choice(np.arange(self.data.train_size-held_out_size,self.data.train_size),
+                                    batch_size, False)
+            data, labels = self.data.sample_observations(idx, True)
+            if np.unique(labels).shape[0]==self.opts['nclasses']:
                 pi = self.sess.run(self.pi, feed_dict={
-                                    self.obs_points: data_test,
+                                    self.obs_points: data,
                                     self.is_training: False})
-                acc += accuracy(labels_test, pi, classes)
+                acc += accuracy(labels, pi, tr_classes)
+                c += 1
+        Acc.append(acc / c)
+        # te acc
+        held_out_size = 1000
+        batch_size = 1000
+        assert batch_size<=held_out_size, 'batch too big for held out dataset'
+        batch_num = int(held_out_size / batch_size)
+        # get classes
+        te_classes = self.get_classes(held_out_size)
+        # loop over hold out
+        acc, c = 0., 0
+        for it_ in range(batch_num):
+            # idx = np.random.choice(np.arange(self.data.test_size),
+            #                         batch_size, False)
+            idx = np.random.choice(np.arange(self.data.test_size-held_out_size,self.data.test_size),
+                                    batch_size, False)
+            data, labels = self.data.sample_observations(idx)
+            if np.unique(labels).shape[0]==self.opts['nclasses']:
+                pi = self.sess.run(self.pi, feed_dict={
+                                    self.obs_points: data,
+                                    self.is_training: False})
+                acc += accuracy(labels, pi, te_classes)
                 c += 1
         Acc_test.append(acc / c)
+
+            # - Logging
         logging.error('')
         debug_str = 'Training done. '
         logging.error(debug_str)
@@ -458,117 +501,76 @@ class Run(object):
                     acc=np.array(Acc), acc_test=np.array(Acc_test))
 
 
-    def test(self, data, MODEL_DIR, WEIGHTS_FILE):
+    def acc(self, WEIGHTS_FILE=None):
         """
-        Test trained MoG model with chosen method
+        Get training and testing acc
         """
-        opts = self.opts
-        # Load trained weights
-        MODEL_PATH = os.path.join(opts['method'],MODEL_DIR)
-        if not tf.io.gfile.IsDirectory(MODEL_PATH):
-            raise Exception("model doesn't exist")
-        WEIGHTS_PATH = os.path.join(MODEL_PATH,'checkpoints',WEIGHTS_FILE)
-        if not tf.io.gfile.Exists(WEIGHTS_PATH+".meta"):
-            raise Exception("weights file doesn't exist")
-        self.saver.restore(self.sess, WEIGHTS_PATH)
-        # Set up
-        batch_size = 100
-        tr_batches_num = int(data.num_points / batch_size)
-        train_size = data.num_points
-        te_batches_num = int(np.shape(data.test_data)[0] / batch_size)
-        test_size = np.shape(data.test_data)[0]
-        debug_str = 'test data size: %d' % (np.shape(data.test_data)[0])
-        logging.error(debug_str)
+        # - Load trained model
+        if WEIGHTS_FILE is None:
+                raise Exception("No model/weights provided")
+        else:
+            if not tf.compat.v1.gfile.IsDirectory(self.opts['exp_dir']):
+                raise Exception("model doesn't exist")
+            WEIGHTS_PATH = os.path.join(self.opts['exp_dir'],'checkpoints', WEIGHTS_FILE)
+            if not tf.compat.v1.gfile.Exists(WEIGHTS_PATH+".meta"):
+                raise Exception("weights file doesn't exist")
+            self.saver.restore(self.sess, WEIGHTS_PATH)
 
-        ### Compute probs
-        # Iterate over batches
-        logging.error('Determining clusters ID using training..')
-        mean_probs = np.zeros((10,10))
-        for it in range(tr_batches_num):
-            # Sample batches of data points and Pz noise
-            data_ids = np.random.choice(train_size, opts['batch_size'],
-                                                replace=True)
-            batch_images = data.test_data[data_ids].astype(np.float32)
-            batch_labels = data.test_labels[data_ids].astype(np.float32)
-            pi_train = self.sess.run(self.pi, feed_dict={
-                                                self.points:batch_images,
-                                                self.is_training:False})
-            mean_prob = get_mean_probs(self.opts,batch_labels,pi_train)
-            mean_probs += mean_prob / tr_batches_num
-        # Determine clusters given mean probs
-        labelled_clusters = relabelling_mask_from_probs(opts, mean_probs)
-        logging.error('Clusters ID:')
-        print(labelled_clusters)
+        # - Train acc
+        held_out_size = 5000
+        batch_size = 1000
+        assert batch_size<=held_out_size, 'batch too big for held out dataset'
+        batch_num = int(held_out_size / batch_size)
+        # get classes
+        tr_classes = self.get_classes(held_out_size,True)
+        # loop over hold out
+        trAcc, c = 0., 0
+        for it_ in range(batch_num):
+            idx = np.random.choice(np.arange(self.data.train_size-held_out_size,self.data.train_size),
+                                    batch_size, False)
+            data, labels = self.data.sample_observations(idx, True)
+            if np.unique(labels).shape[0]==self.opts['nclasses']:
+                pi = self.sess.run(self.pi, feed_dict={
+                                    self.obs_points: data,
+                                    self.is_training: False})
+                trAcc += accuracy(labels, pi, tr_classes)
+                c += 1
+        trAcc /= c
 
-        ### Accuracy
-        logging.error('Computing losses & accuracy..')
-        # Training accuracy & loss
-        acc_tr = 0.
-        loss_rec_tr, loss_match_tr = 0., 0.
-        for it in range(tr_batches_num):
-            # Sample batches of data points and Pz noise
-            data_ids = np.random.choice(train_size, batch_size,
-                                                replace=True)
-            batch_images = data.data[data_ids].astype(np.float32)
-            batch_labels = data.labels[data_ids].astype(np.float32)
-            batch_mix_noise = sample_gmm(opts, self.pz_mean,
-                                                self.pz_cov,
-                                                batch_size,
-                                                sampling_mode='all')
-            # Accuracy & losses
-            [loss_rec, loss_match, pi] = self.sess.run([self.loss_reconstruct,
-                                                self.match_penalty,
-                                                self.pi],
-                                                feed_dict={self.points:batch_images,
-                                                           self.sample_mix_noise: batch_mix_noise,
-                                                           self.is_training:False})
-            acc = accuracy(batch_labels,pi,labelled_clusters)
-            acc_tr += acc / tr_batches_num
-            loss_rec_tr += loss_rec / tr_batches_num
-            loss_match_tr += loss_match / tr_batches_num
-        # Testing accuracy and losses
-        acc_te = 0.
-        loss_rec_te, loss_match_te = 0., 0.
-        for it in range(te_batches_num):
-            # Sample batches of data points and Pz noise
-            data_ids = np.random.choice(test_size,
-                                        batch_size,
-                                        replace=True)
-            batch_images = data.test_data[data_ids].astype(np.float32)
-            batch_labels = data.test_labels[data_ids].astype(np.float32)
-            batch_mix_noise = sample_gmm(opts, self.pz_mean,
-                                                self.pz_cov,
-                                                batch_size,
-                                                sampling_mode='all')
-            # Accuracy & losses
-            [loss_rec, loss_match, pi] = self.sess.run([self.loss_reconstruct,
-                                                self.match_penalty,
-                                                self.pi],
-                                                feed_dict={self.points:batch_images,
-                                                           self.sample_mix_noise: batch_mix_noise,
-                                                           self.is_training:False})
-            acc = accuracy(batch_labels,probs,labelled_clusters)
-            acc_te += acc / tr_batches_num
-            loss_rec_te += loss_rec / te_batches_num
-            loss_match_te += loss_match / te_batches_num
+        # - Test acc
+        held_out_size = 1000
+        batch_size = 1000
+        assert batch_size<=held_out_size, 'batch too big for held out dataset'
+        batch_num = int(held_out_size / batch_size)
+        # get classes
+        te_classes = self.get_classes(held_out_size)
+        # loop over hold out
+        teAcc, c = 0., 0
+        for it_ in range(batch_num):
+            # idx = np.random.choice(np.arange(self.data.test_size),
+            #                         batch_size, False)
+            idx = np.random.choice(np.arange(self.data.test_size-held_out_size,self.data.test_size),
+                                    batch_size, False)
+            data, labels = self.data.sample_observations(idx)
+            if np.unique(labels).shape[0]==self.opts['nclasses']:
+                pi = self.sess.run(self.pi, feed_dict={
+                                    self.obs_points: data,
+                                    self.is_training: False})
+                teAcc += accuracy(labels, pi, te_classes)
+                c += 1
+        teAcc /= c
 
-        ### Logs
-        debug_str = 'rec train: %.4f, rec test: %.4f' % (loss_rec_tr,
-                                                       loss_rec_te)
-        logging.error(debug_str)
-        debug_str = 'match train: %.4f, match test: %.4f' % (loss_match_tr,
-                                                           loss_match_te)
-        logging.error(debug_str)
-        debug_str = 'acc train: %.2f, acc test: %.2f' % (100.*acc_tr,
-                                                             100.*acc_te)
-        logging.error(debug_str)
+        # - logging
+        debug_str = 'train Acc: %.2f, te Acc: %.2f' % (100.*trAcc, 100.*teAcc)
+        print(debug_str)
 
-        ### Saving
-        filename = 'res_test'
-        res_test = np.array((loss_rec_tr, loss_rec_te,
-                            loss_match_tr, loss_match_te,
-                            acc_tr, acc_te))
-        np.save(os.path.join(MODEL_PATH,filename),res_test)
+        # - Saving
+        filename = 'accuracy'
+        data_dir = 'test_data'
+        save_path = os.path.join(self.opts['exp_dir'], data_dir)
+        utils.create_dir(save_path)
+        np.savez(os.path.join(save_path, filename),
+                tracc=np.array(trAcc), teacc=np.array(teAcc))
 
 
     def plot(self, WEIGHTS_FILE=None):
