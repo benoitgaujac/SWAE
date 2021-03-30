@@ -10,7 +10,7 @@
 
 #$ -t 6-11
 
-#$ -N wae2d
+#$ -N wae10d
 
 source /share/apps/examples/source_files/python/python-3.6.4.source
 source /share/apps/examples/source_files/cuda/cuda-10.0.source
