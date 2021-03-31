@@ -611,9 +611,9 @@ class Run(object):
         batch_size = 100
         teBatch_num = int(self.data.test_size / batch_size)
         labels_enc_vizu, enc_vizu = [], []
-        # for n in range(teBatch_num):
         # for n in range(5):
-        for n in range(1):
+        # for n in range(1):
+        for n in range(teBatch_num):
             idx = np.random.choice(np.arange(self.data.test_size), batch_size, False)
             data, labels = self.data.sample_observations(idx)
             enc = self.sess.run(self.encoded, feed_dict={self.obs_points: data,

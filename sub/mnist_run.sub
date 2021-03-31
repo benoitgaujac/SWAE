@@ -10,7 +10,7 @@
 
 #$ -t 6-11
 
-#$ -N wae10d
+#$ -N wae2d
 
 source /share/apps/examples/source_files/python/python-3.6.4.source
 source /share/apps/examples/source_files/cuda/cuda-10.0.source
@@ -21,7 +21,7 @@ source /share/apps/examples/source_files/cuda/cuda-10.0.source
 
 # array
 # 2d
-# python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim2_econv_dconv --full_cov_mat --net_archi conv_per_mix_econv_dconv --zdim 2 --model WAE
+python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim2_econv_dconv --full_cov_mat --net_archi conv_per_mix_econv_dconv --zdim 2 --model WAE
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim2_econv_v2_dconv --full_cov_mat --net_archi conv_per_mix_econv_v2_dconv --zdim 2 --model WAE
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim2_econv_dconv_v2 --full_cov_mat --net_archi conv_per_mix_econv_dconv_v2 --zdim 2 --model WAE
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim2_econv_v2_dconv_v2 --full_cov_mat --net_archi conv_per_mix_econv_v2_dconv_v2 --zdim 2 --model WAE
@@ -29,8 +29,8 @@ source /share/apps/examples/source_files/cuda/cuda-10.0.source
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim10_econv_dconv --net_archi conv_per_mix_econv_dconv --zdim 10 --model WAE
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim10_econv_v2_dconv --net_archi conv_per_mix_econv_v2_dconv --zdim 10 --model WAE
 # python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim10_econv_dconv_v2 --net_archi conv_per_mix_econv_dconv_v2 --zdim 10 --model WAE
-python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim10_econv_v2_dconv_v2 --net_archi conv_per_mix_econv_v2_dconv_v2 --zdim 10 --model WAE
+# python3 run_array.py --data_dir ../data --dataset mnist --num_it 200000 --lr 0.0001 --id $SGE_TASK_ID --pretrain_encoder --lr_decay --out_dir mnist_zdim10_econv_v2_dconv_v2 --net_archi conv_per_mix_econv_v2_dconv_v2 --zdim 10 --model WAE
 
 # testing
-# python3 run_test.py --data_dir ../data --dataset mnist --out_dir mnist_zdim2_econv_dconv --full_cov_mat --net_archi conv_per_mix_econv_dconv --mode acc --zdim 2 --weights_file trained-WAE-final-200000 --model WAE --res_dir res_1000_2021_03_24_20_20
+# python3 run_test.py --data_dir ../data --dataset mnist --out_dir mnist_zdim2_econv_dconv --full_cov_mat --net_archi conv_per_mix_econv_dconv --mode plot --zdim 2 --weights_file trained-WAE-final-200000 --model VAE --res_dir res_1_2021_03_30_16_18
 # python3 run_test.py --data_dir ../data --dataset mnist --out_dir mnist_zdim10_econv_dconv --full_cov_mat --net_archi conv_per_mix_econv_dconv --mode acc --zdim 10 --weights_file trained-WAE-final-200000 --model WAE --res_dir res_750_2021_03_25_10_50 --samples_near_modes

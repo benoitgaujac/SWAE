@@ -17,7 +17,7 @@ def init_gaussian_prior(opts):
         # pz_means, pz_sigma = set_2d_priors(opts['nmixtures'], opts['full_cov_matrix'],
         #                             x_var=1./3., y_var=sin(pi / nmixtures)/3.)
         pz_means, pz_sigma = set_2d_priors(opts['nmixtures'], opts['full_cov_matrix'],
-                                    opts['x_var'], opts['x_var'])
+                                    opts['x_var'], opts['y_var'])
         pz_means = opts['pz_scale']*pz_means
         pz_sigma *= opts['pz_scale']**2
     else:
